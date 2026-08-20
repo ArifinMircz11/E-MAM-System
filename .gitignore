@@ -132,3 +132,4 @@ pids
 *.pid
 *.seed
 *.pid.lock
+-1.env
