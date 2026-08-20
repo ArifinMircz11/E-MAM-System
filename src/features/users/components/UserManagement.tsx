@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * e-Mam System - User Management Component
  * LAYER: UI (Vertical Slice Architecture Compliant)
@@ -257,6 +257,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, onOpenSi
 
     const newUser: UserData = {
       tenantId,
+      referenceId: formReferenceId || formUid,
+      isClaimed: false,
+      isSso: false,
+      approvalStatus: 'approved',
       uid: formUid,
       id: formUid,
       permissions: [],
@@ -1285,3 +1289,4 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, onOpenSi
     </div>
   );
 };
+

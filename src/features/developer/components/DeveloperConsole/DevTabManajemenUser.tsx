@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -202,6 +202,10 @@ export const DevTabManajemenUser: React.FC = () => {
         roles: [primaryRole],
         permissions: ['*'],
         tenantId: formData.organizationId,
+        referenceId: newUid,
+        isClaimed: false,
+        isSso: false,
+        approvalStatus: 'approved',
         status: formData.status === 'active' ? 'active' : 'inactive',
         syncStatus: 'pending',
         version: 1,
@@ -320,7 +324,7 @@ export const DevTabManajemenUser: React.FC = () => {
                   <tr key={u.uid} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-800 dark:text-slate-100">{u.name}</div>
-                      <div className="text-xs font-mono text-slate-400">@{u.username} • {u.email}</div>
+                      <div className="text-xs font-mono text-slate-400">@{u.username} â€¢ {u.email}</div>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 uppercase">
@@ -394,7 +398,7 @@ export const DevTabManajemenUser: React.FC = () => {
                 onClick={() => setIsCreateModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold text-lg"
               >
-                ✕
+                âœ•
               </button>
             </div>
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
@@ -500,13 +504,13 @@ export const DevTabManajemenUser: React.FC = () => {
                   {selectedUser.accountType}
                 </span>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">{selectedUser.name}</h3>
-                <p className="text-xs font-mono text-slate-400">@{selectedUser.username} • {selectedUser.email}</p>
+                <p className="text-xs font-mono text-slate-400">@{selectedUser.username} â€¢ {selectedUser.email}</p>
               </div>
               <button
                 onClick={() => setDetailModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold"
               >
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -545,3 +549,4 @@ export const DevTabManajemenUser: React.FC = () => {
     </div>
   );
 };
+

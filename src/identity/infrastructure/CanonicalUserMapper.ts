@@ -1,4 +1,4 @@
-import { CanonicalUser } from '../domain/CanonicalUser';
+﻿import { CanonicalUser } from '../domain/CanonicalUser';
 import { validateCanonicalUser } from '../domain/CanonicalValidation';
 
 export class CanonicalUserMapperException extends Error {
@@ -9,54 +9,155 @@ export class CanonicalUserMapperException extends Error {
 }
 
 export class CanonicalUserMapper {
-  /**
-   * Strictly enforces explicit tenantId without silent fallbacks.
-   */
   static requireTenantId(tenantId?: string | null): string {
-    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '' || tenantId === 'unknown' || tenantId === 'default') {
+    if (
+      !tenantId ||
+      typeof tenantId !== 'string' ||
+      tenantId.trim() === '' ||
+      tenantId === 'unknown' ||
+      tenantId === 'default'
+    ) {
       throw new CanonicalUserMapperException(
         `Invalid or missing explicit tenantId: "${tenantId}". Fallback tenant is strictly forbidden.`
       );
     }
+
     return tenantId.trim();
   }
 
   static toCanonical(data: any): CanonicalUser {
     if (!data) {
-      throw new CanonicalUserMapperException('Cannot map null or undefined data to CanonicalUser.');
+      throw new CanonicalUserMapperException(
+        'Cannot map null or undefined data to CanonicalUser.'
+      );
     }
 
     const tenantId = this.requireTenantId(data.tenantId);
+    const uid = data.uid || data.id;
+
+    if (!uid) {
+      throw new CanonicalUserMapperException(
+        'CanonicalUser requires a stable uid.'
+      );
+    }
+
+    const role = data.role || data.peran || 'staf';
+    const roles =
+      Array.isArray(data.roles) && data.roles.length > 0
+        ? data.roles
+        : [role];
+
+    const referenceId =
+      data.referenceId ||
+      data.studentsId ||
+      data.teachersId ||
+      uid;
 
     const canonical: CanonicalUser = {
-      id: data.id || data.uid,
-      uid: data.uid || data.id,
+      id: data.id || uid,
+      uid,
+
+      tenantId,
+
+      accountType:
+        data.accountType === 'developer'
+          ? 'developer'
+          : 'madrasah',
+
+      role,
+      roles,
+
+      referenceId,
+
+      isClaimed:
+        typeof data.isClaimed === 'boolean'
+          ? data.isClaimed
+          : true,
+
+      isSso: Boolean(data.isSso),
+
+      approvalStatus:
+        data.approvalStatus === 'pending' ||
+        data.approvalStatus === 'rejected'
+          ? data.approvalStatus
+          : 'approved',
+
       email: data.email || '',
-      displayName: data.displayName || data.namaLengkap || '',
-      accountType: data.accountType || 'user',
-      role: data.role || data.peran || 'user',
-      roles: Array.isArray(data.roles) && data.roles.length > 0 ? data.roles : [data.role || data.peran || 'user'],
-      permissions: Array.isArray(data.permissions) ? data.permissions : [],
-      referenceId: data.referenceId || data.studentsId || data.teachersId || null,
+      displayName:
+        data.displayName ||
+        data.namaLengkap ||
+        data.namaTampilan ||
+        '',
+
+      photoURL: data.photoURL || null,
+      phoneNumber: data.phoneNumber,
+
+      permissions: Array.isArray(data.permissions)
+        ? data.permissions
+        : [],
+
       studentsId: data.studentsId || null,
       teachersId: data.teachersId || null,
       walasOfClass: data.walasOfClass || null,
-      tenantId,
+
       status: data.status || 'active',
       syncStatus: data.syncStatus || 'synced',
+
+      rbacVersion:
+        typeof data.rbacVersion === 'number'
+          ? data.rbacVersion
+          : 1,
+
+      securityVersion:
+        typeof data.securityVersion === 'number'
+          ? data.securityVersion
+          : 1,
+
+      scopeType: data.scopeType,
+      scopeId: data.scopeId,
+
       profile: data.profile,
       assignment: data.assignment,
       scope: data.scope,
       metadata: data.metadata,
-      version: typeof data.version === 'number' ? data.version : 1,
-      schemaVersion: typeof data.schemaVersion === 'number' ? data.schemaVersion : 1,
-      createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
-      updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+
+      isActive:
+        typeof data.isActive === 'boolean'
+          ? data.isActive
+          : data.status !== 'inactive',
+
+      version:
+        typeof data.version === 'number'
+          ? data.version
+          : 1,
+
+      schemaVersion:
+        typeof data.schemaVersion === 'number'
+          ? data.schemaVersion
+          : 2,
+
+      createdAt:
+        typeof data.createdAt === 'number'
+          ? data.createdAt
+          : Date.now(),
+
+      updatedAt:
+        typeof data.updatedAt === 'number'
+          ? data.updatedAt
+          : Date.now(),
+
       deleted: Boolean(data.deleted),
       deletedAt: data.deletedAt,
+
+      peran: data.peran,
+      idUnik: data.idUnik,
+      nisn: data.nisn,
+      nik: data.nik,
+      nip: data.nip,
     };
 
     const validation = validateCanonicalUser(canonical);
+
     if (!validation.valid) {
       throw new CanonicalUserMapperException(
         `CanonicalUser validation failed. Missing required fields: ${validation.missing.join(', ')}`

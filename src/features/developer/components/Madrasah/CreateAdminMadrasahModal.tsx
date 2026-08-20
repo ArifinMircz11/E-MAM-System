@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { userRepository } from '@/repositories/userRepository';
@@ -101,6 +101,10 @@ export const CreateAdminMadrasahModal: React.FC<CreateAdminMadrasahModalProps> =
         roles: [UserRole.ADMIN, UserRole.ADMIN_MADRASAH],
         permissions: ['*'],
         tenantId: selectedTenantId,
+        referenceId: newUid,
+        isClaimed: false,
+        isSso: false,
+        approvalStatus: 'approved',
         status: 'active',
         syncStatus: 'pending',
         version: 1,
@@ -336,3 +340,4 @@ export const CreateAdminMadrasahModal: React.FC<CreateAdminMadrasahModalProps> =
     </AnimatePresence>
   );
 };
+

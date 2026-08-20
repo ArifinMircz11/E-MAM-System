@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * e-Mam System - Integrated Madrasah Academic Manager
  * LAYER: USER & ACCOUNT MANAGEMENT SERVICE
@@ -1014,7 +1014,7 @@ export const repairUserReferenceIds = async (
         roleStr,
       );
 
-      let targetRefId: string | null = null;
+      let targetRefId: string | null = data.referenceId || data.uid || data.id || null;
       let targetStudentsId: string | null = null;
       let targetTeachersId: string | null = null;
 
@@ -1093,7 +1093,7 @@ export const repairUserReferenceIds = async (
       ) {
         await userRepository.update({
           ...data,
-          referenceId: targetRefId,
+          referenceId: targetRefId ?? data.referenceId ?? data.uid ?? data.id,
           studentsId: targetStudentsId,
           teachersId: targetTeachersId,
           updatedAt: Date.now(),
@@ -1233,3 +1233,6 @@ export const getUsersByTenant = async (tenantId: string): Promise<any[]> => {
     return [];
   }
 };
+
+
+

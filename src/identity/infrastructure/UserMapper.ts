@@ -1,4 +1,4 @@
-import { CanonicalUser } from '../domain/CanonicalUser';
+﻿import { CanonicalUser } from '../domain/CanonicalUser';
 
 /**
  * UserMapper - Maps raw data to CanonicalUser.
@@ -14,7 +14,10 @@ export class UserMapper {
       role: data.role,
       roles: data.roles || [],
       permissions: data.permissions || [],
-      referenceId: data.referenceId,
+      referenceId: data.referenceId || data.uid || data.id,
+      isClaimed: Boolean(data.isClaimed),
+      isSso: Boolean(data.isSso),
+      approvalStatus: data.approvalStatus || 'approved',
       tenantId: data.tenantId,
       status: data.status,
       profile: data.profile,
@@ -28,3 +31,7 @@ export class UserMapper {
     };
   }
 }
+
+
+
+

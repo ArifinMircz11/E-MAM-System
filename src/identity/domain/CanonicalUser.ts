@@ -1,12 +1,24 @@
-/**
- * @license
- * e-Mam System - Identity & Access Management (IAM)
- * Canonical User Schema Definition v2.0
+﻿/**
+ * Canonical User Contract
+ *
+ * SINGLE SOURCE OF TRUTH
+ * Identity → Tenant → RBAC → SecurityContext → Service → Repository → UI
  */
 
-import type { UserRole } from '@/types/roles';
+import type { UserRole, AccountType } from '@/types/roles';
 
-export type UserStatus = 'active' | 'pending' | 'inactive' | 'suspended' | 'deleted' | 'rejected' | 'aktif' | 'Nonaktif';
+export type CanonicalRole = UserRole;
+export type CanonicalSubRole = UserRole;
+
+export type UserStatus =
+  | 'active'
+  | 'pending'
+  | 'inactive'
+  | 'suspended'
+  | 'deleted'
+  | 'rejected'
+  | 'aktif'
+  | 'Nonaktif';
 
 export interface UserProfile {
   email: string;
@@ -42,72 +54,108 @@ export interface UserMetadata {
   isOfflineFallback?: boolean;
 }
 
-/**
- * CanonicalUser is the single source of truth for user identity in e-Mam System.
- * It is stored in Firestore 'users' collection and local IndexedDB 'users' table.
- */
-/**
- * Domain Authority / Single Source of Truth (SSOT).
- * Represents the identity in Firestore and Dexie.
- * 
- * ADR: This file is the authoritative source for domain entity identity.
- * All repository and service logic must refer to this interface.
- */
 export interface CanonicalUser {
-  id: string; // Primary ID (same as uid)
-  uid: string; // Firebase Auth UID
+  /** Stable application-level identity */
+  id: string;
+
+  /** Firebase Authentication UID */
+  uid: string;
+
+  /** Mandatory tenant boundary */
+  tenantId: string;
+
+  /** Organization/account scope */
+  accountType: AccountType;
+
+  /** Primary effective role */
+  role: string | UserRole;
+
+  /** Effective subordinate roles */
+  roles: (string | UserRole)[];
+
+  /**
+   * Canonical reference key.
+   * Student → students.id
+   * Teacher → teachers.id
+   * Other identity → stable identity reference derived from UID
+   */
+  referenceId: string;
+
+  /** Identity claim state */
+  isClaimed: boolean;
+
+  /** Authentication source */
+  isSso: boolean;
+
+  /** Account approval lifecycle */
+  approvalStatus: 'approved' | 'pending' | 'rejected';
+
   email: string;
   displayName: string;
   photoURL?: string | null;
-  
-  // Canonical Contract - First Class Core Identity Fields
-  accountType: string; 
-  role: string | UserRole; // Primary role string
-  roles: (string | UserRole)[]; // List of assigned roles
-  permissions: string[]; // Explicit permissions list
-  
-  // Multi-Tenant Isolation (P0 Invariant)
-  tenantId: string;
-  
-  // Links to Domain Entities (P0/P1 Invariant: referenceId === students.id or teachers.id)
-  referenceId?: string | null; // Master Entity Link (Student or Teacher ID)
-  studentsId?: string | null; // Direct link to Student ID
-  teachersId?: string | null; // Direct link to Teacher ID
-  walasOfClass?: string | null; // Link for wali kelas
-  
-  // Account Claim & SSO Contract (P0 Mandatory Fields)
-  isClaimed?: boolean; // Account claimed and bound to login identity
-  isSso?: boolean; // Authenticated via SSO / Google Provider
-  approvalStatus?: 'approved' | 'pending' | 'rejected' | string; // Account approval state
-  
-  // Status & Lifecycle
+  phoneNumber?: string;
+
+
+  /** Canonical presentation/profile data */
+  profile?: UserProfile;
+  /** Explicit RBAC permission set */
+  permissions: string[];
+
+  /** Compatibility/domain links */
+  studentsId?: string | null;
+  teachersId?: string | null;
+  walasOfClass?: string | null;
+
+  /** Account lifecycle state */
   status: UserStatus;
+
+  /** Synchronization state */
   syncStatus: 'synced' | 'pending' | 'error';
+
+  /** Security/RBAC versions */
   rbacVersion?: number;
   securityVersion?: number;
+
+  /** Security scope */
   scopeType?: string;
   scopeId?: string;
-  isActive?: boolean;
-  
-  // Extended Data
-  profile?: UserProfile;
-  assignment?: UserAssignment;
   scope?: UserScope;
+
+  /** Domain assignment */
+  assignment?: UserAssignment;
+
+  /** Operational metadata */
   metadata?: UserMetadata;
-  
-  // Versioning & Audit
+
+  isActive?: boolean;
+
+  /** Versioning */
   version: number;
   schemaVersion: number;
+
+  /** Audit timestamps */
   createdAt: number;
   updatedAt: number;
+
   deleted: boolean;
   deletedAt?: number;
 
-  // Legacy Support (Backward Compatibility)
+  /** Legacy compatibility fields */
   peran?: string;
   idUnik?: string;
   nisn?: string;
   nik?: string;
   nip?: string;
 }
+
+
+
+
+
+
+
+
+
+
+
 

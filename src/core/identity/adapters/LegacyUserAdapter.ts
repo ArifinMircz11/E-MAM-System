@@ -1,4 +1,4 @@
-import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+﻿import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { UserRole, AccountType } from '@/types/roles';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
@@ -52,6 +52,7 @@ export class LegacyUserAdapter {
         isActive: true,
         isSso: Boolean(legacyUser.isSso),
         isClaimed: Boolean(legacyUser.isClaimed),
+        approvalStatus: legacyUser.approvalStatus || 'approved',
         profile: {
           email: email || 'developer@emam.internal',
           displayName: namaTampilan,
@@ -202,4 +203,6 @@ export class LegacyUserAdapter {
     return this.convertLegacyUserToCanonicalUser(user);
   }
 }
+
+
 

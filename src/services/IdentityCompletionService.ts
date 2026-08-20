@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * e-Mam System - Identity Completion Service
  * Business logic and orchestration for Canonical User Identity Completion
@@ -7,15 +7,16 @@
 import { userRepository } from '@/repositories/userRepository';
 import { validateCanonicalUser, derivePermissionsForRole } from '@/identity/domain/CanonicalValidation';
 import type { CanonicalUser, UserAssignment, UserScope } from '@/identity/domain/CanonicalUser';
+import type { AccountType, UserRole } from '@/types/roles';
 import { useAuthStore } from '@/stores/authStore';
 import { sessionManager } from '@/core/session/sessionManager';
 import { toast } from 'sonner';
 
 export interface CompletionPayload {
   tenantId: string;
-  accountType: string;
-  role: string;
-  roles: string[];
+  accountType: AccountType;
+  role: UserRole;
+  roles: UserRole[];
   assignment?: UserAssignment;
   scope?: UserScope;
 }
@@ -87,3 +88,4 @@ export class IdentityCompletionService {
     });
   }
 }
+
