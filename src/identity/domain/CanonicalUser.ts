@@ -106,8 +106,8 @@ export interface CanonicalUser {
   // Legacy Support (Backward Compatibility)
   peran?: string;
   idUnik?: string;
-  isClaimed?: boolean;
   nisn?: string;
   nik?: string;
   nip?: string;
 }
+

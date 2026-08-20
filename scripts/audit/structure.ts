@@ -1,42 +1,63 @@
-import fs from 'fs';
-import path from 'path';
+﻿import fs from 'node:fs';
+import path from 'node:path';
 
-export function runStructureAudit() {
-  console.log('🔍 [Audit Structure] Checking Feature Folder Structure...');
-  const featuresDir = path.resolve('src/features');
-  let issues = 0;
+const FEATURES_DIR = path.resolve('src/features');
 
-  if (!fs.existsSync(featuresDir)) {
-    console.log('⚠️  src/features directory does not exist!');
-    return 1;
-  }
+const OPTIONAL_LAYERS = [
+  'components',
+  'hooks',
+  'services',
+  'types',
+  'repositories',
+];
 
-  const features = fs.readdirSync(featuresDir).filter((file) => {
-    return fs.statSync(path.join(featuresDir, file)).isDirectory();
-  });
+function getFeatureDirs(): string[] {
+  if (!fs.existsSync(FEATURES_DIR)) return [];
 
-  const mandatorySubdirs = ['components', 'hooks', 'services', 'repositories', 'types'];
-
-  features.forEach((feature) => {
-    const featurePath = path.join(featuresDir, feature);
-    mandatorySubdirs.forEach((sub) => {
-      const subPath = path.join(featurePath, sub);
-      if (!fs.existsSync(subPath)) {
-        console.log(`⚠️  [Feature: ${feature}] Missing standard layer: /${sub}`);
-        issues++;
-      }
-    });
-  });
-
-  if (issues === 0) {
-    console.log('✅ [Audit Structure] All features strictly comply with the 5 mandatory layers!');
-  } else {
-    console.log(`⚠️  [Audit Structure] Total structural recommendations: ${issues}`);
-  }
-
-  return issues;
+  return fs
+    .readdirSync(FEATURES_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
 }
 
-if (process.argv[1]?.endsWith('structure.ts')) {
-  runStructureAudit();
+function hasFiles(dir: string): boolean {
+  if (!fs.existsSync(dir)) return false;
+
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .some((entry) => entry.isFile());
+}
+
+export function runStructureAudit(): number {
+  console.log('🔍 [Audit Structure] Checking Feature Architecture...');
+
+  const features = getFeatureDirs();
+  let findings = 0;
+
+  for (const feature of features) {
+    const featurePath = path.join(FEATURES_DIR, feature);
+
+    for (const layer of OPTIONAL_LAYERS) {
+      const layerPath = path.join(featurePath, layer);
+
+      if (fs.existsSync(layerPath) && !hasFiles(layerPath)) {
+        console.log(
+          `⚠️ [Feature: ${feature}] Empty layer detected: /${layer}`,
+        );
+        findings++;
+      }
+    }
+  }
+
+  if (findings === 0) {
+    console.log(
+      '✅ [Audit Structure] No structural violations found.',
+    );
+  } else {
+    console.log(
+      `⚠️ [Audit Structure] ${findings} structural findings.`,
+    );
+  }
+
+  return findings;
 }
