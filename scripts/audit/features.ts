@@ -43,6 +43,8 @@ export function runFeaturesAudit(): number {
       const normalized = relativePath.replace(/\\/g, '/');
 
       const isAuthorizedFirestoreBoundary =
+        normalized === 'src/services/firebase.ts' ||
+        normalized === 'src/services/gateways/FirestoreGateway.ts' ||
         normalized.startsWith('src/services/sync/') ||
         normalized.startsWith('src/services/realtime/') ||
         normalized === 'src/services/SyncEngine.ts' ||
@@ -81,3 +83,4 @@ export function runFeaturesAudit(): number {
 if (process.argv[1]?.endsWith('features.ts')) {
   runFeaturesAudit();
 }
+
