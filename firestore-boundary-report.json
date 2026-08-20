@@ -1,0 +1,27 @@
+[
+    {
+        "File":  "src\\esaf\\registry\\RuleRegistry.ts",
+        "Layer":  "UNKNOWN",
+        "Priority":  "MEDIUM"
+    },
+    {
+        "File":  "src\\services\\gateways\\FirestoreGateway.ts",
+        "Layer":  "SERVICE_BYPASS",
+        "Priority":  "HIGH"
+    },
+    {
+        "File":  "src\\services\\sync\\firestoreHelpers.ts",
+        "Layer":  "SERVICE_BYPASS",
+        "Priority":  "HIGH"
+    },
+    {
+        "File":  "src\\services\\firebase.ts",
+        "Layer":  "SERVICE_BYPASS",
+        "Priority":  "HIGH"
+    },
+    {
+        "File":  "src\\tools\\architecture-audit\\rules\\firestore.rules.ts",
+        "Layer":  "UNKNOWN",
+        "Priority":  "MEDIUM"
+    }
+]
