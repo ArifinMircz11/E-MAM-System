@@ -1,0 +1,70 @@
+{
+  "tasks": [
+    {
+      "taskId": "WO-SEC-001",
+      "title": "Security Context Audit (Notifications & Profile)",
+      "priority": "P1",
+      "module": "security"
+    },
+    {
+      "taskId": "WO-PROG-001",
+      "title": "Automatic Project Progress History Implementation",
+      "priority": "P1",
+      "module": "dev-governance"
+    },
+    {
+      "taskId": "WO-QR-001",
+      "title": "QR Scanner Offline-First",
+      "priority": "P1",
+      "module": "attendance"
+    },
+    {
+      "taskId": "WO-ATT-001",
+      "title": "Attendance Engine Audit",
+      "priority": "P1",
+      "module": "attendance"
+    },
+    {
+      "taskId": "WO-USER-001",
+      "title": "User Management Audit",
+      "priority": "P1",
+      "module": "users"
+    },
+    {
+      "taskId": "WO-SYNC-001",
+      "title": "Audit SyncEngine & SyncQueue",
+      "priority": "P1",
+      "module": "sync"
+    },
+    {
+      "taskId": "WO-PTSP-001",
+      "title": "Audit PTSP & Surat Services",
+      "priority": "P2",
+      "module": "letters"
+    },
+    {
+      "taskId": "WO-POINT-001",
+      "title": "Audit Point System & Behavior Logs",
+      "priority": "P2",
+      "module": "points"
+    },
+    {
+      "taskId": "WO-DASH-001",
+      "title": "Audit Dashboard Summary Collections",
+      "priority": "P2",
+      "module": "dashboard"
+    },
+    {
+      "taskId": "WO-TEACH-001",
+      "title": "Teacher Service & Repository Audit",
+      "priority": "P2",
+      "module": "teachers"
+    },
+    {
+      "taskId": "WO-STUD-001",
+      "title": "Student Service & Repository Audit",
+      "priority": "P2",
+      "module": "students"
+    }
+  ]
+}

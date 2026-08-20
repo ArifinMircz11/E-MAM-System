@@ -1,0 +1,14 @@
+# layer-rules.yaml
+
+rules:
+  - layer: ui
+    no_direct_db: true
+    no_auth_import: true
+
+  - layer: service
+    allow_business_logic: true
+    must_use_repository: true
+
+  - layer: repository
+    must_use_dexie: true
+    no_firebase: true

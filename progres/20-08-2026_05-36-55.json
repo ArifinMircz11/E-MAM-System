@@ -1,0 +1,25 @@
+{
+  "taskId": "WO-QR-001",
+  "title": "QR Scanner Offline-First",
+  "status": "completed",
+  "result": "PASS",
+  "timestamp": "20-08-2026_05-36-55",
+  "startedAt": "2026-08-20T05:36:55.100Z",
+  "completedAt": "2026-08-20T05:36:55.101Z",
+  "files": [
+    "src/features/attendance/components/QRScanner.tsx",
+    "src/features/attendance/hooks/useAttendance.ts"
+  ],
+  "summary": "Audit & verifikasi fitur QR Scanner Offline-First di IMAM System.",
+  "changes": [
+    "Verifikasi pemindaian QR luring dengan data siswa dari Dexie local DB, dukungan manual ID untuk kartu rusak, dan pencatatan presensi ber-status offline secara seamless."
+  ],
+  "error": null,
+  "cause": null,
+  "fix": null,
+  "testing": "npm run typecheck && compile_applet",
+  "preventions": [
+    "Akses kamera dan pencatatan presensi tidak boleh memblokir UI jika perangkat sedang offline."
+  ],
+  "nextStep": "Lanjutkan ke audit task berikutnya dalam registry."
+}

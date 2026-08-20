@@ -1,0 +1,419 @@
+==============================================
+AUDIT ATTENDANCE REFERENCEID
+Timestamp: 20-08-2026_06-38-16
+==============================================
+
+### 1. Attendance schema/type
+src/features/attendance/services/attendanceService.ts:119:export const getAttendanceByStudentId = async (studentsId: string, forceRefresh = false) => {
+src/features/attendance/services/attendanceService.ts:121:    if (!studentsId) return [];
+src/features/attendance/services/attendanceService.ts:126:      if (secCtx.referenceId && secCtx.referenceId !== studentsId) {
+src/features/attendance/services/attendanceService.ts:127:        console.error(`[Security] Access Denied: Student ${secCtx.referenceId} attempted to access attendance of ${studentsId}`);
+src/features/attendance/services/attendanceService.ts:137:      const cached = await attendanceRepository.getByStudentId(tenantId, studentsId);
+src/features/attendance/services/attendanceService.ts:146:    const results = await attendanceRepository.getByStudentId(tenantId, studentsId);
+src/features/attendance/services/attendanceService.ts:156:    console.warn('getAttendanceByStudentId error:', error.message);
+src/features/attendance/services/attendanceService.ts:234:    const idUnik = student.idUnik || (student as any).studentsId;
+src/features/attendance/services/attendanceService.ts:300:            studentId: idUnik,
+src/features/attendance/services/attendanceService.ts:301:            studentsId: idUnik,
+src/features/attendance/services/attendanceService.ts:331:            studentsId: idUnik,
+src/features/attendance/services/attendanceService.ts:332:            studentId: idUnik,
+src/features/attendance/services/attendanceService.ts:365:                studentsId: idUnik,
+src/features/attendance/services/attendanceService.ts:366:                studentId: idUnik,
+src/features/attendance/services/attendanceService.ts:375:                attendanceId: attId,
+src/features/attendance/services/attendanceService.ts:379:                studentsId: idUnik,
+src/features/attendance/services/attendanceService.ts:380:                studentId: idUnik,
+src/features/attendance/services/attendanceService.ts:389:                attendanceId: attId,
+src/features/attendance/services/attendanceService.ts:419:  studentId: string,
+src/features/attendance/services/attendanceService.ts:433:    const attId = `${studentId}_${today}`;
+src/features/attendance/services/attendanceService.ts:438:      studentsId: studentId,
+src/features/attendance/services/attendanceService.ts:482:    studentsId: studentDocId,
+src/features/attendance/services/attendanceService.ts:483:    studentId: studentDocId,
+src/features/attendance/services/attendanceService.ts:506:        studentsId: studentDocId,
+src/features/attendance/services/attendanceService.ts:507:        studentId: studentDocId,
+src/features/attendance/components/QRScanner.tsx:91:  const [selectedStudentId, setSelectedStudentId] = useState('');
+src/features/attendance/components/QRScanner.tsx:318:          let studentIdUnik = localStudent?.idUnik || '-';
+src/features/attendance/components/QRScanner.tsx:324:            studentIdUnik = 'SIM-001';
+src/features/attendance/components/QRScanner.tsx:337:              idUnik: studentIdUnik,
+src/features/attendance/components/Schedule.tsx:38:  studentsId?: string;
+src/features/attendance/components/Schedule.tsx:77:const Schedule: React.FC<ScheduleProps> = ({ onBack, userRole, studentsId, onOpenSidebar }) => {
+src/features/attendance/components/Schedule.tsx:417:        if (isStudent && studentsId) {
+src/features/attendance/components/Schedule.tsx:419:          const sDoc = await getStudentData(studentsId);
+src/features/attendance/components/Schedule.tsx:507:  }, [studentsId, userRole]);
+src/features/attendance/AttendancePanel.tsx:17:  onRemindParent?: (studentId: string) => void;
+src/features/attendance/AttendanceView.tsx:85:  studentsId?: string; // Force individual view if passed
+src/features/attendance/AttendanceView.tsx:159:  studentsId,
+src/features/attendance/AttendanceView.tsx:165:  const studentsIdFromStore = useAuthStore((state) => state.user?.studentsId);
+src/features/attendance/AttendanceView.tsx:187:  const effectiveStudentId = studentsId || studentsIdFromStore || idUnikFromStore;
+src/features/attendance/AttendanceView.tsx:189:    effectiveStudentId ? 'Personal' : isStaff ? 'History' : 'Personal',
+src/features/attendance/AttendanceView.tsx:191:  const [drillDownStudentId, setDrillDownStudentId] = useState<string | null>(
+src/features/attendance/AttendanceView.tsx:192:    studentsId || (isStudentOnly && effectiveStudentId ? effectiveStudentId : null),
+src/features/attendance/AttendanceView.tsx:213:  // We only use the hook when drillDownStudentId is set
+src/features/attendance/AttendanceView.tsx:220:  } = useStudentAttendance(drillDownStudentId || '');
+src/features/attendance/AttendanceView.tsx:223:    if (isStudentOnly && effectiveStudentId && drillDownStudentId !== effectiveStudentId) {
+src/features/attendance/AttendanceView.tsx:224:      setDrillDownStudentId(effectiveStudentId);
+src/features/attendance/AttendanceView.tsx:227:  }, [isStudentOnly, effectiveStudentId, drillDownStudentId]);
+src/features/attendance/AttendanceView.tsx:239:    if (drillDownStudentId) {
+src/features/attendance/AttendanceView.tsx:240:      getStudentData(drillDownStudentId).then(setSelectedStudent);
+src/features/attendance/AttendanceView.tsx:244:  }, [drillDownStudentId]);
+src/features/attendance/AttendanceView.tsx:247:    if (!isStaff || viewMode !== 'History' || drillDownStudentId !== null) return;
+src/features/attendance/AttendanceView.tsx:274:  }, [selectedDate, selectedMonth, selectedClass, viewType, viewMode, drillDownStudentId]);
+src/features/attendance/AttendanceView.tsx:278:      attendanceRecordsHistory.map((r) => [r.studentsId || '', r] as any),
+src/features/attendance/AttendanceView.tsx:282:        const record = attMap.get(student.studentsId!);
+src/features/attendance/AttendanceView.tsx:286:            id: `${student.studentsId}_${selectedDate}`,
+src/features/attendance/AttendanceView.tsx:287:            studentsId: student.studentsId!,
+src/features/attendance/AttendanceView.tsx:388:          'ID Siswa': r.studentsId || '',
+src/features/attendance/AttendanceView.tsx:412:      subtitle={drillDownStudentId ? selectedStudent?.namaLengkap : ''}
+src/features/attendance/AttendanceView.tsx:413:      onBack={drillDownStudentId && !isStudentOnly ? () => setDrillDownStudentId(null) : onBack}
+src/features/attendance/AttendanceView.tsx:418:          {drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:429:          {isStaff && !drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:485:        {isStudentOnly && !drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:497:        {isStaff && !drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:513:        {drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:543:        {isStaff && !drillDownStudentId && (
+src/features/attendance/AttendanceView.tsx:655:                                onClick={() => setDrillDownStudentId(r.studentsId)}
+src/features/attendance/AttendanceView.tsx:662:                                  {r.studentsId}
+src/repositories/bkRepository.ts:10:  studentId: string;
+src/repositories/gradeRepository.ts:9:  studentId: string;
+src/repositories/gradeRepository.ts:84:  async getByStudent(context: SecurityContext, studentId: string): Promise<GradeEntity[]> {
+src/repositories/gradeRepository.ts:86:      .where('[tenantId+studentId+subjectId]')
+src/repositories/gradeRepository.ts:87:      .between([context.tenantId, studentId, Dexie.minKey], [context.tenantId, studentId, Dexie.maxKey])
+src/repositories/PointRepository.ts:74:  async getByStudent(studentId: string, tenantId?: string): Promise<PointTransaction[]> {
+src/repositories/PointRepository.ts:79:        .filter((p: any) => p.studentsId === studentId || p.studentId === studentId)
+src/repositories/PointRepository.ts:83:      .filter((p: any) => p.studentsId === studentId || p.studentId === studentId)
+src/repositories/PointSummaryRepository.ts:72:  async getByStudent(studentId: string, tenantId?: string): Promise<StudentPointSummary | null> {
+src/repositories/PointSummaryRepository.ts:78:          .filter((s: any) => s.studentsId === studentId || s.studentId === studentId || s.id === studentId)
+src/repositories/PointSummaryRepository.ts:84:        .filter((s: any) => s.studentsId === studentId || s.studentId === studentId || s.id === studentId)
+src/repositories/SubmissionRepository.ts:76:  async findByStudent(tenantId: string, studentId: string): Promise<Submission[]> {
+src/repositories/SubmissionRepository.ts:77:    return await this.table.where({ tenantId, studentId }).toArray();
+src/repositories/SubmissionRepository.ts:82:    studentId: string,
+src/repositories/SubmissionRepository.ts:86:      .where('[studentId+assignmentId]')
+src/repositories/SubmissionRepository.ts:87:      .equals([studentId, assignmentId])
+src/repositories/SyncRepository.ts:43:      sanitizedPayload?.studentId ||
+src/repositories/SyncRepository.ts:44:      sanitizedPayload?.studentsId ||
+src/repositories/StudentParentRepository.ts:7:  studentId: string;
+src/repositories/StudentParentRepository.ts:25:  async getByStudentId(tenantId: string, studentId: string): Promise<StudentParentRelation[]> {
+src/repositories/StudentParentRepository.ts:27:      .where('[tenantId+studentId]')
+src/repositories/StudentParentRepository.ts:28:      .equals([tenantId, studentId])
+src/repositories/ProfileRepository.ts:15:  async getByStudentId(context: SecurityContext, studentId: string): Promise<Student | null> {
+src/repositories/ProfileRepository.ts:16:    return await this.getById(context, studentId);
+src/repositories/ProfileRepository.ts:19:  async updateProfile(context: SecurityContext, studentId: string, data: Partial<Student>): Promise<Student> {
+src/repositories/ProfileRepository.ts:20:    const existing = await this.getById(context, studentId);
+src/repositories/ProfileRepository.ts:22:      throw new Error(`Student record not found for ID: ${studentId}`);
+src/repositories/attendanceRepository.ts:91:  async getByStudentId(tenantId: string, studentId: string): Promise<AttendanceRecord[]> {
+src/repositories/attendanceRepository.ts:93:      .where('[tenantId+studentsId+tanggal]')
+src/repositories/attendanceRepository.ts:95:        [tenantId, studentId, Dexie.minKey],
+src/repositories/attendanceRepository.ts:96:        [tenantId, studentId, Dexie.maxKey],
+src/repositories/attendanceRepository.ts:182:    studentId: string,
+src/repositories/attendanceRepository.ts:184:    return await this.getByStudentId(tenantId, studentId);
+src/types/index.ts:192:  studentsId?: string;
+src/types/index.ts:193:  studentId?: string;
+src/types/index.ts:196:  referenceId: string;
+src/types/index.ts:229:  studentId: string;
+src/types/index.ts:264:  studentId: string;
+src/types/enterpriseHierarchy.ts:68:  studentId: string;
+src/types/enterpriseHierarchy.ts:111:  attendanceId: string;
+src/types/validators.ts:169:    studentsId: '',
+src/types/validators.ts:233:    studentsId: '',
+src/types/validators.ts:251:    studentId: '',
+src/types/schemas.ts:100:  referenceId: z.string().nullish(),
+src/types/schemas.ts:114:  studentsId: z.string().optional(), // Added for compatibility
+src/types/schemas.ts:115:  studentId: z.string().optional(), // Alias for legacy
+src/types/schemas.ts:267:  id: z.string(), // PK studentsId_tanggal
+src/types/schemas.ts:269:  studentsId: z.string().optional(),
+src/types/schemas.ts:300:  studentsId: z.string().min(1),
+src/types/schemas.ts:301:  studentId: z.string().optional(), // Legacy compatibility
+src/types/schemas.ts:338:  studentsId: z.string().optional(),
+src/types/schemas.ts:339:  studentId: z.string().optional(),
+src/types/userEntity.ts:23:  referenceId?: string;
+src/core/database/db.ts:158:      students: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], tenantsId, studentsId, classId, tingkatRombel, status',
+src/core/database/db.ts:159:      orang_tua: 'id, tenantId, version, syncStatus, [tenantId+studentId], nik',
+src/core/database/db.ts:179:      riwayat_siswa: 'id, tenantId, version, syncStatus, [tenantId+studentId], academicYearId',
+src/core/database/db.ts:186:      absensi_siswa: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+tanggal], tenantsId, studentsId, studentId, date, tanggal, classId',
+src/core/database/db.ts:187:      attendance: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+studentsId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+classId+date], [tenantId+tanggal], [tenantId+date], tenantsId, studentsId, studentId, date, tanggal, classId',
+src/core/database/db.ts:192:      penilaian: 'id, tenantId, version, syncStatus, [tenantId+studentId+subjectId], semesterId',
+src/core/database/db.ts:193:      rapor: 'id, tenantId, version, syncStatus, [tenantId+studentId+semesterId], status',
+src/core/database/db.ts:194:      kenaikan_kelas: 'id, tenantId, version, syncStatus, [tenantId+studentId+academicYearId], status',
+src/core/database/db.ts:195:      kelulusan: 'id, tenantId, version, syncStatus, [tenantId+studentId], graduationDate',
+src/core/database/db.ts:197:      submissions: 'id, tenantId, version, syncStatus, [tenantId+assignmentId], [tenantId+studentId+assignmentId], tenantsId, assignmentId, studentId',
+src/core/database/db.ts:222:      poin: 'id, tenantId, version, syncStatus, [tenantId+studentId], [tenantId+date], tenantsId, studentsId, date, type',
+src/core/database/db.ts:223:      points: 'id, tenantId, version, syncStatus, [tenantId+studentId], [tenantId+date], tenantsId, studentsId, date, type',
+src/core/database/db.ts:224:      student_point_summaries: 'id, tenantId, version, syncStatus, [tenantId+studentId], tenantsId, studentId, totalPoints',
+src/core/database/db.ts:225:      konseling: 'id, tenantId, version, syncStatus, [tenantId+studentId], [tenantId+counselorId], date',
+src/core/database/db.ts:226:      pemanggilan_orang_tua: 'id, tenantId, version, syncStatus, [tenantId+studentId], [tenantId+status], scheduleDate',
+src/core/database/db.ts:316:      students: 'idUnik, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], studentsId, classId, tingkatRombel, status, nisn, nik',
+src/core/database/db.ts:351:      student_parents: 'id, tenantId, studentId, parentId, [tenantId+studentId], [tenantId+parentId]',
+src/core/database/db.ts:369:      students: 'idUnik, id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], studentsId, classId, tingkatRombel, status, nisn, nik',
+src/core/database/db.ts:370:      student_point_summaries: 'id, tenantId, version, syncStatus, [tenantId+studentId], tenantsId, studentId, studentsId, totalPoints',
+src/core/database/db.ts:376:      students: 'idUnik, id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], studentsId, classId, tingkatRombel, status, nisn, nik',
+src/core/database/db.ts:377:      student_point_summaries: 'id, tenantId, version, syncStatus, [tenantId+studentId], tenantsId, studentId, studentsId, totalPoints',
+src/database/MigrationRegistry.ts:91:      'id, studentsId, [tenantId+statusGlobal+date], [tenantId+class+date], [tenantId+studentsId+date], date',
+src/database/MigrationRegistry.ts:93:    student_point_summaries: 'studentId, tenantId',
+src/database/MigrationRegistry.ts:94:    pointRankings: 'studentId, tenantId',
+src/database/MigrationRegistry.ts:118:      'id, studentsId, [tenantId+statusGlobal+date], [tenantId+class+date], [tenantId+studentsId+date], date, class, className, classId',
+src/database/MigrationRegistry.ts:138:      'id, tenantId, [tenantId+id], studentsId, [tenantId+studentsId], date, [tenantId+date], [tenantId+statusGlobal+date], [tenantId+classId+date], [tenantId+studentsId+date]',
+src/database/MigrationRegistry.ts:140:    poin: 'id, tenantId, [tenantId+id], studentsId, [tenantId+studentsId], timestamp',
+src/database/MigrationRegistry.ts:157:      'id, tenantId, [tenantId+id], [tenantId+idUnik], studentsId, [tenantId+studentsId], nisn, status, className, classId',
+src/database/MigrationRegistry.ts:160:    student_point_summaries: 'id, tenantId, [tenantId+id], studentId, [tenantId+studentId]',
+src/database/MigrationRegistry.ts:161:    pointRankings: 'id, tenantId, [tenantId+id], studentId, [tenantId+studentId]',
+src/database/MigrationRegistry.ts:186:    points: 'id, tenantId, [tenantId+id], studentsId, [tenantId+studentsId], type, date',
+src/database/MigrationRegistry.ts:190:      'id, tenantId, [tenantId+id], studentId, [tenantId+studentId], studentsId, [tenantId+studentsId]',
+src/database/MigrationRegistry.ts:237:      'id, tenantId, [tenantId+id], studentsId, [tenantId+studentsId], tanggal, [tenantId+tanggal], [tenantId+status+tanggal], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal]',
+src/database/offlineService.ts:57:        payload.studentsId ||
+
+### 2. Attendance service
+49:export const enqueueSync = async (payload: any, action = 'SCAN_PRESENSI') => {
+119:export const getAttendanceByStudentId = async (studentsId: string, forceRefresh = false) => {
+121:    if (!studentsId) return [];
+126:      if (secCtx.referenceId && secCtx.referenceId !== studentsId) {
+127:        console.error(`[Security] Access Denied: Student ${secCtx.referenceId} attempted to access attendance of ${studentsId}`);
+137:      const cached = await attendanceRepository.getByStudentId(tenantId, studentsId);
+146:    const results = await attendanceRepository.getByStudentId(tenantId, studentsId);
+156:    console.warn('getAttendanceByStudentId error:', error.message);
+234:    const idUnik = student.idUnik || (student as any).studentsId;
+300:            studentId: idUnik,
+301:            studentsId: idUnik,
+331:            studentsId: idUnik,
+332:            studentId: idUnik,
+357:        await enqueueSync(outboxPayload, 'SCAN_PRESENSI');
+365:                studentsId: idUnik,
+366:                studentId: idUnik,
+375:                attendanceId: attId,
+379:                studentsId: idUnik,
+380:                studentId: idUnik,
+389:                attendanceId: attId,
+419:  studentId: string,
+433:    const attId = `${studentId}_${today}`;
+438:      studentsId: studentId,
+482:    studentsId: studentDocId,
+483:    studentId: studentDocId,
+497:  await enqueueSync(attendanceData, 'SCAN_PRESENSI');
+504:    await enqueueSync(
+506:        studentsId: studentDocId,
+507:        studentId: studentDocId,
+
+### 3. Attendance repository
+17:  async findById(id: string, tenantId: string): Promise<AttendanceRecord | null> {
+18:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+21:  async findAll(tenantId: string): Promise<AttendanceRecord[]> {
+22:    return await this.table.where('tenantId').equals(tenantId).toArray();
+29:      updatedAt: Date.now(),
+32:      await this.table.add(dataToSave);
+37:        tenantId: entity.tenantId,
+43:  async update(entity: AttendanceRecord): Promise<void> {
+47:      updatedAt: Date.now(),
+50:      await this.table.put(dataToSave);
+53:        action: 'UPDATE',
+55:        tenantId: entity.tenantId,
+61:  async delete(id: string, tenantId: string): Promise<void> {
+63:      await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+68:        tenantId: tenantId,
+74:  async refresh(tenantId: string): Promise<void> {
+81:    tenantId: string,
+86:      .where('[tenantId+classId+tanggal]')
+87:      .equals([tenantId, className, date])
+91:  async getByStudentId(tenantId: string, studentId: string): Promise<AttendanceRecord[]> {
+93:      .where('[tenantId+studentsId+tanggal]')
+95:        [tenantId, studentId, Dexie.minKey],
+96:        [tenantId, studentId, Dexie.maxKey],
+101:  async getByDate(tenantId: string, date: string): Promise<AttendanceRecord[]> {
+102:    return await this.table.where('[tenantId+tanggal]').equals([tenantId, date]).toArray();
+106:    tenantId: string,
+115:        .where('[tenantId+tanggal]')
+116:        .between([tenantId, start], [tenantId, end], true, true)
+121:      .where('[tenantId+classId+tanggal]')
+122:      .between([tenantId, classId, start], [tenantId, classId, end], true, true)
+127:    tenantId: string,
+130:    const records = await this.getByDate(tenantId, date);
+174:    tenantId: string,
+177:    return await this.getByDate(tenantId, date);
+181:    tenantId: string,
+182:    studentId: string,
+184:    return await this.getByStudentId(tenantId, studentId);
+188:    tenantId: string,
+191:    return await this.getByDate(tenantId, date);
+194:  async deleteByDate(tenantId: string, date: string): Promise<number> {
+195:    const records = await this.getByDate(tenantId, date);
+201:  async deleteByMonth(tenantId: string, month: string): Promise<number> {
+202:    const records = await this.getByClassAndMonth(tenantId, 'All', month);
+
+### 4. Sync pipeline
+src/sync/SyncDispatcher.ts:30:    if (op.collection === 'attendance' && (type === 'SCAN_PRESENSI' || type === 'ATTENDANCE_PROCESS')) {
+src/services/SyncEngine.ts:356:      const isCustomAction = ['SCAN_PRESENSI', 'ADD_POINT', 'ATTENDANCE_PROCESS', 'BATCH_SYNC'].includes(action);
+src/repositories/SyncRepository.ts:79:    } else if (originalAction === 'SCAN_PRESENSI' || originalAction === 'ADD_POINT') {
+src/repositories/SyncRepository.ts:81:    } else if (originalAction === 'ATTENDANCE_PROCESS' || originalAction === 'AUTO_SWEEP' || originalAction === 'REPAIR_POINTS') {
+
+### 5. Direct Firestore attendance access
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov.tsx:21:import { AttendanceSimulationTable } from './DevTabFirestoreGov/components/AttendanceSimulationTable';
+src/hooks/useTeacherAttendanceRecords.ts:85:          ? query(collection(db!, 'teacher_attendance'), orderBy('timestamp', 'desc'), limit(150))
+src/hooks/useTeacherAttendanceRecords.ts:87:              collection(db!, 'teacher_attendance'),
+src/hooks/useTeacherAttendanceRecords.ts:147:        await deleteDoc(doc(db, 'teacher_attendance', id));
+src/services/devConsoleService.ts:143:    const attendanceRef = dbGateway.collection(dbGateway.db, 'teacher_attendance');
+src/services/devConsoleService.ts:150:      const docRef = dbGateway.doc(attendanceRef);
+src/services/devConsoleService.ts:169:    handleFirestoreError(e, OperationType.WRITE, 'teacher_attendance');
+src/services/teacherAttendanceService.ts:102:    handleFirestoreError(error, OperationType.WRITE, 'teacher_attendance');
+src/services/teacherAttendanceService.ts:195:    handleFirestoreError(error, OperationType.WRITE, 'teacher_attendance');
+src/services/devConsoleActions.ts:89:    const q = dbGateway.query(dbGateway.collection(firestore, 'attendance'), dbGateway.where('date', '==', date));
+src/services/seedService.ts:359:        batch.set(dbGateway.doc(db, 'attendance', attId), ensureStringIds(scanData), { merge: true });
+src/domain/registry/EntityRegistry.ts:159:  firestoreCollection: 'attendance',
+src/domain/registry/EntityRegistry.ts:434:  firestoreCollection: 'teacher_attendance',
+
+### 6. Student identity
+src/features/students/components/ReportStudentSummaryCard.tsx:23:              {student.idUnik || '-'}
+src/features/students/components/AlumniData.tsx:86:                        {s.idUnik}
+src/features/students/components/Assignments.tsx:206:          studentId: userContext.id || 'unknown',
+src/features/students/components/DuplicateStudentsDashboard.tsx:271:    const groupIds = group.students.map((s) => s.id || s.idUnik).filter((id) => !!id) as string[];
+src/features/students/components/DuplicateStudentsDashboard.tsx:293:        const sId = student.id || student.idUnik;
+src/features/students/components/DuplicateStudentsDashboard.tsx:297:            name: `${student.namaLengkap} (ID: ${student.idUnik || sId})`,
+src/features/students/components/DuplicateStudentsDashboard.tsx:331:        const idToCheck = student.id || student.idUnik;
+src/features/students/components/DuplicateStudentsDashboard.tsx:383:        } else if (criteria === ('idUnik' as any)) {
+src/features/students/components/DuplicateStudentsDashboard.tsx:384:          key = student.idUnik?.trim() || '';
+src/features/students/components/DuplicateStudentsDashboard.tsx:423:    const idToDelete = student.id || student.idUnik;
+src/features/students/components/DuplicateStudentsDashboard.tsx:428:        `Hapus permanen data duplikat ${student.namaLengkap} (ID Unik: ${student.idUnik})?\nTindakan ini tidak dapat dibatalkan.`,
+src/features/students/components/DuplicateStudentsDashboard.tsx:440:                students: group.students.filter((s) => (s.id || s.idUnik) !== idToDelete),
+src/features/students/components/DuplicateStudentsDashboard.tsx:463:        id: student.id || student.idUnik || '',
+src/features/students/components/DuplicateStudentsDashboard.tsx:464:        name: `${student.namaLengkap} (ID: ${student.idUnik})`,
+src/features/students/components/DuplicateStudentsDashboard.tsx:499:    if (!formData.idUnik) {
+src/features/students/components/DuplicateStudentsDashboard.tsx:505:      await updateStudent(formData.idUnik, formData);
+src/features/students/components/DuplicateStudentsDashboard.tsx:564:              onClick={() => setCriteria('idUnik' as any)}
+src/features/students/components/DuplicateStudentsDashboard.tsx:565:              className={`flex-1 lg:flex-initial px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 ${criteria === ('idUnik' as any) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+src/features/students/components/DuplicateStudentsDashboard.tsx:599:                        const idToCheck = s.id || s.idUnik;
+src/features/students/components/DuplicateStudentsDashboard.tsx:707:                          .map((s) => s.id || s.idUnik)
+src/features/students/components/DuplicateStudentsDashboard.tsx:724:                    {group.students.map((student, studentIdx) => (
+src/features/students/components/DuplicateStudentsDashboard.tsx:726:                        key={student.id || student.idUnik || studentIdx}
+src/features/students/components/DuplicateStudentsDashboard.tsx:734:                              checked={selectedIds.includes(student.id || student.idUnik || '')}
+src/features/students/components/DuplicateStudentsDashboard.tsx:735:                              onChange={() => toggleSelect(student.id || student.idUnik || '')}
+src/features/students/components/DuplicateStudentsDashboard.tsx:740:                            #{studentIdx + 1}
+src/features/students/components/DuplicateStudentsDashboard.tsx:748:                                Siswa {studentIdx === 0 ? 'Induk' : 'Duplikat'}
+src/features/students/components/DuplicateStudentsDashboard.tsx:753:                                ID: {student.idUnik}
+src/features/students/components/StudentDataMain.tsx:62:  idUnik: '',
+src/features/students/components/StudentDataMain.tsx:82:  if (!s.idUnik || !s.namaLengkap) return true;
+src/features/students/components/StudentDataMain.tsx:113:    migrateStudentId,
+src/features/students/components/StudentDataMain.tsx:267:    if (!s.idUnik || !s.namaLengkap) return true;
+src/features/students/components/StudentDataMain.tsx:325:        'IDUNIK': '25001',
+src/features/students/components/StudentDataMain.tsx:363:      'ID UNIK': s.idUnik || s.id || '',
+src/features/students/components/StudentDataMain.tsx:398:        .filter((s) => s.idUnik && s.namaLengkap);
+src/features/students/components/StudentDataMain.tsx:422:    setEditingId(student.id || student.idUnik || null);
+src/features/students/components/StudentDataMain.tsx:446:    const idToDelete = student.id || student.idUnik;
+src/features/students/components/StudentDataMain.tsx:460:  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+src/features/students/components/StudentDataMain.tsx:463:    const allIds = processedStudents.map(s => s.id || s.idUnik).filter((id): id is string => !!id);
+src/features/students/components/StudentDataMain.tsx:464:    if (selectedStudentIds.length === allIds.length) {
+src/features/students/components/StudentDataMain.tsx:465:      setSelectedStudentIds([]);
+src/features/students/components/StudentDataMain.tsx:467:      setSelectedStudentIds(allIds);
+src/features/students/components/StudentDataMain.tsx:472:    setSelectedStudentIds(prev =>
+src/features/students/components/StudentDataMain.tsx:478:    if (selectedStudentIds.length === 0) {
+src/features/students/components/StudentDataMain.tsx:496:        setSelectedStudentIds([]);
+src/features/students/components/StudentDataMain.tsx:500:        await bulkDeleteStudents(selectedStudentIds);
+src/features/students/components/StudentDataMain.tsx:501:        toast.success(`Berhasil menghapus ${selectedStudentIds.length} data siswa.`);
+src/features/students/components/StudentDataMain.tsx:502:        setSelectedStudentIds([]);
+src/features/students/components/StudentDataMain.tsx:512:    if (!formData.idUnik) emptyFields.push('ID UNIK');
+src/features/students/components/StudentDataMain.tsx:522:        if (editingId !== formData.idUnik) {
+src/features/students/components/StudentDataMain.tsx:524:            `Apakah Anda yakin ingin mengubah ID unik siswa ini dari "${editingId}" menjadi "${formData.idUnik}"?\nTindakan ini akan memicu migrasi data siswa.`,
+src/features/students/components/StudentDataMain.tsx:529:          await migrateStudentId(editingId, formData.idUnik!, formData);
+src/features/students/components/StudentDataMain.tsx:570:            userId: s.idUnik,
+src/features/students/components/StudentDataMain.tsx:688:              {selectedStudentIds.length > 0 && (
+src/features/students/components/StudentDataMain.tsx:696:                    HAPUS TERPILIH ({selectedStudentIds.length})
+src/features/students/components/StudentDataMain.tsx:773:                  selectedIds={selectedStudentIds}
+src/features/students/components/StudentDataMain.tsx:833:                <p className="text-[10px] font-bold opacity-80">{selectedIdCard.idUnik}</p>
+src/features/students/components/StudentDataMain.tsx:872:        selectedCount={selectedStudentIds.length}
+src/features/students/components/StudentDetailModal.tsx:147:                  {student.idUnik || '-'}
+src/features/students/components/StudentList.tsx:47:  if (!s.idUnik || !s.namaLengkap) return true;
+src/features/students/components/StudentList.tsx:101:          const studentId = s.id || s.idUnik || '';
+src/features/students/components/StudentList.tsx:102:          const isSelected = selectedIds.includes(studentId);
+src/features/students/components/StudentList.tsx:106:              key={`${studentId}-${globalIdx}`}
+src/features/students/components/StudentList.tsx:118:                     onChange={() => onSelect(studentId)}
+src/features/students/components/StudentList.tsx:137:                          {s.idUnik || 'MISSING ID'}
+src/features/students/components/StudentList.tsx:294:            const studentId = s.id || s.idUnik || '';
+src/features/students/components/StudentList.tsx:295:            const isSelected = selectedIds.includes(studentId);
+src/features/students/components/StudentList.tsx:299:                key={`${studentId}-${globalIdx}`}
+src/features/students/components/StudentList.tsx:309:                    onChange={() => onSelect(studentId)}
+src/features/students/components/StudentList.tsx:331:                    {s.idUnik || 'MISSING'}
+src/features/students/components/InvalidStudentsList.tsx:111:              key={`${student.id || student.idUnik || 'invalid-student'}-${index}`}
+src/features/students/components/StudentFormModal.tsx:96:    if (!formData.idUnik) {
+src/features/students/components/StudentFormModal.tsx:106:        formData.idUnik,
+src/features/students/components/StudentFormModal.tsx:126:              ID Unik: {formData.idUnik || 'Otomatis'} • Sinkronisasi Firestore
+src/features/students/components/StudentFormModal.tsx:209:                      value={formData.idUnik || ''}
+src/features/students/components/StudentFormModal.tsx:214:                          idUnik: val,
+src/features/students/components/StudentFormModal.tsx:727:          {formData.noTelepon && formData.idUnik && (
+src/features/students/components/MutationData.tsx:89:                        {s.idUnik}
+src/features/students/components/Grades.tsx:74:          const found = existingGrades.find((g) => g.studentId === student.id);
+src/features/students/components/Grades.tsx:78:              studentId: student.id || '',
+src/features/students/components/Grades.tsx:187:                  <tr key={`${grade.studentId}-${index}`} className="hover:bg-slate-50 transition-colors">
+src/features/students/components/Grades.tsx:189:                      {students.find((s) => s.id === grade.studentId)?.namaLengkap || 'Unknown'}
+src/features/students/components/Grades.tsx:262:          if (userData && (userData.studentsId || userData.studentId)) {
+src/features/students/components/Grades.tsx:263:            const sid = userData.studentsId || userData.studentId;
+src/features/students/dashboard/components/ProfileCard.tsx:65:        <span>ID UNIK: {student.idUnik || '-'}</span>
+src/features/students/dashboard/StudentDashboardPage.tsx:45:  const referenceId = useUserStore((state) => state.referenceId);
+src/features/students/dashboard/services/studentDashboardService.ts:14:  if (secCtx && secCtx.role === 'siswa' && secCtx.referenceId !== studentsId) {
+src/features/students/dashboard/services/studentDashboardService.ts:15:    console.warn(`[Security] Siswa ${secCtx.referenceId} attempted to view dashboard for ${studentsId}`);
+src/features/students/dashboard/types.ts:14:  studentId: string;
+src/features/students/dashboard/hooks/useStudentDashboard.ts:8:  const referenceId = useUserStore((state) => state.referenceId);
+src/features/students/dashboard/hooks/useStudentDashboard.ts:31:    if (!referenceId) return;
+src/features/students/dashboard/hooks/useStudentDashboard.ts:39:      const result = await getStudentDashboardData(referenceId, '');
+src/features/students/dashboard/hooks/useStudentDashboard.ts:43:  }, [referenceId, safeCall]);
+src/features/students/dashboard/hooks/useStudentDashboard.ts:47:  }, [referenceId, fetchData]);
+src/features/students/hooks/useStudents.ts:31:    migrateStudentId,
+src/features/students/hooks/useStudents.ts:71:    migrateStudentId,
+src/features/students/repositories/StudentRepository.ts:25:      entity.idUnik = entity.idUnik || entity.id || '';
+src/features/students/repositories/StudentRepository.ts:31:    entity.idUnik = entity.idUnik || entity.id || '';
+src/features/students/repositories/StudentRepository.ts:50:      idUnik: entity.idUnik || entity.id,
+src/features/students/repositories/StudentRepository.ts:71:      idUnik: entity.idUnik || entity.id,
+src/features/students/repositories/StudentRepository.ts:153:  async fetchByIdUnik(tenantId: string, idUnik: string): Promise<Student | null> {
+src/features/students/repositories/StudentRepository.ts:154:    const student = await this.table.get(idUnik);
+src/features/students/repositories/StudentRepository.ts:212:    return await this.table.where("tenantId").equals(tenantId).filter((s) => !s.namaLengkap || !s.idUnik).toArray();
+src/repositories/bkRepository.ts:10:  studentId: string;
+src/repositories/teacherRepository.ts:22:  async fetchByIdUnik(tenantId: string, idUnik: string): Promise<Teacher | null> {
+src/repositories/teacherRepository.ts:23:    const teacher = await this.table.get(idUnik);
+src/repositories/teacherRepository.ts:91:  async findByIdUnik(tenantId: string, idUnik: string): Promise<Teacher | null> {
+src/repositories/teacherRepository.ts:92:    return await this.findById(idUnik, tenantId);
+src/repositories/gradeRepository.ts:9:  studentId: string;
+src/repositories/gradeRepository.ts:84:  async getByStudent(context: SecurityContext, studentId: string): Promise<GradeEntity[]> {
+src/repositories/gradeRepository.ts:86:      .where('[tenantId+studentId+subjectId]')
+src/repositories/gradeRepository.ts:87:      .between([context.tenantId, studentId, Dexie.minKey], [context.tenantId, studentId, Dexie.maxKey])
+src/repositories/PointRepository.ts:74:  async getByStudent(studentId: string, tenantId?: string): Promise<PointTransaction[]> {
+src/repositories/PointRepository.ts:79:        .filter((p: any) => p.studentsId === studentId || p.studentId === studentId)
+src/repositories/PointRepository.ts:83:      .filter((p: any) => p.studentsId === studentId || p.studentId === studentId)
+src/repositories/PointSummaryRepository.ts:72:  async getByStudent(studentId: string, tenantId?: string): Promise<StudentPointSummary | null> {
+src/repositories/PointSummaryRepository.ts:78:          .filter((s: any) => s.studentsId === studentId || s.studentId === studentId || s.id === studentId)
+src/repositories/PointSummaryRepository.ts:84:        .filter((s: any) => s.studentsId === studentId || s.studentId === studentId || s.id === studentId)
+src/repositories/userRepository.ts:98:  async findByIdUnik(_tenantId: string, idUnik: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:99:    const direct = await this.table.get(idUnik);
+src/repositories/userRepository.ts:101:    return (await this.table.filter(u => u.idUnik === idUnik).first()) || null;
+src/repositories/SubmissionRepository.ts:76:  async findByStudent(tenantId: string, studentId: string): Promise<Submission[]> {
+src/repositories/SubmissionRepository.ts:77:    return await this.table.where({ tenantId, studentId }).toArray();
+src/repositories/SubmissionRepository.ts:82:    studentId: string,
+src/repositories/SubmissionRepository.ts:86:      .where('[studentId+assignmentId]')
+src/repositories/SubmissionRepository.ts:87:      .equals([studentId, assignmentId])
+src/repositories/SyncRepository.ts:40:      sanitizedPayload?.idUnik ||
+src/repositories/SyncRepository.ts:43:      sanitizedPayload?.studentId ||
+src/repositories/AuthRepository.ts:29:            u.idUnik === idTrimmed ||
+src/repositories/AuthRepository.ts:30:            u.idUnik === idNormalized ||
+src/repositories/AuthRepository.ts:31:            u.idUnik === idLower ||
+src/repositories/StudentParentRepository.ts:7:  studentId: string;
+src/repositories/StudentParentRepository.ts:25:  async getByStudentId(tenantId: string, studentId: string): Promise<StudentParentRelation[]> {
+src/repositories/StudentParentRepository.ts:27:      .where('[tenantId+studentId]')
+src/repositories/StudentParentRepository.ts:28:      .equals([tenantId, studentId])
+src/repositories/ProfileRepository.ts:15:  async getByStudentId(context: SecurityContext, studentId: string): Promise<Student | null> {
+src/repositories/ProfileRepository.ts:16:    return await this.getById(context, studentId);
+src/repositories/ProfileRepository.ts:19:  async updateProfile(context: SecurityContext, studentId: string, data: Partial<Student>): Promise<Student> {
+src/repositories/ProfileRepository.ts:20:    const existing = await this.getById(context, studentId);
+src/repositories/ProfileRepository.ts:22:      throw new Error(`Student record not found for ID: ${studentId}`);
+src/repositories/attendanceRepository.ts:91:  async getByStudentId(tenantId: string, studentId: string): Promise<AttendanceRecord[]> {
+src/repositories/attendanceRepository.ts:95:        [tenantId, studentId, Dexie.minKey],
+src/repositories/attendanceRepository.ts:96:        [tenantId, studentId, Dexie.maxKey],
+src/repositories/attendanceRepository.ts:182:    studentId: string,
+src/repositories/attendanceRepository.ts:184:    return await this.getByStudentId(tenantId, studentId);
+src/types/index.ts:193:  studentId?: string;
+src/types/index.ts:196:  referenceId: string;
+src/types/index.ts:229:  studentId: string;
+src/types/index.ts:264:  studentId: string;
+src/types/enterpriseHierarchy.ts:68:  studentId: string;
+src/types/validators.ts:112:    idUnik: '',
+src/types/validators.ts:132:    idUnik: 'TEA_NEW',
+src/types/validators.ts:251:    studentId: '',
+src/types/schemas.ts:100:  referenceId: z.string().nullish(),
+src/types/schemas.ts:101:  idUnik: z.string().nullish(),
+src/types/schemas.ts:113:  idUnik: z.string().min(1),
+src/types/schemas.ts:115:  studentId: z.string().optional(), // Alias for legacy
+src/types/schemas.ts:186:  idUnik: z.string().min(1),
+src/types/schemas.ts:301:  studentId: z.string().optional(), // Legacy compatibility
+src/types/schemas.ts:339:  studentId: z.string().optional(),
+src/types/userEntity.ts:23:  referenceId?: string;

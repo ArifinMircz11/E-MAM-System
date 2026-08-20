@@ -1,0 +1,71 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+
+    "skipLibCheck": true,
+
+    "types": [
+      "node"
+    ],
+
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+
+    "allowJs": false,
+
+    "jsx": "react-jsx",
+
+    "baseUrl": ".",
+
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@/contracts/*": [
+        "./src/types/contracts/*"
+      ],
+      "@domain/*": [
+        "./src/domain/*",
+        "./src/domains/*"
+      ],
+      "@domains/*": [
+        "./src/domains/*"
+      ],
+      "@infrastructure/*": [
+        "./src/infrastructure/*",
+        "./src/core/database/*"
+      ],
+      "@core/*": [
+        "./src/core/*"
+      ]
+    },
+
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "backup",
+    "dev-dist",
+    "scripts"
+  ]
+}

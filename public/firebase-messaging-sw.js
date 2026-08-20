@@ -1,0 +1,1 @@
+importScripts('/fcm-worker.js');

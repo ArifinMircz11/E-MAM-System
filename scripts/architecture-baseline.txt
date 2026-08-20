@@ -1,0 +1,49 @@
+Running Architecture Hardening Check...
+
+❌ ARCHITECTURE VIOLATION DETECTED!
+UI Components MUST NOT import firestore or db directly.
+All database operations must go through the Service Layer.
+
+Violation in src/App.tsx: Firestore / DB direct import detected.
+Violation in src/components/AcademicYear.tsx: Firestore / DB direct import detected.
+Violation in src/components/Admin/AccountEditModal.tsx: Firestore / DB direct import detected.
+Violation in src/components/Admin/OnboardingApproval.tsx: Firestore / DB direct import detected.
+Violation in src/components/Archives.tsx: Firestore / DB direct import detected.
+Violation in src/components/Assignments.tsx: Firestore / DB direct import detected.
+Violation in src/components/AttendanceView.tsx: Firestore / DB direct import detected.
+Violation in src/components/CreateAccount.tsx: Firestore / DB direct import detected.
+Violation in src/components/Dashboard/ReferenceIdEntryModal.tsx: Firestore / DB direct import detected.
+Violation in src/components/DataSubmissionForm.tsx: Firestore / DB direct import detected.
+Violation in src/components/DeveloperConsole/DevTabMigration.tsx: Firestore / DB direct import detected.
+Violation in src/components/DeveloperConsole/StudentApprovalModal.tsx: Firestore / DB direct import detected.
+Violation in src/components/DeveloperConsole.tsx: Firestore / DB direct import detected.
+Violation in src/components/DuplicateStudentsDashboard.tsx: Firestore / DB direct import detected.
+Violation in src/components/EmergencyAlert.tsx: Firestore / DB direct import detected.
+Violation in src/components/Events.tsx: Firestore / DB direct import detected.
+Violation in src/components/FloatingActionMenu.tsx: Firestore / DB direct import detected.
+Violation in src/components/GenericView.tsx: Firestore / DB direct import detected.
+Violation in src/components/Grades.tsx: Firestore / DB direct import detected.
+Violation in src/components/Login.tsx: Firestore / DB direct import detected.
+Violation in src/components/MadrasahInfo.tsx: Firestore / DB direct import detected.
+Violation in src/components/Messages.tsx: Firestore / DB direct import detected.
+Violation in src/components/NotificationCenter.tsx: Firestore / DB direct import detected.
+Violation in src/components/NotificationLogs.tsx: Firestore / DB direct import detected.
+Violation in src/components/Onboarding/ReferenceIdForm.tsx: Firestore / DB direct import detected.
+Violation in src/components/PWAUpdateNotification.tsx: Firestore / DB direct import detected.
+Violation in src/components/PointCategorySettings.tsx: Firestore / DB direct import detected.
+Violation in src/components/Profile/ProfileCompletionModal.tsx: Firestore / DB direct import detected.
+Violation in src/components/Profile.tsx: Firestore / DB direct import detected.
+Violation in src/components/QRScanner.tsx: Firestore / DB direct import detected.
+Violation in src/components/Reports.tsx: Firestore / DB direct import detected.
+Violation in src/components/Schedule.tsx: Firestore / DB direct import detected.
+Violation in src/components/SchemaMigrationSection.tsx: Firestore / DB direct import detected.
+Violation in src/components/Settings.tsx: Firestore / DB direct import detected.
+Violation in src/components/SystemDocumentation.tsx: Firestore / DB direct import detected.
+Violation in src/features/gtk/TeacherAccountManagement.tsx: Firestore / DB direct import detected.
+Violation in src/features/gtk/TeacherData.tsx: Firestore / DB direct import detected.
+Violation in src/features/siswa/StudentDataMain.tsx: Firestore / DB direct import detected.
+Violation in src/modules/dashboard/Dashboard.tsx: Firestore / DB direct import detected.
+Violation in src/modules/settings/TenantSettings.tsx: Firestore / DB direct import detected.
+
+Please refactor the above files to use Service layer and Dexie.
+

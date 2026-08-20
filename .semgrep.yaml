@@ -1,0 +1,37 @@
+rules:
+  - id: e-mam-no-firestore-in-ui
+    patterns:
+      - pattern: import { ... } from 'firebase/firestore'
+      - pattern-inside: |
+          import ... from 'src/components/...';
+          ...
+    message: "Architecture Violation: Firestore SDK detected in UI component. Use Service/Repository layer."
+    languages: [typescript, tsx]
+    severity: ERROR
+
+  - id: e-mam-no-dexie-in-ui
+    patterns:
+      - pattern: import { ... } from 'src/database/dexie'
+      - pattern-inside: |
+          import ... from 'src/components/...';
+          ...
+    message: "Architecture Violation: Dexie detected in UI component. Use Hooks/Services."
+    languages: [typescript, tsx]
+    severity: ERROR
+
+  - id: e-mam-no-console-log-production
+    patterns:
+      - pattern: console.log(...)
+    message: "Production Risk: console.log detected. Use Logger or AuditLogger."
+    languages: [javascript, typescript, tsx]
+    severity: WARNING
+
+  - id: e-mam-use-repository-not-direct-db
+    patterns:
+      - pattern: db.$COLLECTION.add(...)
+      - pattern-not-inside: |
+          class $REPO extends BaseRepository { ... }
+          ...
+    message: "Architecture Violation: Direct database access detected. Use Repository pattern."
+    languages: [typescript, tsx]
+    severity: ERROR

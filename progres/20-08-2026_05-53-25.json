@@ -1,0 +1,26 @@
+{
+  "taskId": "WO-SEC-001",
+  "title": "Security Context Audit (Notifications & Profile)",
+  "status": "completed",
+  "result": "PASS",
+  "timestamp": "20-08-2026_05-53-25",
+  "startedAt": "2026-08-20T05:53:25.315Z",
+  "completedAt": "2026-08-20T05:53:25.315Z",
+  "files": [
+    "src/repositories/notificationLogRepository.ts",
+    "src/features/notifications/components/NotificationLogs.tsx",
+    "src/services/madrasahService.ts"
+  ],
+  "summary": "Audit Security Context pada fitur Notification dan Profile serta perbaikan signature repository.",
+  "changes": [
+    "Penerapan SecurityContext pada repository calls, perbaikan tipe data, dan verifikasi typecheck."
+  ],
+  "error": null,
+  "cause": null,
+  "fix": null,
+  "testing": "npm run typecheck && compile_applet",
+  "preventions": [
+    "Akses TenantContext internal pada repository sudah dibersihkan."
+  ],
+  "nextStep": "Lanjutkan ke audit task berikutnya."
+}

@@ -1,0 +1,9 @@
+# feature-template.yaml
+
+structure:
+  components: "Pure UI components, no business logic"
+  hooks: "Orchestration, state management, no business logic"
+  services: "Business orchestration, validation, transaction flow"
+  repositories: "Dexie access only"
+  types: "Feature-specific types"
+  index: "Public API for the feature"

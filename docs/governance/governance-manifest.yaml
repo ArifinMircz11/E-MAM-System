@@ -1,0 +1,40 @@
+# governance-manifest.yaml
+
+architecture:
+  name: e-MAM Enterprise
+  version: 7.8
+
+layers:
+
+  - name: ui
+    path:
+      - src/components
+      - src/features/*/components
+    forbidden:
+      - firebase
+      - dexie
+      - firestore
+
+  - name: store
+    path:
+      - src/store
+
+  - name: service
+    path:
+      - src/services
+      - src/features/*/services
+
+  - name: repository
+    path:
+      - src/database/repositories
+
+  - name: sync-engine
+    path:
+      - src/database/sync
+
+
+firebase_boundary:
+
+  allowed:
+    - src/database/sync
+    - src/services/firebase.ts

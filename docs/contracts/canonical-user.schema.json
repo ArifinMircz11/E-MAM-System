@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CanonicalUser",
+  "description": "Enterprise Data Contract SSOT for Canonical User e-MAM V7.7 (Identity & RBAC Reference)",
+  "type": "object",
+  "properties": {
+    "accountType": {
+      "type": "string",
+      "description": "User's organization domain classification",
+      "enum": [
+        "developer",
+        "madrasah"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "description": "Primary organizational role",
+      "enum": [
+        "developer",
+        "admin",
+        "kepala_madrasah",
+        "wakil_kepala_madrasah",
+        "kepala_tata_usaha",
+        "guru",
+        "staf",
+        "siswa",
+        "orang_tua"
+      ]
+    },
+    "roles": {
+      "type": "array",
+      "description": "Additional organizational responsibilities or sub-roles",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "wali_kelas",
+          "guru_bk",
+          "operator_emis",
+          "tim_kurikulum",
+          "tim_penjamin_mutu",
+          "panitia_ujian",
+          "tim_keuangan",
+          "operator_ptsp",
+          "operator_persuratan",
+          "kepala_perpustakaan",
+          "ketua_kelas"
+        ]
+      }
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Organization/madrasah tenant identifier ('system' for developer domain)"
+    },
+    "status": {
+      "type": "string",
+      "description": "Account lifecycle status",
+      "enum": [
+        "active",
+        "pending",
+        "suspended",
+        "inactive"
+      ]
+    }
+  },
+  "required": [
+    "accountType",
+    "role",
+    "roles",
+    "tenantId",
+    "status"
+  ],
+  "additionalProperties": false
+}
