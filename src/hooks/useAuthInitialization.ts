@@ -107,7 +107,7 @@ export const useAuthInitialization = () => {
           setProfile(guestProfile as any);
           setAccountStatus('pending' as any);
 
-          // A registered Firebase account without a canonical user is a valid
+          // An authenticated account without a canonical user is a valid
           // authenticated-but-pending state, not an application error.
           finishLoading();
           return;
@@ -145,6 +145,13 @@ export const useAuthInitialization = () => {
           throw new Error(`Invalid canonical tenantId: ${tenantId}`);
         }
 
+        const studentType = ['student', 'siswa'].includes(
+          String(accountType).toLowerCase(),
+        );
+        const teacherType = ['teacher', 'guru', 'pendidik'].includes(
+          String(accountType).toLowerCase(),
+        );
+
         if (role === UserRole.SISWA && !authoritativeUser.studentsId) {
           try {
             const linkRes = await attemptAutoLinkStudent(
@@ -158,12 +165,6 @@ export const useAuthInitialization = () => {
           }
         }
 
-        const studentType = ['student', 'siswa'].includes(
-          String(accountType).toLowerCase(),
-        );
-        const teacherType = ['teacher', 'guru', 'pendidik'].includes(
-          String(accountType).toLowerCase(),
-        );
         const studentId = studentType
           ? referenceId
           : authoritativeUser.studentsId || null;
@@ -210,14 +211,21 @@ export const useAuthInitialization = () => {
         setUserData(userData as any);
         setAccountStatus(status as any);
 
+        // Only student/teacher accounts have a domain master profile. Organization
+        // and developer identities are complete at the canonical user boundary and
+        // must not trigger an unrelated teacher/student repository read here.
         setProfileLoading(true);
         try {
-          const masterData = await getMasterProfile(
-            firebaseUser.uid,
-            accountType,
-            referenceId,
-          );
-          setProfile(masterData || profilePayload);
+          if (studentType || teacherType) {
+            const masterData = await getMasterProfile(
+              firebaseUser.uid,
+              accountType,
+              referenceId,
+            );
+            setProfile(masterData || profilePayload);
+          } else {
+            setProfile(profilePayload as any);
+          }
         } finally {
           setProfileLoading(false);
         }
