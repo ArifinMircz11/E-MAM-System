@@ -4,17 +4,27 @@ import { deepClean } from '@/utils/firestoreHelpers';
 export const handleStudentSync = async (type: string, payload: any) => {
   const id = payload.idUnik || payload.id || payload.studentsId;
   if (!id) {
-    console.warn('[handleStudentSync] Missing student ID in payload', payload);
+    throw new Error('STUDENT_SYNC_ENTITY_ID_MISSING');
+  }
+
+  const ref = db.doc('students', String(id));
+  const normalizedType = String(type).toUpperCase();
+
+  if (normalizedType === 'ADD_STUDENT' || normalizedType === 'CREATE') {
+    await db.setDoc(ref, deepClean(payload), { merge: true });
     return;
   }
-  const ref = db.doc('students', id);
-  
-  if (type === 'ADD_STUDENT' || type === 'CREATE') {
-    await db.setDoc(ref, deepClean(payload));
-  } else if (type === 'UPDATE_STUDENT' || type === 'UPDATE') {
+
+  if (normalizedType === 'UPDATE_STUDENT' || normalizedType === 'UPDATE') {
     const updateData = payload.data || payload;
     await db.setDoc(ref, deepClean(updateData), { merge: true });
-  } else if (type === 'DELETE_STUDENT' || type === 'DELETE') {
-    await db.deleteDoc(ref);
+    return;
   }
+
+  if (normalizedType === 'DELETE_STUDENT' || normalizedType === 'DELETE') {
+    await db.deleteDoc(ref);
+    return;
+  }
+
+  throw new Error(`STUDENT_SYNC_UNSUPPORTED_OPERATION:${type}`);
 };
