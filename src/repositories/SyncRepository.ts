@@ -5,6 +5,8 @@ import { getSecurityContext } from '@/core/security/contextHelper';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import type { SecurityContext } from '@/core/security/types';
 
+const PROCESSING_RECOVERY_TIMEOUT_MS = 60_000;
+
 /**
  * SyncRepository
  *
@@ -111,6 +113,39 @@ export class SyncRepository {
     return res;
   }
 
+  async recoverStaleProcessingItems(tenantId: string): Promise<number> {
+    if (!tenantId) return 0;
+
+    const cutoff = Date.now() - PROCESSING_RECOVERY_TIMEOUT_MS;
+    const staleItems = (await this.db.sync_queue
+      .where('tenantId')
+      .equals(tenantId)
+      .toArray())
+      .filter((item) => item.status === 'processing' && (item.updatedAt ?? item.createdAt) <= cutoff);
+
+    let recovered = 0;
+    for (const item of staleItems) {
+      const attempts = item.attempts || 0;
+      if (attempts >= 5) {
+        await this.moveToDeadLetterQueue(
+          item.id,
+          'Queue item remained processing beyond recovery timeout',
+          'SYNC_PROCESSING_STALE',
+        );
+      } else {
+        const updated = await this.db.sync_queue.update(item.id, {
+          status: 'waiting',
+          lastError: 'Recovered stale processing item after interrupted sync execution',
+          nextRetryAt: new Date().toISOString(),
+          updatedAt: Date.now(),
+        });
+        recovered += updated;
+      }
+    }
+
+    return recovered;
+  }
+
   async getPendingItems(context?: SecurityContext): Promise<SyncQueueItem[]> {
     const activeSecCtx = context || getSecurityContext(false);
     if (!activeSecCtx?.tenantId) return [];
@@ -124,9 +159,7 @@ export class SyncRepository {
     return items
       .filter((i) => {
         if (i.status === 'pending' || i.status === 'failed') return true;
-        if (i.status === 'waiting') {
-          return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
-        }
+        if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
         return false;
       })
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -139,9 +172,7 @@ export class SyncRepository {
     return items
       .filter((i) => {
         if (i.status === 'pending' || i.status === 'failed') return true;
-        if (i.status === 'waiting') {
-          return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
-        }
+        if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
         return false;
       })
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -167,11 +198,9 @@ export class SyncRepository {
   }
 
   async scheduleRetry(id: string, delayMs: number) {
-    if (!Number.isFinite(delayMs) || delayMs < 0) {
-      throw new Error('SYNC_RETRY_DELAY_INVALID');
-    }
-
+    if (!Number.isFinite(delayMs) || delayMs < 0) throw new Error('SYNC_RETRY_DELAY_INVALID');
     return await this.db.sync_queue.update(id, {
+      status: 'waiting',
       nextRetryAt: new Date(Date.now() + delayMs).toISOString(),
       updatedAt: Date.now(),
     });
@@ -184,11 +213,7 @@ export class SyncRepository {
     return await table.update(String(recordId), { syncStatus: 'synced' });
   }
 
-  async moveToDeadLetterQueue(
-    id: string,
-    reason: string,
-    errorCode = 'SYNC_MAX_RETRIES_EXCEEDED',
-  ): Promise<DeadLetterQueueItem | null> {
+  async moveToDeadLetterQueue(id: string, reason: string, errorCode = 'SYNC_MAX_RETRIES_EXCEEDED'): Promise<DeadLetterQueueItem | null> {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
 
@@ -211,29 +236,21 @@ export class SyncRepository {
       failedAt: Date.now(),
     };
 
-    const activeDb = this.db;
-    await activeDb.transaction('rw', [activeDb.sync_queue, activeDb.dead_letter_queue], async () => {
-      await activeDb.dead_letter_queue.put(dlqItem);
-      await activeDb.sync_queue.delete(id);
+    await this.db.transaction('rw', [this.db.sync_queue, this.db.dead_letter_queue], async () => {
+      await this.db.dead_letter_queue.put(dlqItem);
+      await this.db.sync_queue.delete(id);
     });
 
     return dlqItem;
   }
 
   async getDeadLetterItems(tenantId?: string): Promise<DeadLetterQueueItem[]> {
-    if (tenantId) {
-      return await this.db.dead_letter_queue.where('tenantId').equals(tenantId).sortBy('failedAt');
-    }
+    if (tenantId) return await this.db.dead_letter_queue.where('tenantId').equals(tenantId).sortBy('failedAt');
     return await this.db.dead_letter_queue.toArray();
   }
 
-  async remove(id: string) {
-    return await this.db.sync_queue.delete(id);
-  }
-
-  async clearCompleted() {
-    return await this.db.sync_queue.where('status').equals('completed').delete();
-  }
+  async remove(id: string) { return await this.db.sync_queue.delete(id); }
+  async clearCompleted() { return await this.db.sync_queue.where('status').equals('completed').delete(); }
 }
 
 export const syncRepository = new SyncRepository();
