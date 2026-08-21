@@ -11,7 +11,6 @@ import { syncRepository } from '@/repositories/SyncRepository';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
-import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { AuditLogger } from '@/core/audit/AuditLogger';
 
@@ -30,6 +29,7 @@ export class SyncEngine {
 
     this.isProcessing = true;
     try {
+      await syncRepository.recoverStaleProcessingItems(activeSecCtx.tenantId);
       const items = await syncRepository.getPendingItems(activeSecCtx);
       for (const item of items) {
         try {
@@ -86,7 +86,7 @@ export class SyncEngine {
         let overwriteRemote = true;
         try {
           const docSnap = await dbGateway.getDoc(docRef);
-          if (docSnap.exists()) {
+          if (docSnap.exists) {
             const remoteData = docSnap.data();
             const remoteVersion = remoteData.version || 0;
             const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp
@@ -148,7 +148,6 @@ export class SyncEngine {
       } else {
         const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
         await syncRepository.incrementRetry(item.id);
-        await syncRepository.updateStatus(item.id, 'waiting', error.message);
         await syncRepository.scheduleRetry(item.id, retryDelayMs);
       }
       throw error;
