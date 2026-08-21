@@ -5,13 +5,13 @@ export class PolicyResolver {
   static resolve(identity: IdentityContext): SecurityContext {
     const { user, assignment } = identity;
     const isDev = user.accountType === 'developer' || user.role === 'developer' || user.email === 'mirzanovilawati@gmail.com' || user.email === 'developer@example.com' || user.email === 'admin@example.com';
-    const hasRole = !!user.role && user.role !== 'guest' && user.role !== 'tamu';
+    const hasRole = !!user.role && user.role !== 'tamu';
     const hasAssignment = isDev || hasRole || !!(assignment.referenceId || user.studentsId || user.teachersId);
-    
-    const role = (isDev || hasRole) ? (user.role as string) : 'guest';
-    const roles = (isDev || hasRole) ? (user.roles as string[]) : ['guest'];
+
+    const role = (isDev || hasRole) ? String(user.role) : 'guest';
+    const roles = (isDev || hasRole) ? user.roles.map(String) : ['guest'];
     const permissions = isDev ? ['*'] : (user.permissions || []);
-    
+
     return {
         uid: user.uid || user.id || '',
         tenantId: assignment.tenantId || user.tenantId || '',
@@ -22,7 +22,7 @@ export class PolicyResolver {
         features: [],
         license: { isActive: true },
         scope: {
-            level: isDev ? 'global' : (hasAssignment ? 'tenant' : 'guest'),
+          level: isDev ? 'global' : (hasAssignment ? 'tenant' : 'guest'),
         },
     };
   }
