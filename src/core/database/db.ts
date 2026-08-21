@@ -1,9 +1,8 @@
 import type { Table } from 'dexie';
 import Dexie from 'dexie';
-import type { SyncQueueItem } from '@/types/syncQueue';
+import type { DeadLetterQueueItem, SyncQueueItem } from '@/types/syncQueue';
 
 export class EMamDatabase extends Dexie {
-  // MASTER Collections
   madrasah!: Table<any, string>;
   pengguna!: Table<any, string>;
   users!: Table<any, string>;
@@ -80,7 +79,7 @@ export class EMamDatabase extends Dexie {
   session!: Table<any, string>;
   feature_flags!: Table<any, string>;
   sync_queue!: Table<SyncQueueItem, string>;
-  dead_letter_queue!: Table<any, string>;
+  dead_letter_queue!: Table<DeadLetterQueueItem, string>;
   sync_log!: Table<any, string>;
   audit_log!: Table<any, string>;
   audit_logs!: Table<any, string>;
@@ -209,7 +208,7 @@ export class EMamDatabase extends Dexie {
       session: 'id, tenantId, uid, expiresAt',
       feature_flags: 'id, tenantId, key, enabled',
       sync_queue: 'id, tenantId, operation, collection, recordId, status, attempts, createdAt, updatedAt',
-      dead_letter_queue: 'id, tenantId, createdAt, collection, recordId, operation',
+      dead_letter_queue: 'id, tenantId, createdAt, collection, entityId, operation, errorCode, status, failedAt',
       sync_log: 'id, tenantId, createdAt, collection, operation',
       audit_log: 'id, tenantId, createdAt, action',
       audit_logs: 'id, tenantId, createdAt, action',
