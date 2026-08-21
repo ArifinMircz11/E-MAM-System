@@ -14,8 +14,6 @@ const ROUTED_CUSTOM_ACTIONS = new Set([
   'BATCH_SYNC',
 ]);
 
-const UNSUPPORTED_CUSTOM_ACTIONS = new Set(['ADD_POINT']);
-
 function operationType(op: ISyncOperation): string {
   return String(op.type || op.action || op.operation || '').toUpperCase();
 }
@@ -47,8 +45,9 @@ function assertTenant(op: ISyncOperation, context: SecurityContext) {
 }
 
 /**
- * Routes sync queue items to their specific domain handlers.
- * No handler may receive a payload from another tenant.
+ * Routes sync queue items to domain handlers or deterministic generic CRUD.
+ * The dispatcher is a cloud-write boundary and therefore never bypasses the
+ * Firestore adapter/gateway.
  */
 export class SyncDispatcher {
   static async dispatch(op: ISyncOperation, context: SecurityContext): Promise<void> {
@@ -57,13 +56,7 @@ export class SyncDispatcher {
     const type = operationType(op);
     const payload = payloadForOperation(op);
 
-    if (payload == null) {
-      throw new Error(`SYNC_PAYLOAD_MISSING:${op.id}`);
-    }
-
-    if (UNSUPPORTED_CUSTOM_ACTIONS.has(type)) {
-      throw new Error(`SYNC_CUSTOM_ACTION_UNSUPPORTED:${type}`);
-    }
+    if (payload == null) throw new Error(`SYNC_PAYLOAD_MISSING:${op.id}`);
 
     const finalPayload = withTenant(payload, op.tenantId);
 
@@ -76,9 +69,7 @@ export class SyncDispatcher {
     }
 
     if (type === 'BATCH_SYNC') {
-      if (!Array.isArray(finalPayload)) {
-        throw new Error(`QR_BATCH_PAYLOAD_INVALID:${op.id}`);
-      }
+      if (!Array.isArray(finalPayload)) throw new Error(`QR_BATCH_PAYLOAD_INVALID:${op.id}`);
       await handleQrBatchSync(finalPayload as any);
       return;
     }
@@ -102,27 +93,55 @@ export class SyncDispatcher {
       throw new Error(`SYNC_OPERATION_INVALID:${op.id}`);
     }
 
-    const payloadObject = finalPayload as Record<string, any>;
-    const docId = payloadObject.id || payloadObject.uid || op.docId ||
-      payloadObject.studentsId || payloadObject.teachersId || payloadObject.classId || op.id;
+    const payloadObject = finalPayload as Record<string, unknown>;
+    const docId =
+      payloadObject.id ||
+      payloadObject.uid ||
+      op.docId ||
+      payloadObject.studentsId ||
+      payloadObject.teachersId ||
+      payloadObject.classId ||
+      op.id;
 
     const ref = db.doc(op.collection, String(docId));
-    const cleanData = deepClean(payloadObject.data || payloadObject);
+    const cleanData = deepClean(
+      (payloadObject.data && typeof payloadObject.data === 'object'
+        ? payloadObject.data
+        : payloadObject) as Record<string, unknown>,
+    );
 
     try {
       if (type === 'DELETE' || type === 'DELETE_STUDENT' || type === 'DELETE_TEACHER') {
         await db.deleteDoc(ref);
-      } else if (type === 'UPDATE' || type === 'UPDATE_STUDENT' || type === 'UPDATE_TEACHER' || type === 'PATCH') {
-        await db.setDoc(ref, cleanData, { merge: true });
-      } else if (type === 'CREATE' || type === 'ADD_STUDENT' || type === 'ADD_TEACHER' || type === 'ADD_LETTER') {
-        await db.setDoc(ref, cleanData, { merge: true });
-      } else if (ROUTED_CUSTOM_ACTIONS.has(type)) {
-        throw new Error(`SYNC_CUSTOM_ACTION_UNROUTED:${type}`);
-      } else {
-        throw new Error(`SYNC_OPERATION_UNSUPPORTED:${type}`);
+        return;
       }
+
+      if (
+        type === 'UPDATE' ||
+        type === 'UPDATE_STUDENT' ||
+        type === 'UPDATE_TEACHER' ||
+        type === 'PATCH' ||
+        type === 'CREATE' ||
+        type === 'ADD_STUDENT' ||
+        type === 'ADD_TEACHER' ||
+        type === 'ADD_LETTER'
+      ) {
+        // Deterministic document IDs make retry safe. A repeated set with merge
+        // converges to the same state rather than creating a duplicate record.
+        await db.setDoc(ref, cleanData, { merge: true });
+        return;
+      }
+
+      if (ROUTED_CUSTOM_ACTIONS.has(type)) {
+        throw new Error(`SYNC_CUSTOM_ACTION_UNROUTED:${type}`);
+      }
+
+      throw new Error(`SYNC_OPERATION_UNSUPPORTED:${type}`);
     } catch (err: any) {
-      console.error(`[SyncDispatcher] Firestore error for op ${op.id} (${type} ${op.collection}):`, err.message || err);
+      console.error(
+        `[SyncDispatcher] Firestore error for op ${op.id} (${type} ${op.collection}):`,
+        err?.message || err,
+      );
       throw err;
     }
   }
