@@ -19,10 +19,14 @@ export type WithId<T> = T & {
 };
 
 /**
- * Structure mapping of central collections for offline queue and staging storage.
+ * @deprecated Offline staging belongs to the local outbox/sync boundary,
+ * not to the Firestore document contract. Prefer SyncQueueItem from
+ * `@/types/syncQueue` for new code.
+ *
+ * Retained temporarily for compatibility with legacy consumers.
  */
 export interface OfflineStagedItem<T> {
-  id: string; // Staged item UUID
+  id: string;
   collectionName: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   payload: T;
