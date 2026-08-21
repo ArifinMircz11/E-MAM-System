@@ -156,6 +156,13 @@ export class SyncRepository {
     });
   }
 
+  async markRecordSynced(collection: string, recordId: string) {
+    if (!collection || !recordId) return 0;
+    const table = (this.db as unknown as Record<string, { update?: (key: string, changes: Record<string, unknown>) => Promise<number> }>)[collection];
+    if (!table?.update) return 0;
+    return await table.update(String(recordId), { syncStatus: 'synced' });
+  }
+
   async moveToDeadLetterQueue(id: string, reason: string, errorCode = 'SYNC_MAX_RETRIES_EXCEEDED') {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
