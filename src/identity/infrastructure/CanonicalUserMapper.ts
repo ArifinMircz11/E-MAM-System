@@ -9,6 +9,22 @@ export class CanonicalUserMapperException extends Error {
   }
 }
 
+type ReferenceResolution = {
+  referenceId: string;
+  studentsId: string | null;
+  teachersId: string | null;
+  entityType: CanonicalUser['entityType'];
+};
+
+const STUDENT_ROLES = new Set<UserRole>([UserRole.SISWA, UserRole.KETUA_KELAS]);
+const TEACHER_ROLES = new Set<UserRole>([
+  UserRole.GURU,
+  UserRole.WALI_KELAS,
+  UserRole.GURU_BK,
+  UserRole.GTK,
+  UserRole.KEPALA_MADRASAH,
+]);
+
 export class CanonicalUserMapper {
   static requireTenantId(tenantId?: string | null): string {
     if (
@@ -37,6 +53,47 @@ export class CanonicalUserMapper {
     return match;
   }
 
+  private static stableIdentityReference(data: any, uid: string): string {
+    return String(data.uid || data.id || data.firebaseUid || data.email || uid).trim();
+  }
+
+  private static resolveReference(data: any, role: UserRole, uid: string): ReferenceResolution {
+    const stableIdentityRef = this.stableIdentityReference(data, uid);
+    const studentsId = typeof data.studentsId === 'string' && data.studentsId.trim() !== ''
+      ? data.studentsId.trim()
+      : null;
+    const teachersId = typeof data.teachersId === 'string' && data.teachersId.trim() !== ''
+      ? data.teachersId.trim()
+      : null;
+
+    if (STUDENT_ROLES.has(role)) {
+      return {
+        referenceId: studentsId || stableIdentityRef,
+        studentsId,
+        teachersId: null,
+        entityType: 'student',
+      };
+    }
+
+    if (TEACHER_ROLES.has(role)) {
+      return {
+        referenceId: teachersId || stableIdentityRef,
+        studentsId: null,
+        teachersId,
+        entityType: 'teacher',
+      };
+    }
+
+    return {
+      referenceId: typeof data.referenceId === 'string' && data.referenceId.trim() !== ''
+        ? data.referenceId.trim()
+        : stableIdentityRef,
+      studentsId: null,
+      teachersId: null,
+      entityType: data.entityType || null,
+    };
+  }
+
   static toCanonical(data: any): CanonicalUser {
     if (!data) {
       throw new CanonicalUserMapperException(
@@ -59,11 +116,7 @@ export class CanonicalUserMapper {
         ? data.roles.map((item: unknown) => this.normalizeRole(item))
         : [role];
 
-    const referenceId =
-      data.referenceId ||
-      data.studentsId ||
-      data.teachersId ||
-      uid;
+    const reference = this.resolveReference(data, role, uid);
 
     const canonical: CanonicalUser = {
       id: data.id || uid,
@@ -74,8 +127,8 @@ export class CanonicalUserMapper {
           ? AccountType.DEVELOPER
           : AccountType.MADRASAH,
       role,
-      roles,
-      referenceId,
+      roles: Array.from(new Set(roles.includes(role) ? roles : [role, ...roles])),
+      referenceId: reference.referenceId,
       isClaimed:
         typeof data.isClaimed === 'boolean' ? data.isClaimed : true,
       isSso: Boolean(data.isSso),
@@ -90,11 +143,16 @@ export class CanonicalUserMapper {
         data.namaTampilan ||
         '',
       photoURL: data.photoURL || null,
+      phone: data.phone,
       phoneNumber: data.phoneNumber,
       permissions: Array.isArray(data.permissions) ? data.permissions : [],
-      studentsId: data.studentsId || null,
-      teachersId: data.teachersId || null,
+      studentsId: reference.studentsId,
+      teachersId: reference.teachersId,
       walasOfClass: data.walasOfClass || null,
+      entityType: reference.entityType,
+      targetRombel: data.targetRombel || null,
+      tingkatRombel: data.tingkatRombel || null,
+      class: data.class || null,
       status: data.status || 'active',
       syncStatus: data.syncStatus || 'synced',
       rbacVersion:
@@ -118,6 +176,9 @@ export class CanonicalUserMapper {
         typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
       updatedAt:
         typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+      createdBy: data.createdBy || null,
+      updatedBy: data.updatedBy || null,
+      lastLoginAt: typeof data.lastLoginAt === 'number' ? data.lastLoginAt : data.metadata?.lastLoginAt || null,
       deleted: Boolean(data.deleted),
       deletedAt: data.deletedAt,
       peran: data.peran,
