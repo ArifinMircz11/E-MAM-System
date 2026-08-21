@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { isMockMode } from '@/services/authService';
 import { useAuthStore } from '@/stores/authStore';
-import { useStudentStore } from '@/stores/studentStore';
 import { useSystemStore } from '@/stores/systemStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useAppStore } from '@/stores/appStore';
@@ -17,6 +16,10 @@ import { useUserStore } from '@/stores/userStore';
 
 /**
  * useAppInitialization - System Level Lifecycle Hook
+ *
+ * Authentication is intentionally independent from the heavy application
+ * initialization sequence. The public login shell must be renderable even when
+ * Dexie/schema/system configuration initialization is slow or unavailable.
  */
 export const useAppInitialization = () => {
   const updateConnectivity = useAppStore((state) => state.updateConnectivity);
@@ -26,25 +29,26 @@ export const useAppInitialization = () => {
 
   const user = useAuthStore((state) => state.user);
   const userRole = useAuthStore((state) => state.user?.role || UserRole.TAMU);
-  
   const setPendingLetterCount = useNotificationStore((state) => state.setPendingLetterCount);
 
-  // 0. System Initialization Sequence (Enterprise Level)
+  // Never block the unauthenticated login shell with Dexie/system bootstrap.
+  // Initialization begins once a canonical authenticated user exists.
   useEffect(() => {
-    AppInitializationService.initialize();
-  }, []);
+    if (!user?.uid) return;
+    void AppInitializationService.initialize();
+  }, [user?.uid]);
 
-  // 1. Online Manager
+  // Online Manager
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      updateConnectivity(false); // isOffline = false
+      updateConnectivity(false);
       toast.success('Koneksi terdeteksi.');
       flushPendingAutoFixLogs();
     };
     const handleOffline = () => {
       setIsOnline(false);
-      updateConnectivity(true); // isOffline = true
+      updateConnectivity(true);
       toast.error('Mode Offline Aktif.');
     };
 
@@ -56,12 +60,11 @@ export const useAppInitialization = () => {
     };
   }, [setIsOnline, updateConnectivity]);
 
-  // 2. Automatic System Bootstrapping (Omni-Bootstrap Core Engine Phase 2)
+  // Automatic system bootstrapping for privileged authenticated users.
   useEffect(() => {
     if (isMockMode || !user || !navigator.onLine) return;
 
     const bootstrapSistem = async () => {
-      // Security optimization: Only trigger system bootstrapping checks for admin or developer.
       const isAdminOrDev = [UserRole.ADMIN as string, UserRole.DEVELOPER as string].includes(userRole);
       if (!isAdminOrDev) return;
 
@@ -71,18 +74,17 @@ export const useAppInitialization = () => {
         console.warn('[Omni-Bootstrap] Seeding skipped or errored:', err);
       }
     };
-    bootstrapSistem();
+    void bootstrapSistem();
   }, [user, userRole]);
 
-  // 3. Notification & Realtime Listeners managed centrally
+  // Notification & realtime listeners are only meaningful for authenticated users.
   useEffect(() => {
     if (isMockMode || !user?.uid) return;
 
-    // Initial letters counts
-    fetchPendingLettersCount(user.uid, userRole as any).then(setPendingLetterCount);
+    void fetchPendingLettersCount(user.uid, userRole as any).then(setPendingLetterCount);
   }, [user?.uid, userRole, setPendingLetterCount]);
 
-  // 4. Sync Engine Lifecycle driven by canonical SecurityContextService
+  // Sync Engine lifecycle driven by canonical SecurityContextService.
   useEffect(() => {
     const unsub = SecurityContextService.subscribe((state) => {
       if (state === 'READY' && SecurityContextService.isReady()) {
@@ -97,6 +99,6 @@ export const useAppInitialization = () => {
       SyncEngine.stop();
     };
   }, []);
-  
+
   return { isOnline };
 };
