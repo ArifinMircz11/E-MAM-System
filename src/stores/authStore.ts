@@ -18,7 +18,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null, // Sesuai aturan arsitektur: Tidak menggunakan localStorage sebagai sumber kebenaran auth/role
+  user: null, // Firestore is the source of truth; no local/default identity is created.
   accountStatus: null,
   pendingApprovalCount: 0,
   setUser: (user) => {
@@ -27,6 +27,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       sessionManager.clear();
       return;
     }
+
+    // Guest is an authentication state, not a CanonicalUser.
+    // It is never persisted as users/{uid}, never assigned a tenant,
+    // and never passed through the canonical-user contract.
+    if (user.isGuest === true || user.registrationRequired === true) {
+      set({ user: null, accountStatus: 'registration_required' });
+      sessionManager.clear();
+      return;
+    }
+
     const canonicalUser = LegacyUserAdapter.normalizeCanonicalUser(user);
     if (!canonicalUser) {
       throw new ArchitectureBoundaryError(
@@ -81,4 +91,3 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 }));
-

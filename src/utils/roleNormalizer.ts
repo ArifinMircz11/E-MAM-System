@@ -1,23 +1,23 @@
 import { UserRole, AccountType } from '@/types/roles';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 
-const DEVELOPER_EMAILS = ['developer@example.com', 'admin@example.com', 'mirzanovilawati@gmail.com'];
-
 /**
- * Menormalisasi peran pengguna dari berbagai format string ke UserRole enum.
- * DILARANG melakukan fallback ke SISWA jika role tidak valid atau kosong.
+ * Normalizes an already-authoritative Firestore role into the application enum.
+ *
+ * IMPORTANT: this utility never derives a role from email and never supplies a
+ * default role. Registration/guest classification belongs to the identity
+ * resolver, not to role normalization.
  */
-export const normalizeRoleStr = (roleStr: any, email?: string): UserRole | null => {
-  const activeEmail = (email || '').toLowerCase().trim();
-  if (activeEmail && DEVELOPER_EMAILS.includes(activeEmail)) {
-    return UserRole.DEVELOPER;
-  }
+export const normalizeRoleStr = (roleStr: any): UserRole | null => {
   if (!roleStr) return null;
+
   let str = roleStr;
   if (typeof roleStr === 'object' && roleStr !== null) {
-    str = roleStr.role || roleStr.name || roleStr.value || JSON.stringify(roleStr);
+    str = roleStr.role || roleStr.name || roleStr.value;
   }
-  const r = String(str).toLowerCase().trim();
+  if (typeof str !== 'string' || str.trim() === '') return null;
+
+  const r = str.toLowerCase().trim();
   if (r === 'orang tua' || r === 'orangtua' || r === 'wali murid') return UserRole.ORANG_TUA;
   if (r === 'staf tu' || r === 'tata usaha') return UserRole.KEPALA_TU;
   if (r === 'kepala' || r === 'kepala sekolah' || r === 'kepala madrasah') return UserRole.KEPALA_MADRASAH;
@@ -32,66 +32,46 @@ export const normalizeRoleStr = (roleStr: any, email?: string): UserRole | null 
 
   const validRoles = Object.values(UserRole) as string[];
   const normalized = r.replace(/\s+/g, '_');
-  if (validRoles.includes(normalized)) {
-    return normalized as UserRole;
-  }
-
-  return null;
+  return validRoles.includes(normalized) ? (normalized as UserRole) : null;
 };
 
 /**
- * Canonical user roles and accountType normalization helper.
- * Enforces invariant:
- * 1. roles = unique, valid, non-empty list of roles
- * 2. primaryRole = roles[0]
+ * Normalizes roles from an authoritative user document.
+ * Missing/invalid roles are rejected; there is no email-based or default role.
  */
-export const normalizeUserDataRoles = (data: any, email?: string): { roles: UserRole[]; accountType: AccountType; primaryRole: UserRole } => {
-  const userEmail = (email || data?.email || '').toLowerCase().trim();
-  const isDev = userEmail && DEVELOPER_EMAILS.includes(userEmail);
+export const normalizeUserDataRoles = (
+  data: any,
+): { roles: UserRole[]; accountType: AccountType; primaryRole: UserRole } => {
+  const rawRoles = Array.isArray(data?.roles)
+    ? data.roles
+    : data?.role || data?.peran
+      ? [data.role || data.peran]
+      : [];
 
-  if (isDev) {
-    return {
-      roles: [UserRole.DEVELOPER],
-      accountType: AccountType.DEVELOPER,
-      primaryRole: UserRole.DEVELOPER,
-    };
-  }
-
-  // 1. Get raw potential roles
-  const rawRoles = Array.isArray(data?.roles) ? data.roles : (data?.role || data?.peran ? [data.role || data.peran] : []);
-
-  // 2. Normalize and filter roles
   const normalizedRoles = (rawRoles as any[])
-    .map((r: any) => normalizeRoleStr(r, userEmail))
-    .filter((r): r is UserRole => r !== null);
+    .map((role) => normalizeRoleStr(role))
+    .filter((role): role is UserRole => role !== null);
 
-  // 3. Enforce: Unique roles
   const uniqueRoles = Array.from(new Set(normalizedRoles)) as UserRole[];
-  
+
   if (uniqueRoles.length === 0) {
     throw new ArchitectureBoundaryError(
       'rbac',
       'RBAC_ACCESS_DENIED',
-      `Identitas akun '${userEmail || data?.uid || 'unknown'}' tidak memiliki peran terdaftar yang valid. Fallback role dilarang.`
+      `Identitas akun '${data?.uid || 'unknown'}' tidak memiliki peran terdaftar yang valid. Fallback role dilarang.`,
     );
   }
 
-  // 4. Enforce: primaryRole = roles[0]
   const primaryRole = uniqueRoles[0];
-
   let accountType = data?.accountType as AccountType;
+
   if (!accountType || !Object.values(AccountType).includes(accountType)) {
-    if (uniqueRoles.includes(UserRole.DEVELOPER)) {
-      accountType = AccountType.DEVELOPER;
-    } else {
-      accountType = AccountType.MADRASAH;
-    }
+    throw new ArchitectureBoundaryError(
+      'user_contract',
+      'ACCOUNT_TYPE_INVALID',
+      `AccountType akun '${data?.uid || 'unknown'}' tidak berasal dari kontrak Firestore yang valid.`,
+    );
   }
 
-  return {
-    roles: uniqueRoles,
-    accountType,
-    primaryRole,
-  };
+  return { roles: uniqueRoles, accountType, primaryRole };
 };
-
