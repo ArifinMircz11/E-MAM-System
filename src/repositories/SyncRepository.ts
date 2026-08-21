@@ -120,16 +120,30 @@ export class SyncRepository {
       .equals(activeSecCtx.tenantId)
       .toArray();
 
+    const now = Date.now();
     return items
-      .filter((i) => ['pending', 'waiting', 'failed'].includes(i.status))
+      .filter((i) => {
+        if (i.status === 'pending' || i.status === 'failed') return true;
+        if (i.status === 'waiting') {
+          return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
+        }
+        return false;
+      })
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
   async findPendingItems(tenantId: string): Promise<SyncQueueItem[]> {
     if (!tenantId) return [];
     const items = await this.db.sync_queue.where('tenantId').equals(tenantId).toArray();
+    const now = Date.now();
     return items
-      .filter((i) => ['pending', 'waiting', 'failed'].includes(i.status))
+      .filter((i) => {
+        if (i.status === 'pending' || i.status === 'failed') return true;
+        if (i.status === 'waiting') {
+          return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
+        }
+        return false;
+      })
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
@@ -148,6 +162,17 @@ export class SyncRepository {
     const newAttempts = (item.attempts || 0) + 1;
     return await this.db.sync_queue.update(id, {
       attempts: newAttempts,
+      updatedAt: Date.now(),
+    });
+  }
+
+  async scheduleRetry(id: string, delayMs: number) {
+    if (!Number.isFinite(delayMs) || delayMs < 0) {
+      throw new Error('SYNC_RETRY_DELAY_INVALID');
+    }
+
+    return await this.db.sync_queue.update(id, {
+      nextRetryAt: new Date(Date.now() + delayMs).toISOString(),
       updatedAt: Date.now(),
     });
   }
