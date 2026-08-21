@@ -2,7 +2,16 @@
  * Canonical User Contract
  *
  * SINGLE SOURCE OF TRUTH
- * Identity → Tenant → RBAC → SecurityContext → Service → Repository → UI
+ * Firebase Auth → Firestore users/{uid} → CanonicalUser → SecurityContext.
+ *
+ * `referenceId` is never derived from UID. For domain identities it must point
+ * to the canonical domain document ID:
+ *   student/siswa → students/{referenceId}
+ *   teacher/guru → teachers/{referenceId}
+ *
+ * An authenticated account without users/{uid}, or without a resolvable
+ * canonical reference, is NOT a CanonicalUser. It remains guest/pending
+ * registration until an administrator approves the account.
  */
 
 import type { UserRole, AccountType } from '@/types/roles';
@@ -10,15 +19,7 @@ import type { UserRole, AccountType } from '@/types/roles';
 export type CanonicalRole = UserRole;
 export type CanonicalSubRole = UserRole;
 
-export type UserStatus =
-  | 'active'
-  | 'pending'
-  | 'inactive'
-  | 'suspended'
-  | 'deleted'
-  | 'rejected'
-  | 'aktif'
-  | 'Nonaktif';
+export type UserStatus = 'active' | 'pending' | 'inactive' | 'suspended' | 'deleted' | 'rejected';
 
 export interface UserProfile {
   email: string;
@@ -45,15 +46,8 @@ export interface UserAssignment {
   scope?: UserScope;
 }
 
-export type CanonicalFieldCategory = 'CANONICAL' | 'COMPATIBILITY' | 'LEGACY' | 'DERIVED';
+export type CanonicalFieldCategory = 'CANONICAL' | 'COMPATIBILITY' | 'DERIVED';
 
-/**
- * Field classification for CanonicalUser.
- * CANONICAL fields are the authoritative identity/security contract.
- * COMPATIBILITY fields keep current UI/Dexie/Firestore data readable during migration.
- * LEGACY fields are retained only until legacy data is fully normalized.
- * DERIVED fields can be recomputed from canonical/domain state.
- */
 export const CANONICAL_USER_FIELD_CLASSIFICATION: Record<string, CanonicalFieldCategory> = {
   id: 'CANONICAL',
   uid: 'CANONICAL',
@@ -67,9 +61,9 @@ export const CANONICAL_USER_FIELD_CLASSIFICATION: Record<string, CanonicalFieldC
   isSso: 'CANONICAL',
   approvalStatus: 'CANONICAL',
   status: 'CANONICAL',
-  isActive: 'DERIVED',
   displayName: 'CANONICAL',
   email: 'CANONICAL',
+  isActive: 'DERIVED',
   phone: 'COMPATIBILITY',
   phoneNumber: 'COMPATIBILITY',
   photoURL: 'COMPATIBILITY',
@@ -78,10 +72,6 @@ export const CANONICAL_USER_FIELD_CLASSIFICATION: Record<string, CanonicalFieldC
   teachersId: 'COMPATIBILITY',
   walasOfClass: 'COMPATIBILITY',
   entityType: 'DERIVED',
-  idUnik: 'LEGACY',
-  nik: 'LEGACY',
-  nisn: 'LEGACY',
-  nip: 'LEGACY',
   assignment: 'COMPATIBILITY',
   scope: 'COMPATIBILITY',
   scopeType: 'COMPATIBILITY',
@@ -114,39 +104,30 @@ export interface UserMetadata {
 }
 
 export interface CanonicalUser {
-  /** Stable application-level identity */
   id: string;
-
-  /** Firebase Authentication UID */
   uid: string;
 
-  /** Mandatory tenant boundary */
-  tenantId: string;
+  /** Data isolation boundary. Global accounts may use null. */
+  tenantId: string | null;
 
-  /** Organization/account scope */
+  /** Organization/account scope from Firestore; never inferred from role alone. */
   accountType: AccountType;
 
-  /** Primary effective role */
   role: UserRole;
-
-  /** Effective subordinate roles */
   roles: UserRole[];
+  permissions: string[];
 
   /**
-   * Canonical reference key.
-   * Student → students.id
-   * Teacher → teachers.id
-   * Other identity → stable identity reference derived from UID
+   * Canonical domain reference. Never derived from UID.
+   * student/siswa → students/{referenceId}
+   * teacher/guru → teachers/{referenceId}
+   * Other organization identities must use an explicitly defined canonical
+   * organization reference; absence means registration is required.
    */
-  referenceId: string;
+  referenceId: string | null;
 
-  /** Identity claim state */
   isClaimed: boolean;
-
-  /** Authentication source */
   isSso: boolean;
-
-  /** Account approval lifecycle */
   approvalStatus: 'approved' | 'pending' | 'rejected';
 
   email: string;
@@ -154,53 +135,31 @@ export interface CanonicalUser {
   photoURL?: string | null;
   phone?: string;
   phoneNumber?: string;
-
-  /** Canonical presentation/profile data */
   profile?: UserProfile;
-  /** Explicit RBAC permission set */
-  permissions: string[];
 
-  /** Compatibility/domain links */
   studentsId?: string | null;
   teachersId?: string | null;
   walasOfClass?: string | null;
-
-  /** Derived entity classification for UI and migration compatibility */
   entityType?: 'student' | 'teacher' | 'staff' | 'admin' | 'developer' | 'parent' | string | null;
 
-  /** Compatibility academic placement fields */
   targetRombel?: string | null;
   tingkatRombel?: string | null;
   class?: string | null;
 
-  /** Account lifecycle state */
   status: UserStatus;
-
-  /** Synchronization state */
   syncStatus: 'synced' | 'pending' | 'error';
-
-  /** Security/RBAC versions */
   rbacVersion?: number;
   securityVersion?: number;
 
-  /** Security scope */
   scopeType?: string;
   scopeId?: string;
   scope?: UserScope;
-
-  /** Domain assignment */
   assignment?: UserAssignment;
-
-  /** Operational metadata */
   metadata?: UserMetadata;
-
   isActive?: boolean;
 
-  /** Versioning */
   version: number;
   schemaVersion: number;
-
-  /** Audit timestamps */
   createdAt: number;
   updatedAt: number;
   createdBy?: string | null;
@@ -209,11 +168,4 @@ export interface CanonicalUser {
 
   deleted: boolean;
   deletedAt?: number;
-
-  /** Legacy compatibility fields */
-  peran?: string;
-  idUnik?: string;
-  nisn?: string;
-  nik?: string;
-  nip?: string;
 }
