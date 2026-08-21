@@ -19,9 +19,13 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        manifestFilename: 'manifest.json',
+        devOptions: {
+          enabled: true,
+        },
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         workbox: {
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase to 5MB
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
