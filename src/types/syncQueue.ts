@@ -38,6 +38,7 @@ export interface SyncQueueItem {
     actorId?: string;
     idempotencyKey?: string;
     version?: number;
+    action?: string;
   };
 }
 
