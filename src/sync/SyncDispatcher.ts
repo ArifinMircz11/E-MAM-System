@@ -8,12 +8,13 @@ import { firestoreAdapter as db } from './adapters/firestore.adapter';
 import { deepClean } from '@/utils/firestoreHelpers';
 import type { SecurityContext } from '@/core/security/types';
 
-const CUSTOM_ACTIONS = new Set([
+const ROUTED_CUSTOM_ACTIONS = new Set([
   'SCAN_PRESENSI',
-  'ADD_POINT',
   'ATTENDANCE_PROCESS',
   'BATCH_SYNC',
 ]);
+
+const UNSUPPORTED_CUSTOM_ACTIONS = new Set(['ADD_POINT']);
 
 function operationType(op: ISyncOperation): string {
   return String(op.type || op.action || op.operation || '').toUpperCase();
@@ -60,6 +61,10 @@ export class SyncDispatcher {
       throw new Error(`SYNC_PAYLOAD_MISSING:${op.id}`);
     }
 
+    if (UNSUPPORTED_CUSTOM_ACTIONS.has(type)) {
+      throw new Error(`SYNC_CUSTOM_ACTION_UNSUPPORTED:${type}`);
+    }
+
     const finalPayload = withTenant(payload, op.tenantId);
 
     if (op.collection === 'attendance' && (type === 'SCAN_PRESENSI' || type === 'ATTENDANCE_PROCESS')) {
@@ -93,7 +98,7 @@ export class SyncDispatcher {
       return;
     }
 
-    if (!op.collection || !op.docId && !(finalPayload && typeof finalPayload === 'object')) {
+    if (!op.collection || (!op.docId && !(finalPayload && typeof finalPayload === 'object'))) {
       throw new Error(`SYNC_OPERATION_INVALID:${op.id}`);
     }
 
@@ -111,7 +116,7 @@ export class SyncDispatcher {
         await db.setDoc(ref, cleanData, { merge: true });
       } else if (type === 'CREATE' || type === 'ADD_STUDENT' || type === 'ADD_TEACHER' || type === 'ADD_LETTER') {
         await db.setDoc(ref, cleanData, { merge: true });
-      } else if (CUSTOM_ACTIONS.has(type)) {
+      } else if (ROUTED_CUSTOM_ACTIONS.has(type)) {
         throw new Error(`SYNC_CUSTOM_ACTION_UNROUTED:${type}`);
       } else {
         throw new Error(`SYNC_OPERATION_UNSUPPORTED:${type}`);
