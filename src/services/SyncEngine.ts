@@ -6,7 +6,7 @@
 
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { db } from './firebase';
-import { localDb, SyncStatus } from '@/database/dexie';
+import { SyncStatus } from '@/database/dexie';
 import { syncRepository } from '@/repositories/SyncRepository';
 import type { SyncQueueItem } from '@/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -65,22 +65,10 @@ export class SyncEngine {
       const tenantId = item.tenantId;
 
       const docId = item.recordId ??
-        payload?.id ??
-        payload?.docId ??
-        payload?.documentId ??
-        payload?.idUnik ??
-        payload?.uid ??
-        payload?.userUid ??
-        payload?.studentId ??
-        payload?.studentsId ??
-        payload?.teacherId ??
-        payload?.teachersId ??
-        payload?.userId ??
-        payload?.classId ??
-        payload?.classesId ??
-        payload?.scheduleId ??
-        payload?.journalId ??
-        payload?.letterId ??
+        payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ??
+        payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ??
+        payload?.teacherId ?? payload?.teachersId ?? payload?.userId ?? payload?.classId ??
+        payload?.classesId ?? payload?.scheduleId ?? payload?.journalId ?? payload?.letterId ??
         payload?.pointId;
 
       if (!docId) {
@@ -144,8 +132,7 @@ export class SyncEngine {
       }
 
       await syncRepository.updateStatus(item.id, 'completed');
-      const table = (localDb as any)[colName];
-      if (table) await table.update(String(docId), { syncStatus: SyncStatus.SYNCED });
+      await syncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
       await AuditLogger.log(
@@ -173,7 +160,7 @@ export class SyncEngine {
   static async syncAll() { await this.processQueue(); }
   static async executeAutoSweepSync(_context: any, _tenantId: string) { await this.processQueue(); }
 
-  static async executeClearPointsSync(context: any, tenantId: string) {
+  static async executeClearPointsSync(_context: any, tenantId: string) {
     if (!tenantId) return;
     const q = dbGateway.query(dbGateway.collection(db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
     const poinSnap = await dbGateway.getDocs(q);
