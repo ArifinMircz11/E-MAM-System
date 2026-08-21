@@ -1,7 +1,16 @@
 import type { Table } from 'dexie';
-import Dexie from 'dexie';
 import type { Student, Teacher, ClassData, PointCategory, AttendanceRecord } from '@/types';
 
+/**
+ * @deprecated Compatibility-only Dexie contract.
+ *
+ * The operational database is owned by the canonical database layer under
+ * `src/core/database`. New repositories must resolve tables from the
+ * canonical database and must not instantiate or extend this contract.
+ *
+ * This file intentionally contains no Dexie subclass/instance so it cannot
+ * become a second operational database.
+ */
 export interface LocalDbSchema {
   students: Table<Student, string>;
   teachers: Table<Teacher, string>;
@@ -44,7 +53,11 @@ export interface LocalDbSchema {
   templates: Table<any, string>;
 }
 
-export abstract class EMamBaseDatabase extends Dexie implements LocalDbSchema {
+/**
+ * @deprecated Do not subclass. Kept only so legacy type imports continue to
+ * resolve while consumers are migrated to the canonical database layer.
+ */
+export declare abstract class EMamBaseDatabase implements LocalDbSchema {
   abstract students: Table<Student, string>;
   abstract teachers: Table<Teacher, string>;
   abstract classes: Table<ClassData, string>;
