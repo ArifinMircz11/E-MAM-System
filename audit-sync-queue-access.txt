@@ -1,0 +1,35 @@
+
+=== DIRECT SYNC QUEUE MUTATIONS ===
+src/hooks/useTeacherAttendanceRecords.ts:132:      await localDb.sync_queue.add({
+src/services/SyncEngine.ts:222:                await localDb.sync_queue.delete(qItem.id);
+src/services/userLinkingService.ts:49:    await localDb.sync_queue.add({
+src/services/userLinkingService.ts:64:    await localDb.sync_queue.add({
+src/sync/SyncWorker.ts:52:          await localDb.sync_queue.update(op.id, {
+src/sync/SyncWorker.ts:84:            await localDb.sync_queue.update(op.id, {
+src/sync/SyncWorker.ts:108:      await localDb.sync_queue.delete(op.id);
+src/database/offlineService.ts:48:    const res = await localDb.sync_queue.add({
+src/repositories/StudentParentRepository.ts:35:    await localDb.sync_queue.add({
+src/repositories/SettingsRepository.ts:120:    await localDb.sync_queue.add({
+src/repositories/ProfileRequestRepository.ts:17:    await localDb.sync_queue.add({
+src/repositories/ProfileRequestRepository.ts:33:    await localDb.sync_queue.add({
+src/repositories/ProfileRequestRepository.ts:49:    await localDb.sync_queue.add({
+src/repositories/SyncRepository.ts:128:    const res = await dbInstance.sync_queue.add(candidateItem);
+src/repositories/SyncRepository.ts:167:    return await this.db.sync_queue.update(id, {
+src/repositories/SyncRepository.ts:176:    const item = await this.db.sync_queue.get(id);
+src/repositories/SyncRepository.ts:179:      return await this.db.sync_queue.update(id, {
+src/repositories/SyncRepository.ts:193:    const item = await this.db.sync_queue.get(id);
+src/repositories/SyncRepository.ts:218:      await activeDb.sync_queue.delete(id);
+src/repositories/SyncRepository.ts:235:    return await this.db.sync_queue.delete(id);
+src/repositories/SyncRepository.ts:239:    return await this.db.sync_queue.where('status').equals('completed').delete();
+src/repositories/systemRepository.ts:23:    await localDb.sync_queue.add({
+src/repositories/LoginLogRepository.ts:21:    await localDb.sync_queue.add({
+src/tests/integration/architecture.test.ts:96:    const queueRecords = await testDb.sync_queue.toArray();
+src/features/kanwil/services/kanwilDashboardService.ts:109:    await localDb.sync_queue.add({
+src/features/kanwil/services/kanwilDashboardService.ts:128:    await localDb.sync_queue.add({
+src/features/kanwil/services/kanwilDashboardService.ts:144:    await localDb.sync_queue.add({
+src/features/kanwil/services/kanwilDashboardService.ts:158:    await localDb.sync_queue.add({
+src/features/users/services/user.service.ts:169:      await localDb.sync_queue.add({
+src/features/users/services/user.service.ts:191:      await localDb.sync_queue.add({
+src/features/users/services/user.service.ts:215:      await localDb.sync_queue.add({
+src/features/users/services/user.service.ts:246:        await localDb.sync_queue.add({
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DLQManager.tsx:168:        await localDb.sync_queue.put(newSyncItem);

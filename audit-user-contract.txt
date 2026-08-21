@@ -1,0 +1,213 @@
+
+=== CANONICAL USER REFERENCES ===
+src/stores/authStore.ts:2:import type { UserRole } from '@/types';
+src/stores/authStore.ts:3:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/stores/authStore.ts:11:  user: CanonicalUser | null;
+src/stores/authStore.ts:30:    const canonicalUser = LegacyUserAdapter.normalizeCanonicalUser(user);
+src/stores/authStore.ts:35:        'Gagal menormalisasi pengguna ke CanonicalUser.'
+src/stores/authStore.ts:40:    ArchitectureBoundaryEnforcer.enforceUserContract(cleanUser);
+src/stores/permissionStore.ts:2:import type { UserRole } from '@/types';
+src/stores/userStore.ts:2:import type { UserAssignment, UserStatus, ApprovalStatus, CanonicalUser } from '@/types';
+src/stores/userStore.ts:6:interface UserState {
+src/stores/userStore.ts:18:  user: CanonicalUser | null;
+src/hooks/useAttention.ts:2:import type { UserRole } from '@/types';
+src/hooks/useDashboardSync.ts:12:import type { UserRole } from '@/types';
+src/services/studentService.ts:12:import type { Student, UserRole } from '@/types';
+src/services/pointService.ts:22:import { type PointCategory, UserRole } from "@/types";
+src/services/authService.ts:64: * Bangun context aplikasi dari CanonicalUser.
+src/services/authService.ts:70:    // 1. Dapatkan atau Sync CanonicalUser
+src/services/authService.ts:177:      type === 'student' ? UserRole.SISWA : ((masterData.role || UserRole.GURU) as UserRole);
+src/services/authService.ts:375:    // PHASE 2 Flow: Initialize Session via CanonicalUser
+src/services/authService.ts:732:      // PHASE 2 Flow: Initialize Session via CanonicalUser
+src/services/authService.ts:778:      // PHASE 2 Flow: Initialize Session via CanonicalUser
+src/core/boundary/ArchitectureBoundaryEnforcer.ts:3:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/core/boundary/ArchitectureBoundaryEnforcer.ts:35:   * Menolak jika CanonicalUser tidak memenuhi standar integritas (misal kehilangan role, nama, tenant).
+src/core/boundary/ArchitectureBoundaryEnforcer.ts:37:  static enforceUserContract(user: CanonicalUser | any): void {
+src/core/boundary/ArchitectureBoundaryEnforcer.ts:38:    ArchitectureGuard.assertUserContract(user);
+src/services/domainServices/users/UserAccountService.ts:3:import type { User } from '@/domain/entities/user';
+src/services/domainServices/users/UserRoleService.ts:3:import type { UserRole } from '@/types/roles';
+src/services/UserSyncService.ts:7:import type { UserRole } from '@/types';
+src/services/UserSyncService.ts:91:    return LegacyUserAdapter.convertLegacyUserToCanonicalUser(raw);
+src/services/IdentityCompletionService.ts:8:import { validateCanonicalUser, derivePermissionsForRole } from '@/identity/domain/CanonicalValidation';
+src/services/IdentityCompletionService.ts:9:import type { CanonicalUser, UserAssignment, UserScope } from '@/identity/domain/CanonicalUser';
+src/services/IdentityCompletionService.ts:10:import type { AccountType, UserRole } from '@/types/roles';
+src/services/IdentityCompletionService.ts:28:  static validate(user: CanonicalUser | null) {
+src/services/IdentityCompletionService.ts:29:    return validateCanonicalUser(user);
+src/services/IdentityCompletionService.ts:36:  static async completeProfile(uid: string, payload: CompletionPayload): Promise<CanonicalUser> {
+src/services/IdentityCompletionService.ts:44:    const updatedUser: CanonicalUser = {
+src/services/IdentityCompletionService.ts:81:  static refreshSecurityContext(user: CanonicalUser): void {
+src/core/identity/security-context/SecurityContext.types.ts:1:import type { CanonicalUser } from '../../../identity/domain/CanonicalUser';
+src/core/identity/security-context/SecurityContext.types.ts:14:  user: CanonicalUser;
+src/services/rbac/UserRoleResolver.ts:9:export interface CanonicalUser {
+src/services/rbac/UserRoleResolver.ts:36:  static async resolveUser(uid: string): Promise<CanonicalUser | null> {
+src/services/rbac/UserRoleResolver.ts:84:  static resolvePermissions(user: CanonicalUser): string[] {
+src/services/rbac/UserRoleResolver.ts:111:  static canAccess(user: CanonicalUser, permission: string): boolean {
+src/core/identity/adapters/LegacyUserAdapter.ts:1:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/core/identity/adapters/LegacyUserAdapter.ts:8:  static convertLegacyUserToCanonicalUser(legacyUser: any): CanonicalUser | null {
+src/core/identity/adapters/LegacyUserAdapter.ts:21:      const canonicalDev: CanonicalUser = {
+src/core/identity/adapters/LegacyUserAdapter.ts:30:        permissions: legacyUser.permissions || ['*'], createdAt: typeof legacyUser.createdAt === 'number' ? legacyUser.createdAt : Date.now(),
+src/core/identity/adapters/LegacyUserAdapter.ts:33:      ArchitectureBoundaryEnforcer.enforceUserContract(canonicalDev);
+src/core/identity/adapters/LegacyUserAdapter.ts:81:    const scope = legacyUser.scope && typeof legacyUser.scope === 'object' ? { ...legacyUser.scope } : { level: scopeLevel };
+src/core/identity/adapters/LegacyUserAdapter.ts:97:    const canonicalUser: CanonicalUser = {
+src/core/identity/adapters/LegacyUserAdapter.ts:106:      createdAt: typeof legacyUser.createdAt === 'number' ? legacyUser.createdAt : Date.now(), updatedAt: Date.now(), deleted: false,
+src/core/identity/adapters/LegacyUserAdapter.ts:109:    ArchitectureBoundaryEnforcer.enforceUserContract(canonicalUser);
+src/core/identity/adapters/LegacyUserAdapter.ts:113:  static normalizeCanonicalUser(user: any): CanonicalUser | null {
+src/core/identity/adapters/LegacyUserAdapter.ts:114:    return this.convertLegacyUserToCanonicalUser(user);
+src/core/security/types.ts:69:export interface CanonicalSecurityUser {
+src/core/security/SecurityContextBuilder.ts:11:  public static fromCanonicalUser(user: CanonicalSecurityUser): SecurityContext {
+src/core/security/SecurityContextBuilder.ts:34:    return this.fromCanonicalUser(guestUser);
+src/core/security/SecurityContextBuilder.ts:46:    return this.fromCanonicalUser(devUser);
+src/core/security/rbac/policies.ts:2:import type { UserRole } from './roles';
+src/core/monitoring/ArchitectureGuard.ts:62:  static assertUserContract(user: any): void {
+src/core/impersonation/ImpersonationService.ts:47:    const normalizedTarget = LegacyUserAdapter.normalizeCanonicalUser({
+src/core/impersonation/ImpersonationService.ts:105:      const normalizedDev = LegacyUserAdapter.normalizeCanonicalUser({
+src/core/auth/session-provider.ts:2:import { CanonicalUser } from './canonical-user';
+src/core/auth/canonical-user.ts:14:export interface CanonicalUser {
+src/core/auth/canonical-user.ts:43:export function hasPermission(user: CanonicalUser, permission: string): boolean {
+src/core/auth/canonical-user.ts:50:export function isInScope(user: CanonicalUser, organizationId: string): boolean {
+src/core/auth/security-context.ts:1:import { CanonicalUser } from './canonical-user';
+src/core/auth/security-context.ts:11:  user: CanonicalUser | null;
+src/core/auth/claims-resolver.ts:1:import { CanonicalUser } from './canonical-user';
+src/core/auth/claims-resolver.ts:8: * menjadi model CanonicalUser yang terstandarisasi.
+src/core/auth/claims-resolver.ts:13:   * Resolve CanonicalUser dari data local (Dexie).
+src/core/auth/claims-resolver.ts:16:  static async resolveFromLocal(uid: string): Promise<CanonicalUser | null> {
+src/core/auth/claims-resolver.ts:29:   * Memetakan dokumen user (dari Firestore/Dexie) ke CanonicalUser.
+src/core/auth/claims-resolver.ts:31:  static mapToCanonical(data: any): CanonicalUser {
+src/migration/firestore/mappers/identityMapper.ts:9:export interface LegacyUser {
+src/domain/entities/user.ts:1:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/domain/entities/user.ts:4: * User Entity - Alias to CanonicalUser (Identity Layer).
+src/domain/entities/user.ts:6:export type User = CanonicalUser;
+src/domain/entities/notification.ts:2:import type { UserRole } from '@/types/roles';
+src/components/layout/GlobalSystemBar.tsx:2:import type { UserRole } from '@/types';
+src/components/ui/LocalSearchPalette.tsx:143:                    {item.type === 'teacher' && <UserCheck className="w-4 h-4" />}
+src/identity/domain/IdentityPolicy.ts:1:import type { CanonicalUser } from './CanonicalUser';
+src/identity/domain/IdentityPolicy.ts:7:  static canAccess(user: CanonicalUser, tenantId: string): boolean {
+src/identity/domain/IdentityRepository.ts:1:import type { CanonicalUser } from './CanonicalUser';
+src/identity/domain/IdentityRepository.ts:8:  getById(context: SecurityContext, id: string): Promise<CanonicalUser | null>;
+src/identity/domain/IdentityRepository.ts:9:  getByUid(context: SecurityContext, uid: string): Promise<CanonicalUser | null>;
+src/identity/domain/IdentityRepository.ts:10:  getByReferenceId(context: SecurityContext, referenceId: string): Promise<CanonicalUser | null>;
+src/identity/domain/IdentityRepository.ts:11:  getByTenant(context: SecurityContext, tenantId: string): Promise<CanonicalUser[]>;
+src/identity/domain/CanonicalUser.ts:8:import type { UserRole, AccountType } from '@/types/roles';
+src/identity/domain/CanonicalUser.ts:10:export type CanonicalRole = UserRole;
+src/identity/domain/CanonicalUser.ts:11:export type CanonicalSubRole = UserRole;
+src/identity/domain/CanonicalUser.ts:13:export type UserStatus =
+src/identity/domain/CanonicalUser.ts:23:export interface UserProfile {
+src/identity/domain/CanonicalUser.ts:33:export interface UserScope {
+src/identity/domain/CanonicalUser.ts:38:export interface UserAssignment {
+src/identity/domain/CanonicalUser.ts:47:export interface UserMetadata {
+src/identity/domain/CanonicalUser.ts:57:export interface CanonicalUser {
+src/identity/domain/CanonicalValidation.ts:6:import type { CanonicalUser } from './CanonicalUser';
+src/identity/domain/CanonicalValidation.ts:13:export function validateCanonicalUser(user: Partial<CanonicalUser> | null): ValidationResult {
+src/identity/infrastructure/CanonicalUserMapper.ts:1:import { CanonicalUser } from '../domain/CanonicalUser';
+src/identity/infrastructure/CanonicalUserMapper.ts:3:import { validateCanonicalUser } from '../domain/CanonicalValidation';
+src/identity/infrastructure/CanonicalUserMapper.ts:5:export class CanonicalUserMapperException extends Error {
+src/identity/infrastructure/CanonicalUserMapper.ts:7:    super(`[CanonicalUserMapperException] ${message}`);
+src/identity/infrastructure/CanonicalUserMapper.ts:8:    this.name = 'CanonicalUserMapperException';
+src/identity/infrastructure/CanonicalUserMapper.ts:12:export class CanonicalUserMapper {
+src/identity/infrastructure/CanonicalUserMapper.ts:21:      throw new CanonicalUserMapperException(
+src/identity/infrastructure/CanonicalUserMapper.ts:33:      throw new CanonicalUserMapperException(
+src/identity/infrastructure/CanonicalUserMapper.ts:40:  static toCanonical(data: any): CanonicalUser {
+src/identity/infrastructure/CanonicalUserMapper.ts:42:      throw new CanonicalUserMapperException(
+src/identity/infrastructure/CanonicalUserMapper.ts:43:        'Cannot map null or undefined data to CanonicalUser.'
+src/identity/infrastructure/CanonicalUserMapper.ts:51:      throw new CanonicalUserMapperException(
+src/identity/infrastructure/CanonicalUserMapper.ts:52:        'CanonicalUser requires a stable uid.'
+src/identity/infrastructure/CanonicalUserMapper.ts:68:    const canonical: CanonicalUser = {
+src/identity/infrastructure/CanonicalUserMapper.ts:130:    const validation = validateCanonicalUser(canonical);
+src/identity/infrastructure/CanonicalUserMapper.ts:133:      throw new CanonicalUserMapperException(
+src/identity/infrastructure/CanonicalUserMapper.ts:134:        `CanonicalUser validation failed. Missing required fields: ${validation.missing.join(', ')}`
+src/identity/infrastructure/UserMapper.ts:1:import { CanonicalUser } from '../domain/CanonicalUser';
+src/identity/infrastructure/UserMapper.ts:4: * UserMapper - Maps raw data to CanonicalUser.
+src/identity/infrastructure/UserMapper.ts:7:  static toCanonical(data: any): CanonicalUser {
+src/identity/infrastructure/UserRepositoryImpl.ts:3:import { CanonicalUser } from '../domain/CanonicalUser';
+src/identity/infrastructure/UserRepositoryImpl.ts:9:export class UserRepositoryImpl extends BaseRepository<CanonicalUser> implements IdentityRepository {
+src/identity/infrastructure/UserRepositoryImpl.ts:14:  async getById(context: SecurityContext, id: string): Promise<CanonicalUser | null> {
+src/identity/infrastructure/UserRepositoryImpl.ts:18:  async getByUid(context: SecurityContext, uid: string): Promise<CanonicalUser | null> {
+src/identity/infrastructure/UserRepositoryImpl.ts:20:    return (await this.table.where('tenantId').equals(context.tenantId).filter((u: CanonicalUser) => u.uid === uid).first()) || null;
+src/identity/infrastructure/UserRepositoryImpl.ts:23:  async getByReferenceId(context: SecurityContext, referenceId: string): Promise<CanonicalUser | null> {
+src/identity/infrastructure/UserRepositoryImpl.ts:25:    return (await this.table.where('tenantId').equals(context.tenantId).filter((u: CanonicalUser) => u.referenceId === referenceId).first()) || null;
+src/identity/infrastructure/UserRepositoryImpl.ts:28:  async getByTenant(context: SecurityContext, tenantId: string): Promise<CanonicalUser[]> {
+src/repositories/UserSessionRepository.ts:5:export interface UserSession extends AppEntity {
+src/repositories/UserDeviceRepository.ts:5:export interface UserDevice extends AppEntity {
+src/repositories/UserRoleRepository.ts:2:import type { User } from '@/domain/entities/user';
+src/repositories/UserRoleRepository.ts:4:import type { UserRole } from '@/types/roles';
+src/repositories/UserApprovalRepository.ts:2:import type { User } from '@/domain/entities/user';
+src/repositories/AuthRepository.ts:2:import type { User } from '@/domain/entities/user';
+src/repositories/userRepository.ts:2:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/repositories/userRepository.ts:3:import { validateCanonicalUser } from '@/identity/domain/CanonicalValidation';
+src/repositories/userRepository.ts:12:export class UserRepository extends BaseRepository<CanonicalUser> {
+src/repositories/userRepository.ts:17:  async findById(id: string, tenantId?: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:26:  async findAll(tenantId: string): Promise<CanonicalUser[]> {
+src/repositories/userRepository.ts:30:  async fetchByTenant(tenantId: string, limitVal?: number): Promise<CanonicalUser[]> {
+src/repositories/userRepository.ts:38:  async create(entity: CanonicalUser): Promise<void> {
+src/repositories/userRepository.ts:39:    const validation = validateCanonicalUser(entity);
+src/repositories/userRepository.ts:62:  async update(entity: CanonicalUser): Promise<void> {
+src/repositories/userRepository.ts:63:    const validation = validateCanonicalUser(entity);
+src/repositories/userRepository.ts:112:  async findByIdUnik(_tenantId: string, idUnik: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:118:  async findByNip(_tenantId: string, nip: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:122:  async findByNik(_tenantId: string, nik: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:126:  async getByUid(uid: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:130:  async getByEmail(email: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:137:  async findByEmail(email: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:141:  async fetchPendingRegistrations(tenantId?: string): Promise<CanonicalUser[]> {
+src/repositories/userRepository.ts:153:  async getAllUsers(): Promise<CanonicalUser[]> {
+src/types/index.ts:14:export * from '@/identity/domain/CanonicalUser';
+src/types/index.ts:19:import type { UserRole } from './roles';
+src/types/index.ts:21:  UserSchema,
+src/types/index.ts:40:import type { CanonicalUser } from "@/identity/domain/CanonicalUser";
+src/types/index.ts:41:export type User = CanonicalUser;
+src/types/index.ts:42:export type UserData = CanonicalUser;
+src/types/index.ts:43:export type UserAssignment = z.infer<typeof UserAssignmentSchema>;
+src/types/validators.ts:7:  UserSchema,
+src/types/validators.ts:84:export function safeParseUser(data: unknown): z.infer<typeof UserSchema> {
+src/types/validators.ts:85:  const defaultUser = (): z.infer<typeof UserSchema> => ({
+src/types/validators.ts:99:  return safeValidate(UserSchema, data, defaultUser, 'User').data;
+src/types/schemas.ts:82:export const UserSchema = z.object({
+src/types/schemas.ts:375:import type { CanonicalUser } from "@/identity/domain/CanonicalUser";
+src/types/schemas.ts:376:export type User = CanonicalUser;
+src/types/schemas.ts:377:export type UserData = CanonicalUser;
+src/types/userEntity.ts:2:import type { UserRole } from './roles';
+src/types/userEntity.ts:4:export interface UserEntity extends AppEntity {
+src/routes/ViewRenderer.tsx:4:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/routes/ViewRenderer.tsx:102:  user: CanonicalUser | null;
+src/features/messages/components/types.ts:1:export interface AppUser {
+src/features/messages/components/ChatList.tsx:3:import type { Chat, AppUser } from './types';
+src/features/messages/components/Messages.tsx:12:import type { AppUser, Chat, MessagesProps } from './types';
+src/features/emergency/components/EmergencyAlert.tsx:3:import type { UserRole } from '@/types';
+src/features/dashboard/components/DashboardHeader.tsx:2:import type { UserRole } from '@/types';
+src/features/dashboard/components/Greeting.tsx:3:import type { UserRole } from '@/types';
+src/features/madrasah/components/MadrasahMasterView.tsx:22:import type { UserData } from '@/types';
+src/features/auth/components/MockUserSelector.tsx:8:interface MockUserSelectorProps {
+src/features/auth/CreateAccount.tsx:28:interface UserData {
+src/features/users/stores/userManagementStore.ts:8:import type { UserData, Student, Teacher, UserRole } from '@/types';
+src/features/users/stores/userManagementStore.ts:11:interface UserManagementState {
+src/features/users/hooks/useUsers.ts:8:import type { UserData, UserRole } from '@/types';
+src/features/users/services/user.service.ts:11:import type { UserData, AccountType, Student, Teacher } from '@/types';
+src/features/users/utils/roleRegistry.ts:69:export function getValidPrimaryRoles(type: AccountType): UserRole[] {
+src/features/users/utils/roleRegistry.ts:76:export function getValidAdditionalRoles(type: AccountType): UserRole[] {
+src/features/users/components/UserManagement.tsx:26:import type { UserData, Student, Teacher} from '@/types';
+src/features/users/components/UserManagement.tsx:33:interface UserManagementProps {
+src/features/users/components/ParentPortal.tsx:3:import type { UserData, NewsItem } from '@/types';
+src/features/profile/components/AssignmentForm.tsx:7:import type { UserAssignment, UserScope } from '@/identity/domain/CanonicalUser';
+src/features/profile/components/IdentityCompletionPage.tsx:20:import type { CanonicalUser, UserAssignment, UserScope } from '@/identity/domain/CanonicalUser';
+src/features/profile/components/IdentityCompletionPage.tsx:24:  user: CanonicalUser;
+src/features/profile/components/IdentityCompletionPage.tsx:25:  onCompleted: (updatedUser: CanonicalUser) => void;
+src/features/profile/components/Profile.tsx:43:interface UserProfile {
+src/features/letters/Archives.tsx:12:import type { UserData } from '@/types';
+src/features/developer/components/UserDatabaseManagement.tsx:21:import type { User} from '@/types';
+src/features/developer/components/UserDatabaseManagement.tsx:36:interface UserDatabaseManagementProps {
+src/features/developer/components/inspectors/identity-inspector.tsx:7: * Debug tool untuk melihat identitas (CanonicalUser) yang sedang aktif.
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:6:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:94:      const userPayload: CanonicalUser = {
+src/features/developer/pages/UsersPage.tsx:11:interface UserRecord {
+src/features/developer/types/Impersonation.ts:1:export interface ImpersonationTargetUser {
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:18:import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:20:interface CanonicalUserItem {
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:41:  const [selectedUser, setSelectedUser] = useState<CanonicalUserItem | null>(null);
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:44:  const [users, setUsers] = useState<CanonicalUserItem[]>([
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:139:          const mapped: CanonicalUserItem[] = storedUsers.map((u) => ({
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:178:    const newUserItem: CanonicalUserItem = {
+src/features/developer/components/DeveloperConsole/DevTabManajemenUser.tsx:195:      const canonicalUser: CanonicalUser = {
+src/features/students/components/MutationData.tsx:7:import type { UserRole } from '@/types';
+src/features/students/components/AlumniData.tsx:7:import type { UserRole } from '@/types';
+src/features/teachers/TeacherAttendanceView.tsx:7:import type { UserRole} from '@/types';
+src/features/teachers/TeacherClassAttendance.tsx:8:import type { UserRole } from '@/types';

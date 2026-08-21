@@ -1,0 +1,457 @@
+
+=== TENANT NULLABILITY ===
+src/stores/adminStore.ts:48:    const tenantId = useUserStore.getState().tenantId;
+src/stores/adminStore.ts:86:    const tenantId = useUserStore.getState().tenantId;
+src/stores/userStore.ts:84:        if (!updated.tenantId || updated.tenantId === 'default') {
+src/hooks/useSafeFirestoreListener.ts:16:  tenantId?: string;
+src/hooks/useAttention.ts:25:      const tenantId = useUserStore.getState().tenantId;
+src/hooks/useAuthInitialization.ts:95:                  const tenantId = data.tenantId || (isDev ? 'global' : (data.madrasahId || ''));
+src/hooks/useAuthInitialization.ts:206:                  if (secCtx && secCtx.uid && (secCtx.tenantId || isDev)) {
+src/hooks/useProfileUpdate.ts:34:            tenantId || 'default',
+src/hooks/useRealtimeSubscriptions.ts:44:      const tenantId = user?.tenantId;
+src/hooks/useRealtimeSubscriptions.ts:98:        user.tenantId || undefined,
+src/hooks/useUnreadNotifications.ts:47:      tenantId: user.tenantId || 'default',
+src/hooks/useDashboardSync.ts:17:  const tenantId = useUserStore((state) => state.tenantId) || '30315537';
+src/hooks/useAppInitialization.ts:25:  const tenantId = useUserStore((state) => state.tenantId);
+src/hooks/useNews.ts:13:  const tenantId = useUserStore((s) => s.tenantId);
+src/hooks/useTenant.ts:40:  tenantId?: string;
+src/services/SyncEngine.ts:63:    if (!activeSecCtx || !activeSecCtx.tenantId || activeSecCtx.tenantId === 'global') return;
+src/services/SyncEngine.ts:489:    const tenantId = context?.tenantId;
+src/services/hooks/useLetters.ts:27:        const tenantId = useUserStore.getState().tenantId;
+src/services/offlineAutoProcessService.ts:36:          tenantId: att.tenantId || 'default'
+src/services/devConsoleService.ts:180:    const tenantId = useAuthStore.getState().user?.tenantId || '30315537';
+src/services/devConsoleService.ts:245:    const tenantId = useAuthStore.getState().user?.tenantId || '30315537';
+src/services/devConsoleService.ts:309:        if (data.tenantId === undefined || data.tenantId === null) missingTenant++;
+src/services/historyService.ts:24:    tenantId = useUserStore.getState().tenantId || 'global';
+src/services/studentService.ts:122:  const tenantId = data.tenantId || secCtx.tenantId || useUserStore.getState().tenantId;
+src/services/studentService.ts:300:  const tenantId = useUserStore.getState().tenantId;
+src/services/studentService.ts:383:  const tenantId = useUserStore.getState().tenantId;
+src/services/studentService.ts:466:    const tenantId = useUserStore.getState().tenantId;
+src/services/studentService.ts:556:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/studentService.ts:572:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/studentService.ts:574:  const classId = targetClassId || generateClassId(tenantId || '', normalizedTarget);
+src/services/userLinkingService.ts:19:    const tenantId = record.tenantId || 'default';
+src/services/firebase.ts:213:    tenantId?: string | null;
+src/services/CacheService.ts:12:  tenantId?: string;
+src/services/CacheService.ts:89:            item.tenantId === options.tenantId ||
+src/services/CacheService.ts:90:            (item.sistemJangkar && item.sistemJangkar.tenantId === options.tenantId),
+src/services/CacheService.ts:119:  async getCachedData<T>(collectionName: string, tenantId?: string): Promise<T[]> {
+src/services/CacheService.ts:123:  async saveToCache<T>(collectionName: string, data: T | T[], _tenantId?: string): Promise<any> {
+src/services/CacheService.ts:141:  async invalidateCache(collectionName: string, tenantId?: string): Promise<void> {
+src/services/CacheService.ts:142:    const cacheKey = `collection_${collectionName}_${tenantId || 'global'}`;
+src/services/realtime/Advisor.tsx:144:        const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/realtime/pendingLettersListener.ts:22:    const tenantId = useUserStore.getState().tenantId;
+src/services/realtime/userListener.ts:44:          tenantId: data.tenantId || 'default',
+src/services/realtime/userListener.ts:92:  if (!isAdmin || !tenantId || !dbGateway.db) {
+src/services/realtime/tenantListener.ts:15:  if (!tenantId || !dbGateway.db) return () => {};
+src/services/realtime/pendingApprovalListener.ts:10:    const tenantId = useUserStore.getState().tenantId;
+src/services/realtime/pendingApprovalListener.ts:44:  const tenantId = useUserStore.getState().tenantId;
+src/services/classService.ts:46:          tenantId: cls.tenantId || context.tenantId,
+src/services/classService.ts:101:      tenantId: classData.tenantId || context.tenantId,
+src/services/sync/autoFixEngine.ts:57:      const tenantId = log.tenantId || 'default';
+src/services/onboardingService.ts:109:    const tenantId = useUserStore.getState().tenantId;
+src/services/onboardingService.ts:160:    const tenantId = useUserStore.getState().tenantId;
+src/services/onboardingService.ts:187:    const tenantId = useUserStore.getState().tenantId;
+src/services/onboardingService.ts:295:    const tenantId = useUserStore.getState().tenantId;
+src/services/onboardingService.ts:322:    const tenantId = useUserStore.getState().tenantId;
+src/services/teacherAttendanceService.ts:49:    const tenantId = useUserStore.getState().tenantId;
+src/services/teacherAttendanceService.ts:116:    const tenantId = useUserStore.getState().tenantId;
+src/services/testDataService.ts:14:  const tenantId = useUserStore.getState().tenantId;
+src/services/liveChatService.ts:7:  const tenantId = useUserStore.getState().tenantId;
+src/services/liveChatService.ts:21:  realtimeHub.subscribe(`live-chat-${tenantId || 'global'}`, unsub);
+src/services/parentService.ts:10:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/parentService.ts:19:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/LocalSearchService.ts:38:    const tenantId = context.tenantId || 'default-tenant';
+src/services/userService.ts:82:    const targetTenantId = data.tenantId || context.tenantId || '30315537';
+src/services/userService.ts:200:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:215:    const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:271:  const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:285:    const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:301:    const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:338:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:387:      const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:408:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:431:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:455:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:479:    const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:515:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:534:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:631:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:660:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:693:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:789:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:811:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:862:          tenantId: reqSnap.tenantId || 'default',
+src/services/userService.ts:920:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/userService.ts:949:    const requestId = `${tenantId || 'global'}_${userId}_${now.getTime()}`;
+src/services/userService.ts:998:    const tenantId = useUserStore.getState().tenantId;
+src/services/userService.ts:1009:      const userTenantId = data.tenantId || tenantId;
+src/services/letterService.ts:74:    const tenantId = context.tenantId;
+src/services/letterService.ts:94:    const tenantId = context.tenantId;
+src/services/letterService.ts:119:    const tenantId = context.tenantId;
+src/services/letterService.ts:166:    const tenantId = context.tenantId;
+src/services/summaryFirestoreService.ts:45:  const tenantId = useUserStore.getState().tenantId;
+src/services/summaryFirestoreService.ts:103:    const tenantId = useUserStore.getState().tenantId;
+src/services/summaryFirestoreService.ts:153:    const tenantId = useUserStore.getState().tenantId;
+src/services/pointService.ts:456:		const tenantId = useUserStore.getState().tenantId || "global";
+src/services/pointService.ts:479:		const tenantId = useUserStore.getState().tenantId || "global";
+src/services/authService.ts:100:        tenantId: canonicalUser.tenantId || '',
+src/services/authService.ts:101:        portal: canonicalUser.tenantId ? 'madrasah' : 'public',
+src/services/authService.ts:178:    const tenantId = masterData.tenantId || masterData.sistemJangkar?.tenantId;
+src/services/authService.ts:272:      const tenantIdStr = studentData.tenantId || tenantId;
+src/services/authService.ts:322:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/services/authService.ts:557:      const tenantId = foundLocalUser.tenantId || '30315537';
+src/services/authService.ts:678:      const tenantId = foundLocalUser.tenantId || 'default';
+src/services/authService.ts:829:  tenantId?: string;
+src/services/authService.ts:916:  tenantId?: string;
+src/services/authService.ts:942:    const targetTenantId = payload.tenantId || '30315537';
+src/services/auditLogService.ts:31:  tenantId?: string;
+src/services/auditLogService.ts:70:    context = { tenantId: log.tenantId || 'global', uid: log.userId || 'system' };
+src/services/auditLogService.ts:135:      if (!context.tenantId || context.tenantId === 'global') {
+src/services/auditLogService.ts:136:        context = { ...context, tenantId: data.tenantId || 'global' };
+src/services/auditLogService.ts:139:      context = { tenantId: data.tenantId || 'global', uid: data.userId, isDeveloper: false };
+src/services/auditLogService.ts:161:    const tenantId = useAuthStore.getState().user?.tenantId || 'default';
+src/services/newsService.ts:12:  const tenantId = useUserStore.getState().tenantId;
+src/services/newsService.ts:25:  const tenantId = useUserStore.getState().tenantId;
+src/services/approvalService.ts:9:  const tenantId = request.tenantId;
+src/services/migrationService.ts:588:      const tenantId = data.tenantId || '30315537';
+src/services/migrationService.ts:725:        oldTenantId: beforeData.tenantId || '30315537',
+src/services/systemService.ts:202:export async function getCollectionStats(tenantId?: string) {
+src/services/systemService.ts:206:    const targetTenantId = tenantId || 'global';
+src/services/seedService.ts:169:    const tenantId = useUserStore.getState().tenantId || '30315537';
+src/services/seedService.ts:315:          tenantId: student.tenantId || 'global',
+src/services/schemaRepairService.ts:70:    const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:106:    const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:185:  const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:254:  const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:364:  const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:461:  const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:573:  const tenantId = useUserStore.getState().tenantId;
+src/services/schemaRepairService.ts:935:          tenantId: uData.tenantId || 'default',
+src/services/schemaRepairService.ts:949:  const tenantId = useUserStore.getState().tenantId;
+src/services/IdentityCompletionService.ts:85:      tenantId: user.tenantId || 'global',
+src/services/supportModuleService.ts:13:  let tenantId = useUserStore.getState().tenantId;
+src/services/supportModuleService.ts:14:  if (!tenantId || tenantId === 'global') {
+src/services/complaintService.ts:17:  tenantId?: string; // Tenant isolation key
+src/services/complaintService.ts:44:  let tenantId = useUserStore.getState().tenantId;
+src/services/complaintService.ts:45:  if (!tenantId || tenantId === 'global') {
+src/services/complaintService.ts:106:  let tenantId = useUserStore.getState().tenantId;
+src/services/complaintService.ts:107:  if (!tenantId || tenantId === 'global') {
+src/services/complaintService.ts:134:    let tenantId = useUserStore.getState().tenantId;
+src/services/complaintService.ts:135:    if (!tenantId || tenantId === 'global') {
+src/services/classChatService.ts:23:    const tenantId = useUserStore.getState().tenantId;
+src/services/tickerService.ts:6:  const tenantId = useUserStore.getState().tenantId;
+src/services/tickerService.ts:7:  return await tickerRepository.getActive(tenantId || 'global');
+src/services/tickerService.ts:15:  const tenantId = useUserStore.getState().tenantId;
+src/services/tickerService.ts:16:  await tickerRepository.delete(id, tenantId || 'global');
+src/services/dataSubmissionService.ts:13:    tenantId?: string;
+src/services/dataSubmissionService.ts:25:    const tenantId = useUserStore.getState().tenantId;
+src/services/dataSubmissionService.ts:39:        tenantId: data.tenantId || null,
+src/services/teacherService.ts:28:    tenantId = useUserStore.getState().tenantId || 'global';
+src/services/teacherService.ts:34:    tenantId = useUserStore.getState().tenantId || 'global';
+src/services/teacherService.ts:82:      tenantId: teacherData.tenantId || context.tenantId,
+src/services/teacherService.ts:144:  tenantId?: string,
+src/services/teacherService.ts:149:    const activeTenant = tenantId || context.tenantId;
+src/services/teacherService.ts:187:          tenantId: current.sistemJangkar?.tenantId || current.tenantId || '',
+src/services/teacherService.ts:209:  tenantId?: string,
+src/services/teacherService.ts:214:    const activeTenant = tenantId || context.tenantId || 'global';
+src/services/teacherService.ts:300:    if (!tenantId || !nip) return null;
+src/services/teacherService.ts:314:    if (!tenantId || !nik) return null;
+src/services/teacherService.ts:328:    if (!tenantId || !idUnik) return null;
+src/services/journalCacheService.ts:54:    const tenantId = journal.tenantId;
+src/services/rbac/UserRoleResolver.ts:20:  tenantId?: string | null;
+src/services/rbac/UserRoleResolver.ts:63:        tenantId: isDeveloper ? 'global' : user.tenantId || null,
+src/services/masterDataService.ts:19:  const tenantId = useUserStore.getState().tenantId;
+src/services/masterDataService.ts:44:  const tenantId = useUserStore.getState().tenantId;
+src/services/DashboardSummaryEngine.ts:14:    const tenantId = context.tenantId || 'default-tenant';
+src/services/DashboardSummaryEngine.ts:28:    const targetTenantId = context.tenantId || 'default-tenant';
+src/app/App.tsx:123:  const tenantId = useUserStore((state) => state.tenantId);
+src/app/App.tsx:379:    const activeTenantId = securityContext?.tenantId || tenantId;
+src/app/App.tsx:429:        tenantId: securityContext?.tenantId || tenantId || '30315537',
+src/core/context/TenantContext.ts:17:  const tenantId = context?.tenantId;
+src/core/context/TenantContext.ts:19:  if (!tenantId || tenantId.trim() === '') {
+src/core/context/TenantContext.ts:80:  static validateTenant(entity: { tenantId?: string }): boolean {
+src/core/context/TenantContext.ts:83:    return entity.tenantId === context.tenantId;
+src/migration/firestore/mappers/academicMapper.ts:37:    tenantId: legacy.tenantId || 'default_tenant',
+src/migration/firestore/mappers/academicMapper.ts:63:    tenantId: legacy.tenantId || 'default_tenant',
+src/core/session/sessionManager.ts:24:    return this.session?.tenantId ?? null;
+src/core/session/sessionManager.ts:28:    return this.session?.tenantId ?? null;
+src/migration/firestore/mappers/attendanceMapper.ts:31:    tenantId: legacy.tenantId || 'default_tenant',
+src/migration/firestore/mappers/pointMapper.ts:35:    tenantId: legacy.tenantId || 'default_tenant',
+src/migration/firestore/mappers/identityMapper.ts:31:  const tenantId = legacy.tenantId || 'default_tenant';
+src/migration/firestore/mappers/masterMapper.ts:89:    tenantId: legacy.tenantId || 'default_tenant',
+src/core/realtime/RealtimeScope.ts:64:      return `impersonated:${context.tenantId || 'global'}:${baseKey}`;
+src/core/realtime/RealtimeContextResolver.ts:16:    const tenantId = useUserStore.getState().tenantId || authUser?.tenantId;
+src/core/realtime/RealtimeContextResolver.ts:26:      tenantId: tenantId || undefined,
+src/migration/firestore/importer/importTeachers.ts:16:        const tenantId = raw.tenantId || 'madrasah_al_ikhlas';
+src/core/realtime/RealtimeHub.ts:29:    metadata?: { tenantId?: string; userId?: string; customContract?: RealtimeListenerContract }
+src/core/realtime/RealtimeHub.ts:44:      scope: metadata?.tenantId ? 'TENANT' : 'GLOBAL',
+src/core/realtime/RealtimeHub.ts:73:    metadata?: { tenantId?: string; userId?: string }
+src/core/realtime/RealtimeHub.ts:106:      if (entry.tenantId === tenantId || entry.contract.requiresTenantId) {
+src/core/realtime/RealtimeHub.ts:178:        `  • [${entry.contract.ownerDomain}] ${key} -> ${entry.contract.repository} (Tenant: ${entry.tenantId || 'global'}, Uptime: ${ageSec}s)`
+src/core/realtime/RealtimeSubscription.ts:59:  tenantId?: string;
+src/core/realtime/RealtimeSubscription.ts:72:  tenantId?: string;
+src/migration/rules/UserMigrationV2.ts:73:    let tenantId = isDeveloperTarget ? 'global' : doc.tenantId;
+src/migration/rules/UserMigrationV2.ts:75:    if (!tenantId || (isDeveloperTarget && tenantId !== 'global')) {
+src/migration/rules/UserMigrationV2.ts:124:        oldTenantId: doc.tenantId || legacy.oldTenantId,
+src/migration/rules/TenantMigration.ts:15:    const changed = !doc.tenantId || doc.schemaVersion < 2;
+src/migration/rules/TenantMigration.ts:18:      id: doc.id || doc.tenantId || 'tenant_man_1_surakarta',
+src/migration/rules/TenantMigration.ts:19:      tenantId: doc.tenantId || doc.id || 'tenant_man_1_surakarta',
+src/migration/validators/MigrationValidator.ts:31:    if (!doc.tenantId || typeof doc.tenantId !== 'string') {
+src/migration/engine/MigrationEngine.ts:31:      const docId = doc.id || doc.tenantId || 'unknown_id';
+src/sync/SyncDispatcher.ts:26:      finalPayload.tenantId = op.tenantId;
+src/sync/ConflictResolver.ts:21:    const tenantId = localEntity?.tenantId || serverEntity?.tenantId || 'global';
+src/core/boundary/ArchitectureBoundaryEnforcer.ts:111:  static enforceSyncQueue(item: any, context?: { tenantId?: string; uid?: string; isDeveloper?: boolean } | null): void {
+src/sync/types.ts:11:  tenantId?: string;
+src/sync/handlers/attendance.handler.ts:99:        payload.tenantId || 'default',
+src/sync/handlers/attendance.handler.ts:104:      tenantId: payload.tenantId || 'default',
+src/core/identity/security-context/PolicyResolver.ts:17:        tenantId: assignment.tenantId || user.tenantId || '',
+src/core/identity/security-context/SecurityContext.types.ts:28:  tenantId?: string;
+src/core/identity/security-context/SecurityContextProvider.tsx:24:        const identityContext: IdentityContext = { user, assignment: { referenceId: user.referenceId || undefined, tenantId: user.tenantId || '', portal: user.tenantId ? 'madrasah' : 'public', status: user.status || 'aktif' } };
+src/core/identity/security-context/SecurityContextProvider.tsx:38:        const identityContext: IdentityContext = { user, assignment: { referenceId: user.referenceId || undefined, tenantId: user.tenantId || '', portal: user.tenantId ? 'madrasah' : 'public', status: user.status || 'aktif' } };
+src/utils/schemaTransforms.ts:53:  const tenantId = data.tenantId || '30315537';
+src/utils/schemaTransforms.ts:147:      tenantId: data.sistemJangkar?.tenantId || data.tenantId || '30315537',
+src/utils/schemaTransforms.ts:201:      tenantId: data.sistemJangkar?.tenantId || data.tenantId || '30315537',
+src/core/identity/adapters/LegacyUserAdapter.ts:25:        tenantId: legacyUser.tenantId || 'system', scopeType: 'global', scopeId: 'global',
+src/core/identity/adapters/LegacyUserAdapter.ts:73:    let tenantId = legacyUser.tenantId || legacyUser.idTenant;
+src/core/identity/adapters/LegacyUserAdapter.ts:75:    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '' || ['unknown', 'default', 'system', 'developer'].includes(tenantId)) {
+src/core/identity/adapters/LegacyUserAdapter.ts:79:    tenantId = tenantId.trim();
+src/utils/studentValidator.ts:306:    tenantId: cleanData.tenantId || '',
+src/utils/studentValidator.ts:330:      tenantId: cleanData.sistemJangkar?.tenantId || '',
+src/core/audit/AuditLogger.ts:34:    console.log(`[AUDIT_LOG] [${entry.event}] Tenant: ${entry.tenantId || 'GLOBAL'} | Score: ${entry.healthScore ?? 'N/A'} | ${entry.details || ''}`);
+src/core/security/ScopeResolver.ts:39:    return this.context.tenantId === tenantId;
+src/utils/attendanceCalculations.ts:127:    tenantId: raw.tenantId || '',
+src/core/security/SecurityContextService.ts:28:    if (!ctx || !ctx.uid || !ctx.tenantId || !ctx.role) {
+src/core/security/contextHelper.ts:57:  let tenantId = userState.tenantId || authState.user?.tenantId || user?.tenantId;
+src/core/security/contextHelper.ts:58:  if (isDeveloper && (!tenantId || tenantId === 'global')) {
+src/domain/organization/OrganizationScope.ts:10:  tenantId?: string;
+src/core/monitoring/ArchitectureGuard.ts:74:    if (user.tenantId === undefined || user.tenantId === null) missingFields.push('tenantId');
+src/core/monitoring/ArchitectureGuard.ts:188:    tenantId?: string;
+src/core/monitoring/ArchitectureGuard.ts:262:    if (!tenantId || tenantId.trim() === '') {
+src/core/monitoring/ArchitectureGuard.ts:289:  static assertSyncQueue(item: any, context?: { tenantId?: string; uid?: string; isDeveloper?: boolean } | null): void {
+src/core/monitoring/ArchitectureGuard.ts:295:    const itemTenantId = item.tenantId || (item.payload && item.payload.tenantId);
+src/identity/domain/IdentityPolicy.ts:8:    return user.tenantId === tenantId;
+src/identity/domain/CanonicalValidation.ts:31:  if (!user.tenantId || user.tenantId.trim() === '') {
+src/identity/infrastructure/CanonicalUserMapper.ts:13:  static requireTenantId(tenantId?: string | null): string {
+src/identity/infrastructure/CanonicalUserMapper.ts:15:      !tenantId ||
+src/identity/infrastructure/CanonicalUserMapper.ts:47:    const tenantId = this.requireTenantId(data.tenantId);
+src/lib/auth-middleware.ts:41:          tenantId: decodedToken.tenantId || '',
+src/core/impersonation/ImpersonationBanner.tsx:17:  const orgName = targetUser.organizationName || targetUser.tenantId || 'Madrasah / Organisasi';
+src/core/impersonation/ImpersonationService.ts:39:    const rawTargetTenant = targetUser.tenantId || targetUser.organizationId;
+src/core/impersonation/ImpersonationService.ts:139:          tenantId: session.originalUserSnapshot?.tenantId || 'global',
+src/entities/BaseEntity.ts:5:    tenantId?: string;
+src/core/auth/claims-resolver.ts:50:      tenantId: data.tenantId || 'default',
+src/core/auth/claims-resolver.ts:51:      organizationId: data.organizationId || data.tenantId || 'default',
+src/core/auth/claims-resolver.ts:56:      scopes: data.scopes || [{ type: orgType, id: data.organizationId || data.tenantId || 'default' }],
+src/repositories/complaintRepository.ts:21:    return (await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).first()) || null;
+src/repositories/complaintRepository.ts:69:      await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).delete();
+src/repositories/AssignmentRepository.ts:18:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/AssignmentRepository.ts:66:      await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+src/repositories/ServiceSurveyRepository.ts:8:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/ServiceSurveyRepository.ts:24:    await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/TickerRepository.ts:12:      return (await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId || (t as any).tenantsId === tenantId).first()) || null;
+src/repositories/TickerRepository.ts:25:      if (!tenantId || tenantId === 'global') return all;
+src/repositories/TickerRepository.ts:26:      return all.filter(t => t.tenantId === tenantId || (t as any).tenantsId === tenantId || t.tenantId === 'global');
+src/repositories/TickerRepository.ts:31:        if (!tenantId || tenantId === 'global') return all;
+src/repositories/TickerRepository.ts:32:        return all.filter(t => t.tenantId === tenantId || (t as any).tenantsId === tenantId || t.tenantId === 'global');
+src/repositories/TickerRepository.ts:48:    await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).delete();
+src/repositories/eventRepository.ts:31:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/eventRepository.ts:79:      await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/chatRepository.ts:25:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/chatRepository.ts:41:    await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/gradeRepository.ts:26:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/gradeRepository.ts:74:      await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/newsRepository.ts:76:      const tenantId = existing?.tenantId || 'global';
+src/repositories/BaseRepository.ts:114:    if (!context || !context.tenantId || typeof context.tenantId !== 'string' || context.tenantId.trim() === '' || context.tenantId === 'default' || context.tenantId === 'unknown') {
+src/repositories/BaseRepository.ts:125:  async findById(id: string, tenantId?: string): Promise<T | null> {
+src/repositories/BaseRepository.ts:230:        if (existing && (existing as any).tenantId === tenantId) {
+src/repositories/BaseRepository.ts:241:      if (existing && (context.isDeveloper || (existing as any).tenantId === context.tenantId)) {
+src/repositories/FaqCategoryRepository.ts:18:    return (await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).first()) || null;
+src/repositories/FaqCategoryRepository.ts:34:    await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).delete();
+src/repositories/UserRoleRepository.ts:13:    return (await this.table.where('id').equals(id).filter(u => u.tenantId === tenantId).first()) || null;
+src/repositories/UserRoleRepository.ts:29:    await this.table.where('id').equals(id).filter(u => u.tenantId === tenantId).delete();
+src/repositories/SupportMessageRepository.ts:25:    return (await this.table.where('id').equals(id).filter(m => m.tenantId === tenantId).first()) || null;
+src/repositories/SupportMessageRepository.ts:41:    await this.table.where('id').equals(id).filter(m => m.tenantId === tenantId).delete();
+src/repositories/SurveyTemplateRepository.ts:8:    return (await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).first()) || null;
+src/repositories/SurveyTemplateRepository.ts:24:    await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).delete();
+src/repositories/AcademicYearRepository.ts:18:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/AcademicYearRepository.ts:66:      await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+src/repositories/SettingsRepository.ts:18:    const tenantId = context.tenantId;
+src/repositories/SettingsRepository.ts:19:    const cacheKey = `${tenantId || 'global'}:${key}`;
+src/repositories/SettingsRepository.ts:54:          .and(item => item.tenantId === tenantId)
+src/repositories/SettingsRepository.ts:74:      const tenantId = context.tenantId;
+src/repositories/SettingsRepository.ts:87:    const tenantId = context.tenantId;
+src/repositories/DashboardSummaryRepository.ts:27:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/DashboardSummaryRepository.ts:47:        tenantId: entity.tenantId || 'global',
+src/repositories/DashboardSummaryRepository.ts:66:        tenantId: entity.tenantId || 'global',
+src/repositories/DashboardSummaryRepository.ts:75:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/FaqRepository.ts:22:    return (await this.table.where('id').equals(id).filter(f => f.tenantId === tenantId).first()) || null;
+src/repositories/FaqRepository.ts:38:    await this.table.where('id').equals(id).filter(f => f.tenantId === tenantId).delete();
+src/repositories/userRepository.ts:17:  async findById(id: string, tenantId?: string): Promise<CanonicalUser | null> {
+src/repositories/userRepository.ts:86:  async delete(id: string, tenantId?: string): Promise<void> {
+src/repositories/userRepository.ts:87:    const activeTenant = tenantId || 'global';
+src/repositories/userRepository.ts:141:  async fetchPendingRegistrations(tenantId?: string): Promise<CanonicalUser[]> {
+src/repositories/userRepository.ts:144:      return await collection.filter(u => u.tenantId === tenantId).toArray();
+src/repositories/journalRepository.ts:13:    return (await this.table.where('id').equals(id).filter(j => j.tenantId === tenantId).first()) || null;
+src/repositories/journalRepository.ts:81:      await this.table.where('id').equals(id).filter(j => j.tenantId === tenantId).delete();
+src/repositories/teacherAttendanceRepository.ts:21:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/teacherAttendanceRepository.ts:37:    await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/classRepository.ts:18:    return (await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).first()) || null;
+src/repositories/classRepository.ts:66:      await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).delete();
+src/repositories/classRepository.ts:84:    const tenantId = typeof arg1 === 'string' ? arg1 : arg2 || (arg1 as any)?.tenantId;
+src/repositories/ProfileRequestRepository.ts:8:    return (await this.table.where('id').equals(id).filter(r => r.tenantId === tenantId).first()) || null;
+src/repositories/ProfileRequestRepository.ts:48:    await this.table.where('id').equals(id).filter(r => r.tenantId === tenantId).delete();
+src/repositories/notificationLogRepository.ts:17:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/notificationLogRepository.ts:33:    await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/notificationLogRepository.ts:39:    const tenantId = context.tenantId;
+src/repositories/SupportConversationRepository.ts:23:    return (await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).first()) || null;
+src/repositories/SupportConversationRepository.ts:39:    await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).delete();
+src/repositories/madrasahRepository.ts:59:        tenantId: existing.tenantId || id,
+src/repositories/madrasahRepository.ts:81:        tenantId: madrasah.tenantId || madrasah.id,
+src/repositories/attendanceRepository.ts:19:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/attendanceRepository.ts:127:      if (r && r.id && (!tenantId || r.tenantId === tenantId)) {
+src/repositories/FaqFeedbackRepository.ts:16:    return (await this.table.where('id').equals(id).filter(f => f.tenantId === tenantId).first()) || null;
+src/repositories/FaqFeedbackRepository.ts:32:    await this.table.where('id').equals(id).filter(f => f.tenantId === tenantId).delete();
+src/repositories/DayRepository.ts:14:    return (await this.table.where('id').equals(id).filter(d => d.tenantId === tenantId).first()) || null;
+src/repositories/DayRepository.ts:30:    await this.table.where('id').equals(id).filter(d => d.tenantId === tenantId).delete();
+src/repositories/SurveyStatisticsRepository.ts:8:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/SurveyStatisticsRepository.ts:24:    await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/SupportTicketRepository.ts:26:    return (await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).first()) || null;
+src/repositories/SupportTicketRepository.ts:42:    await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).delete();
+src/repositories/SyncRepository.ts:33:    const tenantId = item.tenantId || activeSecCtx?.tenantId;
+src/repositories/SyncRepository.ts:224:  async getDeadLetterItems(tenantId?: string): Promise<any[]> {
+src/repositories/DocumentationRepository.ts:14:    return (await this.table.where('id').equals(id).filter(d => d.tenantId === tenantId).first()) || null;
+src/repositories/DocumentationRepository.ts:30:    await this.table.where('id').equals(id).filter(d => d.tenantId === tenantId).delete();
+src/repositories/notificationRepository.ts:18:    return (await this.table.where('id').equals(id).filter(n => n.tenantId === tenantId).first()) || null;
+src/repositories/notificationRepository.ts:66:      await this.table.where('id').equals(id).filter(n => n.tenantId === tenantId).delete();
+src/repositories/SemesterRepository.ts:13:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/SemesterRepository.ts:61:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/ScheduleRepository.ts:19:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/ScheduleRepository.ts:67:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/messageRepository.ts:22:    return (await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).first()) || null;
+src/repositories/messageRepository.ts:38:    await this.table.where('id').equals(id).filter(e => e.tenantId === tenantId).delete();
+src/repositories/messageRepository.ts:49:    const messages = await this.table.where('chatId').equals(chatId).filter(m => m.tenantId === tenantId).toArray();
+src/repositories/messageRepository.ts:58:    await this.table.where('chatId').equals(chatId).filter(e => e.tenantId === tenantId).delete();
+src/repositories/implementations/DexieTemplateRepository.ts:24:        tenantId: context.tenantId || entity.tenantId,
+src/repositories/implementations/DexieTemplateRepository.ts:47:      await this.table.where('id').equals(id).filter(item => item.tenantId === context.tenantId).delete();
+src/repositories/implementations/DexieTemplateRepository.ts:64:      tenantId: context.tenantId || entity.tenantId,
+src/repositories/implementations/DexieTemplateRepository.ts:82:        tenantId: context.tenantId || e.tenantId,
+src/repositories/implementations/DexieClassRepository.ts:24:        tenantId: context.tenantId || entity.tenantId,
+src/repositories/implementations/DexieClassRepository.ts:47:      await this.table.where('id').equals(id).filter(item => item.tenantId === context.tenantId).delete();
+src/repositories/implementations/DexieClassRepository.ts:64:      tenantId: context.tenantId || entity.tenantId,
+src/repositories/implementations/DexieClassRepository.ts:82:        tenantId: context.tenantId || e.tenantId,
+src/repositories/SubmissionRepository.ts:12:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/SubmissionRepository.ts:60:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/SubmissionRepository.ts:91:      .filter(s => s.tenantId === tenantId)
+src/repositories/PointSummaryRepository.ts:12:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/repositories/PointSummaryRepository.ts:60:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/repositories/PointSummaryRepository.ts:75:  async getByStudent(studentId: string, tenantId?: string): Promise<StudentPointSummary | null> {
+src/repositories/PointRepository.ts:20:				.filter((p) => p.tenantId === tenantId)
+src/repositories/PointRepository.ts:146:		tenantId?: string,
+src/repositories/SurveyAnswerRepository.ts:8:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/SurveyAnswerRepository.ts:24:    await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+src/repositories/PointCategoryRepository.ts:12:    return (await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).first()) || null;
+src/repositories/PointCategoryRepository.ts:60:      await this.table.where('id').equals(id).filter(c => c.tenantId === tenantId).delete();
+src/repositories/teacherRepository.ts:19:    return (await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).first()) || null;
+src/repositories/teacherRepository.ts:73:      await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).delete();
+src/repositories/teacherRepository.ts:103:    const tenantId = typeof arg1 === 'string' ? arg1 : arg2 || (arg1 as any)?.tenantId;
+src/repositories/SupportAgentRepository.ts:20:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/SupportAgentRepository.ts:36:    await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+src/repositories/approvalRepository.ts:23:    return (await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).first()) || null;
+src/repositories/approvalRepository.ts:39:    await this.table.where('id').equals(id).filter(a => a.tenantId === tenantId).delete();
+src/repositories/letterRepository.ts:21:    return (await this.table.where('id').equals(id).filter(l => l.tenantId === tenantId).first()) || null;
+src/repositories/letterRepository.ts:86:      await this.table.where('id').equals(id).filter(l => l.tenantId === tenantId).delete();
+src/repositories/SurveyQuestionRepository.ts:8:    return (await this.table.where('id').equals(id).filter(q => q.tenantId === tenantId).first()) || null;
+src/repositories/SurveyQuestionRepository.ts:24:    await this.table.where('id').equals(id).filter(q => q.tenantId === tenantId).delete();
+src/core/authorization/services/AuthorizationService.ts:25:        const identityContext: IdentityContext = { user: state.user, assignment: { referenceId: state.user.referenceId, tenantId: state.user.tenantId || '', portal: state.user.tenantId ? 'madrasah' : 'public', status: state.user.status || 'aktif' } };
+src/features/messages/hooks/useMessages.ts:16:    if (!tenantId || !myIdUnik) return;
+src/features/messages/components/Messages.tsx:19:  const tenantId = user?.tenantId || 'default';
+src/core/authorization/policy/PolicyEngine.ts:23:      if (!context.tenantId || context.tenantId === 'global') {
+src/navigation/services/navigationService.ts:16:  tenantId?: string;
+src/navigation/services/navigationService.ts:118:      organizationId: context.tenantId || 'global',
+src/features/madrasah/components/MadrasahMasterView.tsx:287:                                      <p className="text-xs text-slate-500 font-mono">Tenant ID: {madrasah.tenantId || '-'}</p>
+src/navigation/components/OrganizationSwitcher.tsx:17:        value={tenantId || 'global'} 
+src/features/ai/components/AiAgentContainer.tsx:10:  const tenantId = useUserStore((s) => s.tenantId);
+src/features/auth/components/ReferenceIdForm.tsx:62:        tenantId: masterData.tenantId || 'default',
+src/features/reports/hooks/useReports.ts:25:  const tenantId = getSecurityContext().tenantId;
+src/features/auth/Login.tsx:82:  const tenantId = useUserStore((state) => state.tenantId);
+src/features/users/services/user.service.ts:157:    const tenantId = newUser.tenantId;
+src/features/users/components/AccountApproval.tsx:399:      const tenantId = useUserStore.getState().tenantId;
+src/features/attendance/services/attendanceService.ts:39:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:50:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:76:    const tenantId = useUserStore.getState().tenantId;
+src/features/attendance/services/attendanceService.ts:133:    const tenantId = useUserStore.getState().tenantId;
+src/features/attendance/services/attendanceService.ts:172:    const tenantId = useUserStore.getState().tenantId;
+src/features/attendance/services/attendanceService.ts:229:    const tenantIdFromStore = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:235:    const tenantId = student.sistemJangkar?.tenantId || student.tenantId;
+src/features/attendance/services/attendanceService.ts:434:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:471:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:523:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:554:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:589:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:623:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/attendance/services/attendanceService.ts:649:    const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/points/services/PointReportService.ts:37:    const tenantId = TenantContext.getContext().tenantId;
+src/features/points/services/PointReportService.ts:122:    const tenantId = TenantContext.getContext().tenantId;
+src/features/points/services/PointReportService.ts:220:    const tenantId = TenantContext.getContext().tenantId;
+src/features/points/services/PointReportService.ts:303:    const tenantId = TenantContext.getContext().tenantId;
+src/features/points/services/PointReportService.ts:386:    const tenantId = TenantContext.getContext().tenantId;
+src/features/attendance/components/QRScanner.tsx:565:      const activeTenantId = useUserStore.getState().tenantId || '30315537';
+src/features/points/components/IndividuPoinView.tsx:65:      const tenantId = TenantContext.getContext().tenantId;
+src/features/points/components/IndividuPoinView.tsx:77:      const tenantId = TenantContext.getContext().tenantId;
+src/features/points/components/IndividuPoinView.tsx:91:      const tenantId = TenantContext.getContext().tenantId;
+src/features/profile/components/IdentityCompletionPage.tsx:32:  const [tenantId, setTenantId] = useState(user.tenantId || '');
+src/features/profile/components/Profile.tsx:458:                profile.tenantId || 'default',
+src/features/developer/components/UserDatabaseManagement.tsx:113:        tenantId: newData.tenantId || activeTenantId,
+src/features/developer/components/UserDatabaseManagement.tsx:473:                            {u.tenantId || 'DEFAULT'}
+src/features/developer/components/UserDatabaseManagement.tsx:576:                    UID: {editingUser.uid} | Tenant: {editingUser.tenantId || activeTenantId}
+src/features/developer/components/UserDatabaseManagement.tsx:867:                        value={editingUser.tenantId || ''}
+src/features/developer/components/DataSubmissionForm.tsx:49:            tenantId: data.tenantId || '',
+src/features/letters/Letters.tsx:386:      const tenantId = useUserStore.getState().tenantId;
+src/features/developer/components/SchemaMigrationSection.tsx:207:        tenantId: data.sistemJangkar?.tenantId || data.tenantId || '30315537',
+src/features/developer/components/SchemaMigrationSection.tsx:260:      const tenantId = useUserStore.getState().tenantId;
+src/features/developer/components/DeveloperConsole/DevTabLogs.tsx:24:      const tenantId = useUserStore.getState().tenantId || '30315537';
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:171:            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">TenantId: <span className="font-bold text-amber-600">{targetUser?.tenantId || '30315537'}</span></p>
+src/features/audit/components/AuditClassReport.tsx:17:  const tenantId = user?.tenantId || '';
+src/features/audit/components/AuditRBACDashboard.tsx:1166:                  {userState.tenantId ? (
+src/features/audit/components/AuditStudentAttendance.tsx:17:  const tenantId = user?.tenantId || '30315537';
+src/features/audit/components/AuditLetters.tsx:12:  const tenantId = user?.tenantId || '';
+src/features/audit/components/AuditBulkSimulation.tsx:11:  const tenantId = user?.tenantId || '';
+src/features/audit/components/AuditReports.tsx:15:  const tenantId = user?.tenantId || '';
+src/features/audit/components/AuditPoints.tsx:12:  const tenantId = user?.tenantId || '';
+src/features/audit/components/AuditQRScanner.tsx:18:  const tenantId = user?.tenantId || '';
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:171:      if (!list.some((item) => item.tenantId === m.tenantId)) {
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:862:                                    tenantId: madrasah.tenantId || madrasah.npsn,
+src/features/developer/components/DeveloperConsole/SchemaAuditPanel.tsx:8:  const tenantId = user?.tenantId || '';
+src/features/presensi/services/presensiService.ts:35:    const tenantId = context.tenantId;
+src/features/presensi/services/presensiService.ts:58:      const tenantId = useUserStore.getState().tenantId;
+src/features/presensi/services/presensiService.ts:87:      const tenantId = useUserStore.getState().tenantId || '30315537';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:63:      const activeTenantId = useUserStore.getState().tenantId || '30315537';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:67:        const activeTenantId = user?.tenantId || 'global';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DLQManager.tsx:157:        tenantId: updatedPayload.tenantId || user?.tenantId || 'default',
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:192:      const activeTenantId = user?.tenantId || 'global';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:216:              if (parentDoc?.tenantId && child.tenantId !== parentDoc.tenantId) { updatedFields.tenantId = parentDoc.tenantId; needsUpdate = true; fixedTenantCount++; }
+src/features/classes/services/ClassService.ts:18:    return await dexieClassRepository.findByTenant(effectiveContext as any, effectiveContext.tenantId || '30315537');
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:51:      setSelectedTenantId(targetMadrasah.tenantId || targetMadrasah.npsn || '');
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:54:      setSelectedTenantId(allMadrasahs[0].tenantId || allMadrasahs[0].npsn || '');
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:61:    const found = allMadrasahs.find((m) => (m.tenantId || m.npsn) === tenantId);
+src/features/developer/components/Madrasah/CreateAdminMadrasahModal.tsx:204:                      <option key={m.tenantId || m.npsn} value={m.tenantId || m.npsn}>
+src/features/classes/components/ClassPromotion.tsx:29:  const tenantId = useUserStore((state) => state.tenantId);
+src/features/classes/components/ClassPromotion.tsx:80:              setTargetClassId(generateClassId(tenantId || 'tenant_default', suggested));
+src/features/classes/components/ClassList.tsx:76:  const tenantId = useUserStore((s) => s.tenantId) || 'global';
+src/features/classes/components/ClassList.tsx:478:      const activeTenantId = tenantId || context.tenantId;
+src/features/developer/pages/UsersPage.tsx:90:    const matchesTenant = !filters.tenantId || u.tenantId === filters.tenantId;
+src/features/developer/types/Impersonation.ts:7:  tenantId?: string;
+src/features/kanwil/services/kanwilDashboardService.ts:160:      tenantId: requestPayload.tenantId || 'kanwil_kalsel',
+src/features/kanwil/types.ts:31:  tenantId?: string;
+src/features/teachers/TeacherData.tsx:76:  const tenantId = useUserStore.getState().tenantId || 'global';
+src/features/teachers/TeacherData.tsx:212:        tenantId: teacher.sistemJangkar?.tenantId || teacher.tenantId || tenantId,
+src/features/journals/TeachingJournal.tsx:162:      const tenantId = useUserStore.getState().tenantId;
+src/features/journals/TeachingJournal.tsx:195:    const tenantId = useUserStore.getState().tenantId;
+src/features/students/repositories/StudentRepository.ts:36:    return (await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).first()) || null;
+src/features/students/repositories/StudentRepository.ts:44:    return await this.table.where('classId').equals(classId).filter(s => s.tenantId === tenantId).toArray();
+src/features/students/repositories/StudentRepository.ts:94:      await this.table.where('id').equals(id).filter(s => s.tenantId === tenantId).delete();
+src/features/students/components/Assignments.tsx:192:      const tenantId = useUserStore.getState().tenantId;
+src/features/students/components/Assignments.tsx:259:      const tenantId = useUserStore.getState().tenantId;
+src/features/students/components/StudentDataMain.tsx:561:      const currentTenantId = useUserStore.getState().tenantId || 'global';
+src/features/students/components/StudentDataMain.tsx:569:            tenantId: s.sistemJangkar?.tenantId || currentTenantId,
