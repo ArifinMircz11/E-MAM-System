@@ -1,52 +1,63 @@
 /**
  * CANONICAL USER MODEL (Auth Projection)
- * 
- * ADR: This is NOT the domain SSOT. Do not use this as an alternative 
- * database schema. Focuses on session evaluation and scope projection 
- * for Auth/Session providers.
+ *
+ * Canonical session identity. Firebase UID identifies the account;
+ * referenceId identifies the domain identity. Legacy identity fields such as
+ * idUnik are never part of this contract.
  */
 
 export interface Scope {
   type: 'GLOBAL' | 'KANWIL' | 'KEMENAG' | 'MADRASAH';
-  id: string; // ID organisasi terkait
+  id: string;
 }
 
+export type CanonicalAccountType =
+  | 'DEVELOPER'
+  | 'KANWIL'
+  | 'KEMENAG'
+  | 'MADRASAH'
+  | 'ADMIN'
+  | 'TEACHER'
+  | 'STUDENT'
+  | 'PARENT'
+  | 'STAFF';
+
 export interface CanonicalUser {
-  uid: string;           // Firebase UID
-  tenantId: string;      // Multi-tenant isolation ID
-  organizationId: string; // Current active organization ID
+  /** Firebase authentication identity. */
+  uid: string;
+
+  /** Domain identity reference. Never derived from idUnik/studentsId/studentId. */
+  referenceId: string;
+
+  /** Current tenant boundary. */
+  tenantId: string;
+
+  /** Current organization scope. */
+  organizationId: string;
   organizationType: 'DEVELOPER' | 'KANWIL' | 'KEMENAG' | 'MADRASAH';
-  
-  accountType: 'DEVELOPER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT' | 'STAFF';
-  
+
+  accountType: CanonicalAccountType;
+
   roles: string[];
   permissions: string[];
-  
-  scopes: Scope[];       // Daftar cakupan akses pengguna
-  
+  scopes: Scope[];
+
   status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'DELETED';
-  
+
   profile: {
     name: string;
     email: string;
     phoneNumber?: string;
     photoURL?: string;
-    identityNumber?: string; // NISN, NIP, NIK
   };
 
   metadata?: Record<string, any>;
 }
 
-/**
- * Menentukan apakah user memiliki permission tertentu.
- */
 export function hasPermission(user: CanonicalUser, permission: string): boolean {
   return user.permissions.includes(permission) || user.roles.includes('DEVELOPER');
 }
 
-/**
- * Menentukan apakah user berada dalam scope tertentu.
- */
 export function isInScope(user: CanonicalUser, organizationId: string): boolean {
   return user.organizationId === organizationId || user.scopes.some(s => s.id === organizationId);
 }
