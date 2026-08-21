@@ -9,16 +9,20 @@ import { db } from './firebase';
 import { SyncStatus } from '@/database/dexie';
 import { syncRepository } from '@/repositories/SyncRepository';
 import type { SyncQueueItem } from '@/types';
+import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { AuditLogger } from '@/core/audit/AuditLogger';
 
+const MAX_SYNC_ATTEMPTS = 5;
+const BASE_RETRY_DELAY_MS = 1_000;
+
 export class SyncEngine {
   private static isProcessing = false;
 
   static async processQueue() {
-    if (this.isProcessing || !navigator.onLine) return;
+    if (this.isProcessing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     if (!SecurityContextService.isReady()) return;
 
     const activeSecCtx = SecurityContextService.getNullableContext();
@@ -40,15 +44,7 @@ export class SyncEngine {
     }
   }
 
-  private static async processItem(item: SyncQueueItem, activeSecCtx: any) {
-    if (!activeSecCtx) {
-      throw new ArchitectureBoundaryError(
-        'sync_engine',
-        'SYNC_SECURITY_CONTEXT_MISSING',
-        'SecurityContext tidak ditemukan saat memproses item sinkronisasi.',
-      );
-    }
-
+  private static async processItem(item: SyncQueueItem, activeSecCtx: SecurityContext) {
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(
       item.tenantId,
       activeSecCtx.tenantId,
@@ -143,15 +139,17 @@ export class SyncEngine {
         { collection: item.collection, docId: item.recordId, tenantId: item.tenantId, error: error.message, attempts },
       );
 
-      if (attempts >= 5) {
+      if (attempts >= MAX_SYNC_ATTEMPTS) {
         await syncRepository.moveToDeadLetterQueue(
           item.id,
           error.message || 'Exceeded retry limit',
           error.code || 'SYNC_MAX_RETRIES_EXCEEDED',
         );
       } else {
+        const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
         await syncRepository.incrementRetry(item.id);
-        await syncRepository.updateStatus(item.id, 'pending', error.message);
+        await syncRepository.updateStatus(item.id, 'waiting', error.message);
+        await syncRepository.scheduleRetry(item.id, retryDelayMs);
       }
       throw error;
     }
