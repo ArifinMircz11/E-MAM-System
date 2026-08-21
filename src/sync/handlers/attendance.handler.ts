@@ -1,5 +1,4 @@
 import { firestoreAdapter as db } from '../adapters/firestore.adapter';
-import axios from 'axios';
 import { sanitizeForJSON, deepClean } from '@/utils/firestoreHelpers';
 import type { Student } from '@/types';
 import { generateClassId } from '@/utils/rombelHelpers';
@@ -7,46 +6,25 @@ import { generateClassId } from '@/utils/rombelHelpers';
 const ATT_COL = 'attendance';
 const STU_COL = 'students';
 
+/**
+ * Attendance sync is deliberately cloud-bound only through the SyncEngine
+ * adapter. It must never depend on an HTTP API for correctness: the queue
+ * may execute after a long offline period and must remain retry-safe.
+ */
 export async function handleAttendanceSync(payload: any, student: Student = {} as Student) {
+  if (!payload?.tenantId || !payload?.studentId || !payload?.date || !payload?.fieldName) {
+    throw new Error('ATTENDANCE_SYNC_PAYLOAD_INVALID');
+  }
+
   const attId = `${payload.studentId}_${payload.date}`;
   const attRef = db.doc(ATT_COL, attId);
-
-  const attDataSnap = await db.getDoc(attRef);
-  const attData = attDataSnap.exists() ? attDataSnap.data() : null;
-
-  if (attData && attData[payload.fieldName]) {
-    return { success: true, student, message: `Sudah terekam di sesi ${payload.session} (Already synced)` };
-  }
-
-  try {
-    const response = await axios.post('/api/attendance/scan', {
-      code: student.idUnik || student.id || payload.studentId,
-      session: payload.session,
-      isHaid: payload.isHaidMode,
-    });
-    if (response.data.success) {
-      return {
-        success: true,
-        student: sanitizeForJSON<Student>(student),
-        message: response.data.message,
-      };
-    }
-  } catch (apiErr: any) {
-    const errText = apiErr?.response?.data?.message || apiErr?.message || '';
-    if (errText.includes('Sudah terekam')) {
-      return {
-        success: true,
-        student: sanitizeForJSON<Student>(student),
-        message: errText,
-      };
-    }
-    console.warn('API request gagal, fallback ke Firestore Transaction');
-  }
 
   await db.runTransaction(async (transaction: any) => {
     const currentAttSnap = await transaction.get(attRef);
     const currentAtt = currentAttSnap.exists() ? currentAttSnap.data() : null;
-    if (currentAtt && currentAtt[payload.fieldName]) return;
+
+    // Deterministic session key makes a retried scan idempotent.
+    if (currentAtt?.[payload.fieldName]) return;
 
     let finalPointsPenalty = payload.pointsPenalty || 0;
     let alreadyHasViolation = false;
@@ -71,9 +49,7 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
       }
     }
 
-    if (alreadyHasViolation) {
-      finalPointsPenalty = 0;
-    }
+    if (alreadyHasViolation) finalPointsPenalty = 0;
 
     const isHaidMode = payload.isHaidMode || false;
     const statusVal = ['T', 'PC', 'Alpha', 'Haid', 'Hadir'].includes(payload.status)
@@ -90,20 +66,20 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
           : 0;
 
     const updateData: any = {
-      studentsId: payload.studentId || null,
+      studentsId: payload.studentId,
       studentName: payload.studentName || 'Siswa',
-      idUnik: payload.studentId || null,
+      idUnik: payload.studentId,
       nisn: payload.nisn || null,
       className: payload.className || payload.class || 'Tanpa Kelas',
       classId: generateClassId(
-        payload.tenantId || 'default',
+        payload.tenantId,
         payload.className || payload.class || 'Tanpa Kelas',
       ),
       class: payload.class || payload.className || 'Tanpa Kelas',
-      date: payload.date || new Date().toISOString().split('T')[0],
-      tenantId: payload.tenantId || 'default',
+      date: payload.date,
+      tenantId: payload.tenantId,
       tahunAngkatan: payload.academicYear || '2025',
-      [payload.fieldName || 'unknown']: payload.finalVal || '-',
+      [payload.fieldName]: payload.finalVal || '-',
       status: statusVal,
       statusGlobal:
         statusVal === 'T'
@@ -187,5 +163,9 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
     }
   });
 
-  return { success: true, student: sanitizeForJSON<Student>(student), message: payload.status };
+  return {
+    success: true,
+    student: sanitizeForJSON<Student>(student),
+    message: payload.status,
+  };
 }
