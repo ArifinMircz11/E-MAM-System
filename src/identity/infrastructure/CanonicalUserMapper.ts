@@ -1,5 +1,5 @@
 import { CanonicalUser } from '../domain/CanonicalUser';
-import { AccountType } from '@/types/roles';
+import { AccountType, UserRole } from '@/types/roles';
 import { validateCanonicalUser } from '../domain/CanonicalValidation';
 
 export class CanonicalUserMapperException extends Error {
@@ -26,6 +26,17 @@ export class CanonicalUserMapper {
     return tenantId.trim();
   }
 
+  private static normalizeRole(value: unknown): UserRole {
+    const raw = String(value ?? '').toLowerCase().trim();
+    const match = Object.values(UserRole).find((role) => role === raw);
+    if (!match) {
+      throw new CanonicalUserMapperException(
+        `Invalid canonical UserRole: "${value}".`
+      );
+    }
+    return match;
+  }
+
   static toCanonical(data: any): CanonicalUser {
     if (!data) {
       throw new CanonicalUserMapperException(
@@ -42,10 +53,10 @@ export class CanonicalUserMapper {
       );
     }
 
-    const role = data.role || data.peran || 'staf';
+    const role = this.normalizeRole(data.role || data.peran);
     const roles =
       Array.isArray(data.roles) && data.roles.length > 0
-        ? data.roles
+        ? data.roles.map((item: unknown) => this.normalizeRole(item))
         : [role];
 
     const referenceId =
@@ -57,99 +68,58 @@ export class CanonicalUserMapper {
     const canonical: CanonicalUser = {
       id: data.id || uid,
       uid,
-
       tenantId,
-
       accountType:
         data.accountType === AccountType.DEVELOPER
           ? AccountType.DEVELOPER
           : AccountType.MADRASAH,
-
       role,
       roles,
-
       referenceId,
-
       isClaimed:
-        typeof data.isClaimed === 'boolean'
-          ? data.isClaimed
-          : true,
-
+        typeof data.isClaimed === 'boolean' ? data.isClaimed : true,
       isSso: Boolean(data.isSso),
-
       approvalStatus:
-        data.approvalStatus === 'pending' ||
-        data.approvalStatus === 'rejected'
+        data.approvalStatus === 'pending' || data.approvalStatus === 'rejected'
           ? data.approvalStatus
           : 'approved',
-
       email: data.email || '',
       displayName:
         data.displayName ||
         data.namaLengkap ||
         data.namaTampilan ||
         '',
-
       photoURL: data.photoURL || null,
       phoneNumber: data.phoneNumber,
-
-      permissions: Array.isArray(data.permissions)
-        ? data.permissions
-        : [],
-
+      permissions: Array.isArray(data.permissions) ? data.permissions : [],
       studentsId: data.studentsId || null,
       teachersId: data.teachersId || null,
       walasOfClass: data.walasOfClass || null,
-
       status: data.status || 'active',
       syncStatus: data.syncStatus || 'synced',
-
       rbacVersion:
-        typeof data.rbacVersion === 'number'
-          ? data.rbacVersion
-          : 1,
-
+        typeof data.rbacVersion === 'number' ? data.rbacVersion : 1,
       securityVersion:
-        typeof data.securityVersion === 'number'
-          ? data.securityVersion
-          : 1,
-
+        typeof data.securityVersion === 'number' ? data.securityVersion : 1,
       scopeType: data.scopeType,
       scopeId: data.scopeId,
-
       profile: data.profile,
       assignment: data.assignment,
       scope: data.scope,
       metadata: data.metadata,
-
       isActive:
         typeof data.isActive === 'boolean'
           ? data.isActive
           : data.status !== 'inactive',
-
-      version:
-        typeof data.version === 'number'
-          ? data.version
-          : 1,
-
+      version: typeof data.version === 'number' ? data.version : 1,
       schemaVersion:
-        typeof data.schemaVersion === 'number'
-          ? data.schemaVersion
-          : 2,
-
+        typeof data.schemaVersion === 'number' ? data.schemaVersion : 2,
       createdAt:
-        typeof data.createdAt === 'number'
-          ? data.createdAt
-          : Date.now(),
-
+        typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
       updatedAt:
-        typeof data.updatedAt === 'number'
-          ? data.updatedAt
-          : Date.now(),
-
+        typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
       deleted: Boolean(data.deleted),
       deletedAt: data.deletedAt,
-
       peran: data.peran,
       idUnik: data.idUnik,
       nisn: data.nisn,
