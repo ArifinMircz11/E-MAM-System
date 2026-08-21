@@ -7,8 +7,12 @@ import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryE
  * IMPORTANT: this utility never derives a role from email and never supplies a
  * default role. Registration/guest classification belongs to the identity
  * resolver, not to role normalization.
+ *
+ * The optional second argument is retained only for source compatibility with
+ * older callers. It is intentionally ignored and must never influence role
+ * authority.
  */
-export const normalizeRoleStr = (roleStr: any): UserRole | null => {
+export const normalizeRoleStr = (roleStr: any, _legacyContext?: unknown): UserRole | null => {
   if (!roleStr) return null;
 
   let str = roleStr;
@@ -38,9 +42,12 @@ export const normalizeRoleStr = (roleStr: any): UserRole | null => {
 /**
  * Normalizes roles from an authoritative user document.
  * Missing/invalid roles are rejected; there is no email-based or default role.
+ * The optional second argument is retained only for source compatibility and
+ * is intentionally ignored.
  */
 export const normalizeUserDataRoles = (
   data: any,
+  _legacyContext?: unknown,
 ): { roles: UserRole[]; accountType: AccountType; primaryRole: UserRole } => {
   const rawRoles = Array.isArray(data?.roles)
     ? data.roles
@@ -63,7 +70,7 @@ export const normalizeUserDataRoles = (
   }
 
   const primaryRole = uniqueRoles[0];
-  let accountType = data?.accountType as AccountType;
+  const accountType = data?.accountType as AccountType;
 
   if (!accountType || !Object.values(AccountType).includes(accountType)) {
     throw new ArchitectureBoundaryError(
