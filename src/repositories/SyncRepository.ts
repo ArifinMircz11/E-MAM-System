@@ -1,5 +1,5 @@
-import { localDb, DatabaseResolver, type EMamDatabase } from '@/database/dexie';
-import type { SyncOperation, SyncQueueItem, SyncQueueStatus } from '@/types';
+import { DatabaseResolver, type EMamDatabase } from '@/database/dexie';
+import type { DeadLetterQueueItem, SyncOperation, SyncQueueItem, SyncQueueStatus } from '@/types';
 import { ensureStringIds } from '@/utils/schemaHelpers';
 import { getSecurityContext } from '@/core/security/contextHelper';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -9,7 +9,7 @@ import type { SecurityContext } from '@/core/security/types';
  * SyncRepository
  *
  * Single authoritative manager for the offline synchronization queue.
- * Dexie stores only the canonical SyncQueueItem contract.
+ * Dexie stores only the canonical SyncQueueItem / DeadLetterQueueItem contracts.
  */
 export class SyncRepository {
   private get db(): EMamDatabase {
@@ -133,11 +133,7 @@ export class SyncRepository {
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
-  async updateStatus(
-    id: string,
-    status: SyncQueueStatus,
-    error?: string,
-  ) {
+  async updateStatus(id: string, status: SyncQueueStatus, error?: string) {
     return await this.db.sync_queue.update(id, {
       status,
       lastError: error,
@@ -163,11 +159,15 @@ export class SyncRepository {
     return await table.update(String(recordId), { syncStatus: 'synced' });
   }
 
-  async moveToDeadLetterQueue(id: string, reason: string, errorCode = 'SYNC_MAX_RETRIES_EXCEEDED') {
+  async moveToDeadLetterQueue(
+    id: string,
+    reason: string,
+    errorCode = 'SYNC_MAX_RETRIES_EXCEEDED',
+  ): Promise<DeadLetterQueueItem | null> {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
 
-    const dlqItem = {
+    const dlqItem: DeadLetterQueueItem = {
       id: item.id,
       tenantId: item.tenantId,
       tenantsId: item.tenantId,
@@ -195,7 +195,7 @@ export class SyncRepository {
     return dlqItem;
   }
 
-  async getDeadLetterItems(tenantId?: string): Promise<any[]> {
+  async getDeadLetterItems(tenantId?: string): Promise<DeadLetterQueueItem[]> {
     if (tenantId) {
       return await this.db.dead_letter_queue.where('tenantId').equals(tenantId).sortBy('failedAt');
     }
