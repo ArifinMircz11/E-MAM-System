@@ -4,16 +4,26 @@ import { deepClean } from '@/utils/firestoreHelpers';
 export const handleLetterSync = async (type: string, payload: any) => {
   const id = payload.id;
   if (!id) {
-    console.warn('[handleLetterSync] Missing letter ID in payload', payload);
+    throw new Error('LETTER_SYNC_ENTITY_ID_MISSING');
+  }
+
+  const ref = db.doc('letters', String(id));
+  const normalizedType = String(type).toUpperCase();
+
+  if (normalizedType === 'CREATE' || normalizedType === 'ADD_LETTER') {
+    await db.setDoc(ref, deepClean(payload), { merge: true });
     return;
   }
-  const ref = db.doc('letters', id);
-  
-  if (type === 'CREATE' || type === 'ADD_LETTER') {
-    await db.setDoc(ref, deepClean(payload));
-  } else if (type === 'UPDATE' || type === 'UPDATE_LETTER') {
+
+  if (normalizedType === 'UPDATE' || normalizedType === 'UPDATE_LETTER') {
     await db.setDoc(ref, deepClean(payload), { merge: true });
-  } else if (type === 'DELETE') {
-    await db.deleteDoc(ref);
+    return;
   }
+
+  if (normalizedType === 'DELETE' || normalizedType === 'DELETE_LETTER') {
+    await db.deleteDoc(ref);
+    return;
+  }
+
+  throw new Error(`LETTER_SYNC_UNSUPPORTED_OPERATION:${type}`);
 };
