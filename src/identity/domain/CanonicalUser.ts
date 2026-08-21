@@ -68,10 +68,10 @@ export interface CanonicalUser {
   accountType: AccountType;
 
   /** Primary effective role */
-  role: string | UserRole;
+  role: UserRole;
 
   /** Effective subordinate roles */
-  roles: (string | UserRole)[];
+  roles: UserRole[];
 
   /**
    * Canonical reference key.
@@ -94,7 +94,6 @@ export interface CanonicalUser {
   displayName: string;
   photoURL?: string | null;
   phoneNumber?: string;
-
 
   /** Canonical presentation/profile data */
   profile?: UserProfile;
@@ -147,15 +146,3 @@ export interface CanonicalUser {
   nik?: string;
   nip?: string;
 }
-
-
-
-
-
-
-
-
-
-
-
-
