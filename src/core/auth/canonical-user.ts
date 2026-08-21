@@ -55,7 +55,7 @@ export interface CanonicalUser {
 }
 
 export function hasPermission(user: CanonicalUser, permission: string): boolean {
-  return user.permissions.includes(permission) || user.roles.includes('DEVELOPER');
+  return user.permissions.includes(permission) || user.roles.includes('developer');
 }
 
 export function isInScope(user: CanonicalUser, organizationId: string): boolean {
