@@ -4,29 +4,30 @@
  */
 
 import React from 'react';
+import { UserRole } from '@/types/roles';
 
 interface RoleDropdownProps {
-  role: string;
-  roles: string[];
-  onRoleChange: (role: string) => void;
-  onRolesChange: (roles: string[]) => void;
+  role: UserRole;
+  roles: UserRole[];
+  onRoleChange: (role: UserRole) => void;
+  onRolesChange: (roles: UserRole[]) => void;
 }
 
 const PRIMARY_ROLES = [
-  { id: 'admin', label: 'Administrator' },
-  { id: 'teacher', label: 'Guru' },
-  { id: 'bk', label: 'Guru BK' },
-  { id: 'tu', label: 'Tata Usaha (TU)' },
-  { id: 'student', label: 'Siswa' },
-  { id: 'parent', label: 'Orang Tua' },
+  { id: UserRole.ADMIN, label: 'Administrator' },
+  { id: UserRole.GURU, label: 'Guru' },
+  { id: UserRole.GURU_BK, label: 'Guru BK' },
+  { id: UserRole.STAF_TU, label: 'Tata Usaha (TU)' },
+  { id: UserRole.SISWA, label: 'Siswa' },
+  { id: UserRole.ORANG_TUA, label: 'Orang Tua' },
 ];
 
 const SECONDARY_ROLES = [
-  { id: 'teacher', label: 'Guru Mapel' },
-  { id: 'walas', label: 'Wali Kelas' },
-  { id: 'bk', label: 'Guru BK' },
-  { id: 'operator', label: 'Operator Madrasah' },
-  { id: 'tu', label: 'Staf TU' },
+  { id: UserRole.GURU, label: 'Guru Mapel' },
+  { id: UserRole.WALI_KELAS, label: 'Wali Kelas' },
+  { id: UserRole.GURU_BK, label: 'Guru BK' },
+  { id: UserRole.ADMIN_OPERASIONAL, label: 'Operator Madrasah' },
+  { id: UserRole.STAF_TU, label: 'Staf TU' },
 ];
 
 export const RoleDropdown: React.FC<RoleDropdownProps> = ({
@@ -35,7 +36,7 @@ export const RoleDropdown: React.FC<RoleDropdownProps> = ({
   onRoleChange,
   onRolesChange,
 }) => {
-  const handleRoleSelect = (selectedRole: string) => {
+  const handleRoleSelect = (selectedRole: UserRole) => {
     onRoleChange(selectedRole);
     // Automatically include primary role in roles array if not present
     if (!roles.includes(selectedRole)) {
@@ -43,7 +44,7 @@ export const RoleDropdown: React.FC<RoleDropdownProps> = ({
     }
   };
 
-  const handleCheckboxToggle = (roleId: string) => {
+  const handleCheckboxToggle = (roleId: UserRole) => {
     if (roles.includes(roleId)) {
       if (roles.length > 1) {
         onRolesChange(roles.filter((r) => r !== roleId));
@@ -62,7 +63,12 @@ export const RoleDropdown: React.FC<RoleDropdownProps> = ({
         </label>
         <select
           value={role}
-          onChange={(e) => handleRoleSelect(e.target.value)}
+          onChange={(e) => {
+            const selected = e.target.value;
+            if (Object.values(UserRole).includes(selected as UserRole)) {
+              handleRoleSelect(selected as UserRole);
+            }
+          }}
           className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all shadow-sm"
         >
           <option value="">-- Pilih Peran Utama --</option>

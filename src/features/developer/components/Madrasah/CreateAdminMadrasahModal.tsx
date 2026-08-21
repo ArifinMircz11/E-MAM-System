@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { AccountType } from "@/types/roles";import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { userRepository } from '@/repositories/userRepository';
 import { UserRole } from '@/types/roles';
@@ -96,7 +96,7 @@ export const CreateAdminMadrasahModal: React.FC<CreateAdminMadrasahModalProps> =
         uid: newUid,
         email: cleanEmail,
         displayName: cleanName,
-        accountType: 'madrasah',
+        accountType: AccountType.MADRASAH,
         role: UserRole.ADMIN,
         roles: [UserRole.ADMIN, UserRole.ADMIN_MADRASAH],
         permissions: ['*'],
@@ -340,4 +340,3 @@ export const CreateAdminMadrasahModal: React.FC<CreateAdminMadrasahModalProps> =
     </AnimatePresence>
   );
 };
-

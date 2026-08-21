@@ -1,4 +1,4 @@
-﻿import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
+import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { UserRole, AccountType } from '@/types/roles';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
@@ -42,7 +42,7 @@ export class LegacyUserAdapter {
         rbacVersion: legacyUser.rbacVersion || 1,
         securityVersion: legacyUser.securityVersion || 1,
         schemaVersion: 2,
-        accountType: 'developer',
+        accountType: AccountType.DEVELOPER,
         role: 'developer',
         roles: ['developer'],
         tenantId: legacyUser.tenantId || 'system',
@@ -82,8 +82,8 @@ export class LegacyUserAdapter {
       );
     }
 
-    const roleMapping: Record<string, { role: string; accountType: 'developer' | 'madrasah' | 'student' | 'teacher'; level: 'global' | 'tenant' }> = {
-      developer: { role: 'developer', accountType: 'developer', level: 'global' },
+    const roleMapping: Record<string, { role: string; accountType: AccountType.DEVELOPER | 'madrasah' | 'student' | 'teacher'; level: 'global' | 'tenant' }> = {
+      developer: { role: 'developer', accountType: AccountType.DEVELOPER, level: 'global' },
       admin: { role: 'admin', accountType: 'madrasah', level: 'tenant' },
       admin_madrasah: { role: 'admin_madrasah', accountType: 'madrasah', level: 'tenant' },
       administrator: { role: 'admin', accountType: 'madrasah', level: 'tenant' },

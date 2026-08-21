@@ -13,6 +13,7 @@ import {
 } from '@/shared/Icons';
 import { TenantDropdown } from './TenantDropdown';
 import { AccountTypeDropdown } from './AccountTypeDropdown';
+import { AccountType, UserRole } from '@/types/roles';
 import { RoleDropdown } from './RoleDropdown';
 import { AssignmentForm } from './AssignmentForm';
 import { IdentityCompletionService } from '@/services/IdentityCompletionService';
@@ -29,9 +30,9 @@ export const IdentityCompletionPage: React.FC<IdentityCompletionPageProps> = ({
   onCompleted,
 }) => {
   const [tenantId, setTenantId] = useState(user.tenantId || '');
-  const [accountType, setAccountType] = useState(user.accountType || 'madrasah');
-  const [role, setRole] = useState(String(user.role || ''));
-  const [roles, setRoles] = useState<string[]>(Array.isArray(user.roles) ? user.roles : user.role ? [String(user.role)] : []);
+  const [accountType, setAccountType] = useState<AccountType>(user.accountType ?? AccountType.MADRASAH);
+  const [role, setRole] = useState<UserRole>(Object.values(UserRole).includes(user.role as UserRole) ? user.role as UserRole : UserRole.GURU);
+  const [roles, setRoles] = useState<UserRole[]>(Array.isArray(user.roles) ? user.roles.filter((r): r is UserRole => Object.values(UserRole).includes(r as UserRole)) : user.role && Object.values(UserRole).includes(user.role as UserRole) ? [user.role as UserRole] : []);
   const [assignment, setAssignment] = useState<UserAssignment>(user.assignment || {});
   const [scope, setScope] = useState<UserScope>(user.scope || { level: 'tenant' });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,7 +62,7 @@ export const IdentityCompletionPage: React.FC<IdentityCompletionPageProps> = ({
       setIsSubmitting(true);
       const updated = await IdentityCompletionService.completeProfile(user.uid, {
         tenantId,
-        accountType: isDeveloperEligible ? accountType : 'madrasah',
+        accountType: isDeveloperEligible ? accountType : AccountType.MADRASAH,
         role,
         roles,
         assignment,

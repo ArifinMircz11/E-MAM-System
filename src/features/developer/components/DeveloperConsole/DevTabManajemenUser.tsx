@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { AccountType } from "@/types/roles";import { motion } from 'framer-motion';
 import {
   Users,
   UserPlus,
@@ -180,7 +180,7 @@ export const DevTabManajemenUser: React.FC = () => {
       name: formData.name,
       username: formData.username,
       email: cleanEmail,
-      accountType: formData.accountType,
+      accountType: formData.accountType as AccountType,
       organizationId: formData.organizationId,
       organizationName: formData.organizationName,
       role: formData.role,
@@ -197,7 +197,7 @@ export const DevTabManajemenUser: React.FC = () => {
         uid: newUid,
         email: cleanEmail,
         displayName: formData.name,
-        accountType: formData.accountType,
+        accountType: formData.accountType as AccountType,
         role: primaryRole,
         roles: [primaryRole],
         permissions: ['*'],
@@ -549,4 +549,3 @@ export const DevTabManajemenUser: React.FC = () => {
     </div>
   );
 };
-

@@ -1,4 +1,5 @@
-﻿import { CanonicalUser } from '../domain/CanonicalUser';
+import { CanonicalUser } from '../domain/CanonicalUser';
+import { AccountType } from '@/types/roles';
 import { validateCanonicalUser } from '../domain/CanonicalValidation';
 
 export class CanonicalUserMapperException extends Error {
@@ -60,9 +61,9 @@ export class CanonicalUserMapper {
       tenantId,
 
       accountType:
-        data.accountType === 'developer'
-          ? 'developer'
-          : 'madrasah',
+        data.accountType === AccountType.DEVELOPER
+          ? AccountType.DEVELOPER
+          : AccountType.MADRASAH,
 
       role,
       roles,

@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
+import { AccountType } from '@/types/roles';
 
 interface AccountTypeDropdownProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: AccountType;
+  onChange: (value: AccountType) => void;
   isDeveloperEligible?: boolean;
 }
 
@@ -39,11 +40,11 @@ export const AccountTypeDropdown: React.FC<AccountTypeDropdownProps> = ({
       </label>
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value as AccountType)}
         className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all shadow-sm"
       >
-        <option value="madrasah">Madrasah</option>
-        <option value="developer">Developer</option>
+        <option value={AccountType.MADRASAH}>Madrasah</option>
+        <option value={AccountType.DEVELOPER}>Developer</option>
       </select>
     </div>
   );
