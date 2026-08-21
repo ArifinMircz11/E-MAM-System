@@ -9,7 +9,7 @@
  *   student/siswa → students/{referenceId}
  *   teacher/guru → teachers/{referenceId}
  *
- * An authenticated account without users/{uid}, or without a resolvable
+ * An authenticated account without users/{uid}, or without an explicit
  * canonical reference, is NOT a CanonicalUser. It remains guest/pending
  * registration until an administrator approves the account.
  */
@@ -64,6 +64,11 @@ export const CANONICAL_USER_FIELD_CLASSIFICATION: Record<string, CanonicalFieldC
   displayName: 'CANONICAL',
   email: 'CANONICAL',
   isActive: 'DERIVED',
+  idUnik: 'COMPATIBILITY',
+  nisn: 'COMPATIBILITY',
+  nip: 'COMPATIBILITY',
+  nik: 'COMPATIBILITY',
+  peran: 'COMPATIBILITY',
   phone: 'COMPATIBILITY',
   phoneNumber: 'COMPATIBILITY',
   photoURL: 'COMPATIBILITY',
@@ -107,8 +112,8 @@ export interface CanonicalUser {
   id: string;
   uid: string;
 
-  /** Data isolation boundary. Global accounts may use null. */
-  tenantId: string | null;
+  /** Tenant is mandatory at the canonical/security boundary. Global system accounts use the explicit `system` tenant. */
+  tenantId: string;
 
   /** Organization/account scope from Firestore; never inferred from role alone. */
   accountType: AccountType;
@@ -136,6 +141,13 @@ export interface CanonicalUser {
   phone?: string;
   phoneNumber?: string;
   profile?: UserProfile;
+
+  /** Legacy/compatibility projection. These fields are never identity authority. */
+  idUnik?: string;
+  nisn?: string;
+  nip?: string;
+  nik?: string;
+  peran?: string;
 
   studentsId?: string | null;
   teachersId?: string | null;
