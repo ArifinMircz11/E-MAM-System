@@ -8,5 +8,5 @@ export interface IdentityRepository {
   getById(context: SecurityContext, id: string): Promise<CanonicalUser | null>;
   getByUid(context: SecurityContext, uid: string): Promise<CanonicalUser | null>;
   getByReferenceId(context: SecurityContext, referenceId: string): Promise<CanonicalUser | null>;
-  getByTenant(context: SecurityContext, tenantId: string): Promise<CanonicalUser[]>;
+  getByTenant(context: SecurityContext): Promise<CanonicalUser[]>;
 }

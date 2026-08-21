@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * e-Mam System - Integrated Madrasah Academic Manager
  * LAYER: USER & ACCOUNT MANAGEMENT SERVICE
@@ -992,31 +992,56 @@ export const submitProfileUpdateRequest = async (
  */
 export const repairUserReferenceIds = async (
   targetRole?: string,
-): Promise<{ fixed: number; total: number; crossTenantViolations: number }> => {
+): Promise<{
+  fixed: number;
+  total: number;
+  crossTenantViolations: number;
+  invalidReferences: number;
+  studentLinks: number;
+  teacherLinks: number;
+}> => {
   try {
-    if (isMockMode) return { fixed: 0, total: 0, crossTenantViolations: 0 };
+    if (isMockMode) {
+      return { fixed: 0, total: 0, crossTenantViolations: 0, invalidReferences: 0, studentLinks: 0, teacherLinks: 0 };
+    }
     const tenantId = useUserStore.getState().tenantId;
     if (!tenantId) throw new Error('tenantId required');
 
     const snapshots = await userRepository.fetchByTenant(tenantId, 1000);
-    if (snapshots.length === 0) return { fixed: 0, total: 0, crossTenantViolations: 0 };
+    if (snapshots.length === 0) {
+      return { fixed: 0, total: 0, crossTenantViolations: 0, invalidReferences: 0, studentLinks: 0, teacherLinks: 0 };
+    }
 
     let fixedCount = 0;
     let crossTenantViolations = 0;
+    let invalidReferences = 0;
+    let studentLinks = 0;
+    let teacherLinks = 0;
+
+    const getStableIdentityReference = (data: any): string =>
+      String(data.uid || data.id || data.firebaseUid || data.email).trim();
 
     for (const data of snapshots) {
-      const uid = data.id || data.uid;
-      const userTenantId = data.tenantId || tenantId;
+      const uid = String(data.uid || data.id || '').trim();
+      if (!uid) {
+        invalidReferences++;
+        continue;
+      }
 
+      const userTenantId = data.tenantId || tenantId;
+      const stableIdentityReference = getStableIdentityReference(data);
       const roleStr = String(data.role || data.accountType || '').toLowerCase();
+      if (targetRole && roleStr !== targetRole.toLowerCase()) continue;
+
       const isStudent = ['siswa', 'ketua_kelas', 'student'].includes(roleStr);
-      const isTeacher = ['guru', 'wali_kelas', 'guru_bk', 'gtk', 'staf', 'teacher'].includes(
+      const isTeacher = ['guru', 'wali_kelas', 'guru_bk', 'gtk', 'staf', 'teacher', 'kepala_madrasah'].includes(
         roleStr,
       );
 
-      let targetRefId: string | null = data.referenceId || data.uid || data.id || null;
+      let targetRefId: string = stableIdentityReference;
       let targetStudentsId: string | null = null;
       let targetTeachersId: string | null = null;
+      const violationNotes: string[] = [];
 
       if (isStudent) {
         let student = await studentRepository.findById(data.studentsId || data.referenceId || '', userTenantId);
@@ -1024,29 +1049,25 @@ export const repairUserReferenceIds = async (
           student = await studentRepository.fetchByIdUnik(userTenantId, data.idUnik || data.nisn || data.referenceId || '');
         }
 
-        if (student) {
-          if (student.tenantId && student.tenantId !== userTenantId) {
-            console.warn(`[SECURITY_VIOLATION] User ${uid} tenant (${userTenantId}) mismatch with Student master tenant (${student.tenantId}). Unlinking.`);
-            crossTenantViolations++;
-            targetRefId = null;
-            targetStudentsId = null;
-          } else {
-            targetRefId = student.id;
-            targetStudentsId = student.id;
-            // Update master entity linkage
-            if (!(student as any).linked || (student as any).userId !== uid) {
-              await studentRepository.update({
-                ...student,
-                linked: true,
-                userId: uid,
-                linkedAt: Date.now(),
-              } as any);
-            }
+        if (student && student.tenantId && student.tenantId !== userTenantId) {
+          crossTenantViolations++;
+          invalidReferences++;
+          violationNotes.push(`student-cross-tenant:${student.id}`);
+        } else if (student?.id) {
+          targetRefId = student.id;
+          targetStudentsId = student.id;
+          studentLinks++;
+          if (!(student as any).linked || (student as any).userId !== uid) {
+            await studentRepository.update({
+              ...student,
+              linked: true,
+              userId: uid,
+              linkedAt: Date.now(),
+            } as any);
           }
         } else {
-          // Unlink invalid reference if no student found
-          targetRefId = null;
-          targetStudentsId = null;
+          invalidReferences++;
+          violationNotes.push('student-reference-not-found');
         }
       } else if (isTeacher) {
         let teacher = await teacherRepository.findById(data.teachersId || data.referenceId || '', userTenantId);
@@ -1054,72 +1075,77 @@ export const repairUserReferenceIds = async (
           teacher = await teacherRepository.fetchByIdUnik(userTenantId, data.idUnik || data.nip || data.nik || data.referenceId || '');
         }
 
-        if (teacher) {
-          if (teacher.tenantId && teacher.tenantId !== userTenantId) {
-            console.warn(`[SECURITY_VIOLATION] User ${uid} tenant (${userTenantId}) mismatch with Teacher master tenant (${teacher.tenantId}). Unlinking.`);
-            crossTenantViolations++;
-            targetRefId = null;
-            targetTeachersId = null;
-          } else {
-            targetRefId = teacher.id;
-            targetTeachersId = teacher.id;
-            // Update master entity linkage
-            if (!(teacher as any).linked || (teacher as any).userId !== uid) {
-              await teacherRepository.update({
-                ...teacher,
-                linked: true,
-                userId: uid,
-                linkedAt: Date.now(),
-              } as any);
-            }
+        if (teacher && teacher.tenantId && teacher.tenantId !== userTenantId) {
+          crossTenantViolations++;
+          invalidReferences++;
+          violationNotes.push(`teacher-cross-tenant:${teacher.id}`);
+        } else if (teacher?.id) {
+          targetRefId = teacher.id;
+          targetTeachersId = teacher.id;
+          teacherLinks++;
+          if (!(teacher as any).linked || (teacher as any).userId !== uid) {
+            await teacherRepository.update({
+              ...teacher,
+              linked: true,
+              userId: uid,
+              linkedAt: Date.now(),
+            } as any);
           }
         } else {
-          targetRefId = null;
-          targetTeachersId = null;
+          invalidReferences++;
+          violationNotes.push('teacher-reference-not-found');
         }
       } else {
-        // Non-student, non-teacher user: clear any invalid NISN/NIP referenceId
-        if (data.referenceId && (data.referenceId === data.idUnik || data.referenceId === uid)) {
-          targetRefId = null;
-        } else {
-          targetRefId = data.referenceId || null;
-        }
+        targetRefId = data.referenceId || stableIdentityReference;
       }
+
+      const nextMetadata = violationNotes.length > 0
+        ? {
+            ...(data.metadata || {}),
+            referenceRepairViolations: violationNotes,
+            referenceRepairCheckedAt: Date.now(),
+          }
+        : data.metadata;
 
       if (
         data.referenceId !== targetRefId ||
         data.studentsId !== targetStudentsId ||
-        data.teachersId !== targetTeachersId
+        data.teachersId !== targetTeachersId ||
+        nextMetadata !== data.metadata
       ) {
         await userRepository.update({
           ...data,
-          referenceId: targetRefId ?? data.referenceId ?? data.uid ?? data.id,
+          referenceId: targetRefId,
           studentsId: targetStudentsId,
           teachersId: targetTeachersId,
+          metadata: nextMetadata,
           updatedAt: Date.now(),
         });
         fixedCount++;
       }
     }
 
-    if (fixedCount > 0 || crossTenantViolations > 0) {
+    if (fixedCount > 0 || crossTenantViolations > 0 || invalidReferences > 0) {
       publishUserEvent('REFERENCE_IDS_REPAIRED', {
-        count: fixedCount,
+        total: snapshots.length,
+        fixed: fixedCount,
         crossTenantViolations,
-        details: `Sinkronisasi referenceId dilakukan untuk ${fixedCount} user, mendeteksi ${crossTenantViolations} pelanggaran cross-tenant.`,
+        invalidReferences,
+        studentLinks,
+        teacherLinks,
+        details: `Sinkronisasi referenceId dilakukan untuk ${fixedCount} user, mendeteksi ${crossTenantViolations} pelanggaran cross-tenant dan ${invalidReferences} referensi invalid.`,
       });
 
       await auditLog({
         action: 'REFERENCE_ID_NORMALIZATION',
         category: 'SECURITY',
-        details: `Disinkronkan ${fixedCount} user referenceId, ${crossTenantViolations} pelanggaran batas tenant terdeteksi.`,
+        details: `Disinkronkan ${fixedCount} user referenceId, ${crossTenantViolations} pelanggaran batas tenant, ${invalidReferences} referensi invalid.`,
         schoolId: tenantId,
       });
     }
 
-    return { fixed: fixedCount, total: snapshots.length, crossTenantViolations };
+    return { fixed: fixedCount, total: snapshots.length, crossTenantViolations, invalidReferences, studentLinks, teacherLinks };
   } catch (err) {
-    console.error('repairUserReferenceIds error:', err);
     throw new Error(sanitizeError(err));
   }
 };

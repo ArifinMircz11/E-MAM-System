@@ -3,6 +3,7 @@
  * e-Mam System - Canonical User Validation & Permission Derivation
  */
 
+import { UserRole } from '@/types/roles';
 import type { CanonicalUser } from './CanonicalUser';
 
 export interface ValidationResult {
@@ -10,11 +11,21 @@ export interface ValidationResult {
   missing: string[];
 }
 
+const VALID_APPROVAL_STATUSES = new Set(['approved', 'pending', 'rejected']);
+const STUDENT_ROLES = new Set<UserRole>([UserRole.SISWA, UserRole.KETUA_KELAS]);
+const TEACHER_ROLES = new Set<UserRole>([
+  UserRole.GURU,
+  UserRole.WALI_KELAS,
+  UserRole.GURU_BK,
+  UserRole.GTK,
+  UserRole.KEPALA_MADRASAH,
+]);
+
 export function validateCanonicalUser(user: Partial<CanonicalUser> | null): ValidationResult {
   if (!user) {
     return {
       valid: false,
-      missing: ['uid', 'id', 'tenantId', 'accountType', 'role', 'roles', 'status'],
+      missing: ['uid', 'id', 'tenantId', 'accountType', 'role', 'roles', 'status', 'referenceId'],
     };
   }
 
@@ -30,7 +41,7 @@ export function validateCanonicalUser(user: Partial<CanonicalUser> | null): Vali
   }
   if (!user.tenantId || user.tenantId.trim() === '') {
     missing.push('tenantId');
-  } else if (user.role === 'developer' && user.tenantId !== 'system') {
+  } else if (user.role === UserRole.DEVELOPER && user.tenantId !== 'system') {
     missing.push('developer-tenant-system-violation');
   }
   if (!user.accountType || user.accountType.trim() === '') {
@@ -47,21 +58,23 @@ export function validateCanonicalUser(user: Partial<CanonicalUser> | null): Vali
   if (!user.status || user.status.trim() === '') {
     missing.push('status');
   }
-
-  // ReferenceId binding checks for teacher and student roles
-  if (user.role === 'guru' || user.role === 'kepala_madrasah') {
-    if (!user.referenceId && !user.teachersId) {
-      missing.push('referenceId-required-for-teacher');
-    }
+  if (!user.referenceId || user.referenceId.trim() === '') {
+    missing.push('referenceId');
   }
-  if (user.role === 'siswa') {
-    if (!user.referenceId && !user.studentsId) {
-      missing.push('referenceId-required-for-student');
-    }
+  if (!user.approvalStatus || !VALID_APPROVAL_STATUSES.has(user.approvalStatus)) {
+    missing.push('approvalStatus');
+  }
+
+  if (user.role && STUDENT_ROLES.has(user.role) && user.referenceId && user.studentsId && user.referenceId !== user.studentsId) {
+    missing.push('student-referenceId-mismatch');
+  }
+
+  if (user.role && TEACHER_ROLES.has(user.role) && user.referenceId && user.teachersId && user.referenceId !== user.teachersId) {
+    missing.push('teacher-referenceId-mismatch');
   }
 
   return {
-    valid: missing.length === 0 && user.status !== 'pending' && user.status !== 'rejected',
+    valid: missing.length === 0,
     missing,
   };
 }

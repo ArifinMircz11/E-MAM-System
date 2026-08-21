@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Canonical User Contract
  *
  * SINGLE SOURCE OF TRUTH
@@ -24,6 +24,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL?: string | null;
+  phone?: string;
   phoneNumber?: string;
   nip?: string;
   nik?: string;
@@ -43,6 +44,64 @@ export interface UserAssignment {
   teachersId?: string;
   scope?: UserScope;
 }
+
+export type CanonicalFieldCategory = 'CANONICAL' | 'COMPATIBILITY' | 'LEGACY' | 'DERIVED';
+
+/**
+ * Field classification for CanonicalUser.
+ * CANONICAL fields are the authoritative identity/security contract.
+ * COMPATIBILITY fields keep current UI/Dexie/Firestore data readable during migration.
+ * LEGACY fields are retained only until legacy data is fully normalized.
+ * DERIVED fields can be recomputed from canonical/domain state.
+ */
+export const CANONICAL_USER_FIELD_CLASSIFICATION: Record<string, CanonicalFieldCategory> = {
+  id: 'CANONICAL',
+  uid: 'CANONICAL',
+  tenantId: 'CANONICAL',
+  accountType: 'CANONICAL',
+  role: 'CANONICAL',
+  roles: 'CANONICAL',
+  permissions: 'CANONICAL',
+  referenceId: 'CANONICAL',
+  isClaimed: 'CANONICAL',
+  isSso: 'CANONICAL',
+  approvalStatus: 'CANONICAL',
+  status: 'CANONICAL',
+  isActive: 'DERIVED',
+  displayName: 'CANONICAL',
+  email: 'CANONICAL',
+  phone: 'COMPATIBILITY',
+  phoneNumber: 'COMPATIBILITY',
+  photoURL: 'COMPATIBILITY',
+  profile: 'COMPATIBILITY',
+  studentsId: 'COMPATIBILITY',
+  teachersId: 'COMPATIBILITY',
+  walasOfClass: 'COMPATIBILITY',
+  entityType: 'DERIVED',
+  idUnik: 'LEGACY',
+  nik: 'LEGACY',
+  nisn: 'LEGACY',
+  nip: 'LEGACY',
+  assignment: 'COMPATIBILITY',
+  scope: 'COMPATIBILITY',
+  scopeType: 'COMPATIBILITY',
+  scopeId: 'COMPATIBILITY',
+  targetRombel: 'COMPATIBILITY',
+  tingkatRombel: 'COMPATIBILITY',
+  class: 'COMPATIBILITY',
+  metadata: 'COMPATIBILITY',
+  rbacVersion: 'CANONICAL',
+  securityVersion: 'CANONICAL',
+  schemaVersion: 'CANONICAL',
+  syncStatus: 'CANONICAL',
+  version: 'CANONICAL',
+  createdAt: 'CANONICAL',
+  updatedAt: 'CANONICAL',
+  createdBy: 'CANONICAL',
+  updatedBy: 'CANONICAL',
+  lastLoginAt: 'COMPATIBILITY',
+  deleted: 'CANONICAL',
+};
 
 export interface UserMetadata {
   isActivationRequest?: boolean;
@@ -93,6 +152,7 @@ export interface CanonicalUser {
   email: string;
   displayName: string;
   photoURL?: string | null;
+  phone?: string;
   phoneNumber?: string;
 
   /** Canonical presentation/profile data */
@@ -104,6 +164,14 @@ export interface CanonicalUser {
   studentsId?: string | null;
   teachersId?: string | null;
   walasOfClass?: string | null;
+
+  /** Derived entity classification for UI and migration compatibility */
+  entityType?: 'student' | 'teacher' | 'staff' | 'admin' | 'developer' | 'parent' | string | null;
+
+  /** Compatibility academic placement fields */
+  targetRombel?: string | null;
+  tingkatRombel?: string | null;
+  class?: string | null;
 
   /** Account lifecycle state */
   status: UserStatus;
@@ -135,6 +203,9 @@ export interface CanonicalUser {
   /** Audit timestamps */
   createdAt: number;
   updatedAt: number;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  lastLoginAt?: number | null;
 
   deleted: boolean;
   deletedAt?: number;

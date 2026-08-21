@@ -25,9 +25,9 @@ export class UserRepositoryImpl extends BaseRepository<CanonicalUser> implements
     return (await this.table.where('tenantId').equals(context.tenantId).filter((u: CanonicalUser) => u.referenceId === referenceId).first()) || null;
   }
 
-  async getByTenant(context: SecurityContext, tenantId: string): Promise<CanonicalUser[]> {
+  async getByTenant(context: SecurityContext): Promise<CanonicalUser[]> {
     this.validateContext(context, 'getByTenant');
-    return await this.table.where('tenantId').equals(tenantId).toArray();
+    return await this.table.where('tenantId').equals(context.tenantId).toArray();
   }
 }
 

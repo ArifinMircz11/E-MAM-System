@@ -3,6 +3,7 @@ import { UserRole, AccountType } from '@/types/roles';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 import { reportArchitectureViolation } from '@/core/monitoring/ArchitectureGuard';
+import { CanonicalUserMapper } from '@/identity/infrastructure/CanonicalUserMapper';
 
 export class LegacyUserAdapter {
   static convertLegacyUserToCanonicalUser(legacyUser: any): CanonicalUser | null {
@@ -26,12 +27,13 @@ export class LegacyUserAdapter {
         status: (legacyUser.status === 'aktif' || legacyUser.status === 'active') ? 'active' : (legacyUser.status || 'active'),
         isActive: true, isSso: Boolean(legacyUser.isSso), isClaimed: Boolean(legacyUser.isClaimed), approvalStatus: legacyUser.approvalStatus || 'approved',
         profile: { email: email || 'developer@emam.internal', displayName: namaTampilan, photoURL: legacyUser.photoURL || null },
-        metadata: legacyUser.metadata || {}, referenceId: legacyUser.referenceId || legacyUser.idUnik || uid,
+        metadata: legacyUser.metadata || {}, referenceId: uid,
         permissions: legacyUser.permissions || ['*'], createdAt: typeof legacyUser.createdAt === 'number' ? legacyUser.createdAt : Date.now(),
         updatedAt: Date.now(), deleted: false, syncStatus: legacyUser.syncStatus || 'synced',
       };
-      ArchitectureBoundaryEnforcer.enforceUserContract(canonicalDev);
-      return canonicalDev;
+      const normalizedDev = CanonicalUserMapper.toCanonical(canonicalDev);
+      ArchitectureBoundaryEnforcer.enforceUserContract(normalizedDev);
+      return normalizedDev;
     }
 
     if (!rawRole && rolesArray.length === 0) {
@@ -91,8 +93,13 @@ export class LegacyUserAdapter {
     const namaTampilan = legacyUser.namaTampilan || legacyUser.displayName || legacyUser.name || 'User';
     const uid = legacyUser.uid || legacyUser.id || '';
     if (!uid) throw new ArchitectureBoundaryError('identity', 'IDENTITY_UID_MISSING', 'Identitas Pengguna tidak memiliki UID / ID yang valid.');
-    const referenceId = legacyUser.referenceId || legacyUser.idUnik || legacyUser.studentsId || legacyUser.teachersId || uid;
-    if (legacyUser.idUnik && !legacyUser.referenceId) reportArchitectureViolation('user_contract', 'Audit legacy field "idUnik" dipetakan ke canonical "referenceId".', { idUnik: legacyUser.idUnik });
+    const stableIdentityRef = legacyUser.uid || legacyUser.id || legacyUser.firebaseUid || email;
+    const studentsId = typeof legacyUser.studentsId === 'string' && legacyUser.studentsId.trim() !== '' ? legacyUser.studentsId.trim() : null;
+    const teachersId = typeof legacyUser.teachersId === 'string' && legacyUser.teachersId.trim() !== '' ? legacyUser.teachersId.trim() : null;
+    const isStudentRole = [UserRole.SISWA, UserRole.KETUA_KELAS].includes(role);
+    const isTeacherRole = [UserRole.GURU, UserRole.WALI_KELAS, UserRole.GURU_BK, UserRole.GTK, UserRole.KEPALA_MADRASAH].includes(role);
+    const referenceId = isStudentRole ? (studentsId || stableIdentityRef) : isTeacherRole ? (teachersId || stableIdentityRef) : (legacyUser.referenceId || stableIdentityRef);
+    if (legacyUser.idUnik && !legacyUser.referenceId) reportArchitectureViolation('user_contract', 'Audit legacy field "idUnik" tetap dipertahankan sebagai legacy compatibility, bukan canonical referenceId.', { idUnik: legacyUser.idUnik });
 
     const canonicalUser: CanonicalUser = {
       uid, id: uid, email: email || 'user@emam.internal', displayName: namaTampilan,
@@ -102,12 +109,13 @@ export class LegacyUserAdapter {
       isSso: Boolean(legacyUser.isSso), isClaimed: Boolean(legacyUser.isClaimed),
       approvalStatus: legacyUser.approvalStatus || legacyUser.metadata?.approvalStatus || (status === 'pending' ? 'pending' : 'approved'),
       permissions: legacyUser.permissions || [], profile: { email: email || 'user@emam.internal', displayName: namaTampilan, photoURL: legacyUser.photoURL || null },
-      metadata: legacyUser.metadata || {}, referenceId, studentsId: legacyUser.studentsId || null, teachersId: legacyUser.teachersId || null,
+      metadata: legacyUser.metadata || {}, referenceId, studentsId: isStudentRole ? studentsId : null, teachersId: isTeacherRole ? teachersId : null,
       createdAt: typeof legacyUser.createdAt === 'number' ? legacyUser.createdAt : Date.now(), updatedAt: Date.now(), deleted: false,
       scope: scope as any, syncStatus: legacyUser.syncStatus || 'synced',
     };
-    ArchitectureBoundaryEnforcer.enforceUserContract(canonicalUser);
-    return canonicalUser;
+    const normalized = CanonicalUserMapper.toCanonical(canonicalUser);
+    ArchitectureBoundaryEnforcer.enforceUserContract(normalized);
+    return normalized;
   }
 
   static normalizeCanonicalUser(user: any): CanonicalUser | null {
