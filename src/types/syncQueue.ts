@@ -16,36 +16,24 @@ export type SyncOperation =
 export type SyncQueueStatus =
   | 'pending'
   | 'processing'
+  | 'waiting'
   | 'completed'
   | 'success'
   | 'failed';
 
 export interface SyncQueueItem {
-  /** Stable queue item identifier. */
   id: string;
-  /** Tenant isolation boundary. */
   tenantId: string;
-  /** Canonical mutation operation. */
   operation: SyncOperation;
-  /** Canonical collection name. */
   collection: string;
-  /** Canonical target record identifier. */
   recordId?: string;
-  /** Mutation payload captured at the Dexie transaction boundary. */
   payload: unknown;
-  /** Current outbox processing state. */
   status: SyncQueueStatus;
-  /** Number of failed processing attempts. */
   attempts: number;
-  /** Creation timestamp in epoch milliseconds. */
   createdAt: number;
-  /** Last queue state update timestamp in epoch milliseconds. */
   updatedAt?: number;
-  /** Earliest retry time, represented as an ISO timestamp. */
   nextRetryAt?: string;
-  /** Last normalized error message. */
   lastError?: string;
-  /** Non-contractual operational metadata. */
   metadata?: {
     actorId?: string;
     idempotencyKey?: string;
@@ -53,10 +41,25 @@ export interface SyncQueueItem {
   };
 }
 
-/**
- * Legacy queue records are accepted only at migration/normalization boundaries.
- * They must not be used as the canonical SyncEngine contract.
- */
+export interface DeadLetterQueueItem {
+  id: string;
+  tenantId: string;
+  tenantsId?: string;
+  collection: string;
+  entityId?: string;
+  operation: SyncOperation;
+  payload: unknown;
+  version: number;
+  errorCode: string;
+  errorReason: string;
+  createdBy: string;
+  updatedBy?: string;
+  status: 'dead_letter';
+  retryCount: number;
+  createdAt: number;
+  failedAt: number;
+}
+
 export interface LegacySyncQueueItem {
   id: string;
   tenantId: string;
@@ -73,7 +76,6 @@ export interface LegacySyncQueueItem {
   updatedAt?: number;
 }
 
-/** Converts legacy queue vocabulary to the canonical contract. */
 export function normalizeSyncOperation(
   action: LegacySyncQueueItem['action'],
 ): SyncOperation {
@@ -107,6 +109,7 @@ export function normalizeSyncQueueItem(
     payload: legacy.payload ?? null,
     status:
       legacy.status === 'processing' ||
+      legacy.status === 'waiting' ||
       legacy.status === 'completed' ||
       legacy.status === 'success' ||
       legacy.status === 'failed'
