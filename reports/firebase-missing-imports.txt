@@ -19,7 +19,6 @@ auth : C:\E-MAM-System\src\features\teachers\TeacherAccountManagement.tsx
 auth : C:\E-MAM-System\src\features\users\components\AccountApproval.tsx
 auth : C:\E-MAM-System\src\features\users\components\UserManagement.tsx
 auth : C:\E-MAM-System\src\hooks\useAuthInitialization.ts
-auth : C:\E-MAM-System\src\identity\domain\CanonicalUser.ts
 auth : C:\E-MAM-System\src\lib\firestoreHelpers.ts
 auth : C:\E-MAM-System\src\repositories\userRepository.ts
 auth : C:\E-MAM-System\src\routes\ViewRegistry.ts
@@ -65,7 +64,6 @@ collection : C:\E-MAM-System\src\features\students\repositories\StudentRepositor
 collection : C:\E-MAM-System\src\features\users\services\user.service.ts
 collection : C:\E-MAM-System\src\hooks\useAdminNotification.ts
 collection : C:\E-MAM-System\src\hooks\usePaginatedQuery.ts
-collection : C:\E-MAM-System\src\identity\domain\CanonicalUser.ts
 collection : C:\E-MAM-System\src\infrastructure\datasource\SyncDataSource.ts
 collection : C:\E-MAM-System\src\lib\auth-middleware.ts
 collection : C:\E-MAM-System\src\lib\notification-service.ts
