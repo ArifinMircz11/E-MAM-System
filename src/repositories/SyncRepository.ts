@@ -1,5 +1,5 @@
 import { localDb, DatabaseResolver, type EMamDatabase } from '@/database/dexie';
-import type { SyncQueueItem } from '@/types';
+import type { SyncOperation, SyncQueueItem, SyncQueueStatus } from '@/types';
 import { ensureStringIds } from '@/utils/schemaHelpers';
 import { getSecurityContext } from '@/core/security/contextHelper';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -9,7 +9,7 @@ import type { SecurityContext } from '@/core/security/types';
  * SyncRepository
  *
  * Single authoritative manager for the offline synchronization queue.
- * Tenant-scoped queue records are always bound to SecurityContext.
+ * Dexie stores only the canonical SyncQueueItem contract.
  */
 export class SyncRepository {
   private get db(): EMamDatabase {
@@ -17,19 +17,18 @@ export class SyncRepository {
   }
 
   async enqueue(
-    item: Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'retryCount' | 'attempts' | 'operation' | 'action'> & {
-      action?: string;
-      operation?: string;
+    item: Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'attempts' | 'operation'> & {
+      operation?: SyncOperation;
+      metadata?: SyncQueueItem['metadata'];
     },
     context?: SecurityContext,
-    options: { triggerSync?: boolean; db?: any } = { triggerSync: true }
+    options: { triggerSync?: boolean; db?: EMamDatabase } = { triggerSync: true },
   ) {
     const activeSecCtx = context || getSecurityContext(false);
     if (!activeSecCtx?.uid || !activeSecCtx.tenantId) {
       throw new Error('SYNC_QUEUE_SECURITY_CONTEXT_INVALID: SecurityContext wajib tersedia saat enqueue.');
     }
 
-    // SecurityContext is authoritative. A caller cannot silently inject another tenant.
     const requestedTenantId = item.tenantId;
     const tenantId = activeSecCtx.tenantId;
     const isExplicitGlobalScope = activeSecCtx.isDeveloper && tenantId === 'global';
@@ -39,31 +38,32 @@ export class SyncRepository {
         tenantId,
         requestedTenantId,
         'sync_queue',
-        activeSecCtx.isDeveloper
+        activeSecCtx.isDeveloper,
       );
     }
 
     const actorUid = activeSecCtx.uid;
     const sanitizedPayload = ensureStringIds(item.payload);
-
-    let docId =
-      (item as any).documentId ||
-      (item as any).entityId ||
-      sanitizedPayload?.id ||
-      sanitizedPayload?.idUnik ||
-      sanitizedPayload?.uid ||
-      sanitizedPayload?.userId ||
-      sanitizedPayload?.studentId ||
-      sanitizedPayload?.studentsId ||
-      sanitizedPayload?.teacherId ||
-      sanitizedPayload?.teachersId ||
-      sanitizedPayload?.classId;
+    let docId = item.recordId;
 
     if (!docId && sanitizedPayload && typeof sanitizedPayload === 'object') {
-      for (const key of Object.keys(sanitizedPayload)) {
-        if (key.toLowerCase().endsWith('id') && sanitizedPayload[key] && typeof sanitizedPayload[key] !== 'object') {
-          docId = String(sanitizedPayload[key]);
+      const candidate = sanitizedPayload as Record<string, unknown>;
+      const preferredKeys = [
+        'id', 'idUnik', 'uid', 'userId', 'studentId', 'studentsId',
+        'teacherId', 'teachersId', 'classId', 'classesId',
+      ];
+      for (const key of preferredKeys) {
+        if (candidate[key] && typeof candidate[key] !== 'object') {
+          docId = String(candidate[key]);
           break;
+        }
+      }
+      if (!docId) {
+        for (const key of Object.keys(candidate)) {
+          if (key.toLowerCase().endsWith('id') && candidate[key] && typeof candidate[key] !== 'object') {
+            docId = String(candidate[key]);
+            break;
+          }
         }
       }
     }
@@ -73,23 +73,9 @@ export class SyncRepository {
     }
 
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const originalAction = (item.action || (item as any).operation || 'UPDATE').toUpperCase();
-
-    let operation: 'create' | 'update' | 'delete' | 'patch' | 'bulk_create' | 'bulk_update' = 'update';
-    let metadataAction = ((item.metadata as any)?.action || item.action || '').toLowerCase();
-
-    if (originalAction === 'CREATE' || originalAction === 'CREATE_STUDENT' || originalAction === 'CREATE_TEACHER') operation = 'create';
-    else if (originalAction === 'DELETE' || originalAction === 'DELETE_STUDENT' || originalAction === 'DELETE_TEACHER') operation = 'delete';
-    else if (originalAction === 'PATCH') operation = 'patch';
-    else if (originalAction === 'BULK_CREATE') operation = 'bulk_create';
-    else if (originalAction === 'BULK_UPDATE') operation = 'bulk_update';
-    else if (originalAction === 'SCAN_PRESENSI' || originalAction === 'ADD_POINT') operation = 'create';
-    else if (originalAction === 'ATTENDANCE_PROCESS' || originalAction === 'AUTO_SWEEP' || originalAction === 'REPAIR_POINTS') operation = 'patch';
-    else if (originalAction === 'BATCH_SYNC') operation = 'bulk_create';
-    else if (originalAction === 'BATCH_DELETE') operation = 'delete';
+    const operation = item.operation ?? 'update';
 
     const candidateItem: SyncQueueItem = {
-      ...item,
       id,
       tenantId,
       operation,
@@ -101,21 +87,11 @@ export class SyncRepository {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       metadata: {
-        action: metadataAction,
-        actorId: actorUid,
-        idempotencyKey: (item as any).metadata?.idempotencyKey || id,
+        ...(item.metadata ?? {}),
+        actorId: item.metadata?.actorId ?? actorUid,
+        idempotencyKey: item.metadata?.idempotencyKey ?? id,
       },
-      action: originalAction as any,
-      retryCount: 0,
-      error: undefined,
-      createdBy: (item as any).createdBy || actorUid,
-      updatedBy: (item as any).updatedBy || actorUid,
-      entityId: docId ? String(docId) : (item as any).entityId,
-      entityType: item.collection,
-      operationId: (item as any).operationId || id,
-      correlationId: (item as any).correlationId || `CORR_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      documentId: docId ? String(docId) : undefined,
-    } as any;
+    };
 
     ArchitectureBoundaryEnforcer.enforceSyncQueue(candidateItem, activeSecCtx);
 
@@ -126,7 +102,7 @@ export class SyncRepository {
       setTimeout(() => {
         import('@/services/SyncEngine').then(({ SyncEngine }) => {
           SyncEngine.processQueue().catch((err) =>
-            console.warn('[SyncRepository] Background auto-sync trigger warning:', err)
+            console.warn('[SyncRepository] Background auto-sync trigger warning:', err),
           );
         });
       }, 100);
@@ -135,7 +111,6 @@ export class SyncRepository {
     return res;
   }
 
-  /** Returns only retryable queue items belonging to the active SecurityContext tenant. */
   async getPendingItems(context?: SecurityContext): Promise<SyncQueueItem[]> {
     const activeSecCtx = context || getSecurityContext(false);
     if (!activeSecCtx?.tenantId) return [];
@@ -160,12 +135,11 @@ export class SyncRepository {
 
   async updateStatus(
     id: string,
-    status: 'pending' | 'processing' | 'completed' | 'failed' | 'dead_letter',
+    status: SyncQueueStatus,
     error?: string,
   ) {
     return await this.db.sync_queue.update(id, {
       status,
-      error,
       lastError: error,
       updatedAt: Date.now(),
     });
@@ -173,36 +147,34 @@ export class SyncRepository {
 
   async incrementRetry(id: string) {
     const item = await this.db.sync_queue.get(id);
-    if (item) {
-      const newAttempts = (item.attempts || item.retryCount || 0) + 1;
-      return await this.db.sync_queue.update(id, {
-        attempts: newAttempts,
-        retryCount: newAttempts,
-        updatedAt: Date.now(),
-      });
-    }
-    return null;
+    if (!item) return null;
+
+    const newAttempts = (item.attempts || 0) + 1;
+    return await this.db.sync_queue.update(id, {
+      attempts: newAttempts,
+      updatedAt: Date.now(),
+    });
   }
 
-  async moveToDeadLetterQueue(id: string, reason: string, errorCode: string = 'SYNC_MAX_RETRIES_EXCEEDED') {
+  async moveToDeadLetterQueue(id: string, reason: string, errorCode = 'SYNC_MAX_RETRIES_EXCEEDED') {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
 
     const dlqItem = {
       id: item.id,
       tenantId: item.tenantId,
-      tenantsId: (item as any).tenantsId || item.tenantId,
+      tenantsId: item.tenantId,
       collection: item.collection,
-      entityId: (item as any).entityId || item.documentId || item.payload?.id,
-      operation: item.action || (item as any).operation,
+      entityId: item.recordId,
+      operation: item.operation,
       payload: item.payload,
-      version: item.payload?.version || 1,
+      version: item.metadata?.version || 1,
       errorCode,
       errorReason: reason,
-      createdBy: (item as any).createdBy || 'system',
-      updatedBy: (item as any).updatedBy || 'system',
+      createdBy: item.metadata?.actorId || 'system',
+      updatedBy: item.metadata?.actorId || 'system',
       status: 'dead_letter',
-      retryCount: item.retryCount || 0,
+      retryCount: item.attempts,
       createdAt: item.createdAt || Date.now(),
       failedAt: Date.now(),
     };
