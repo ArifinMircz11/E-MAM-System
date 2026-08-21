@@ -8,18 +8,14 @@ import type { SecurityContext } from '@/core/security/types';
 /**
  * SyncRepository
  *
- * Manages the offline synchronization queue in Dexie.
- * Single Authoritative Manager for Sync Queue Operations.
- * Enforces strict Fail-Closed Sync Queue Boundaries.
+ * Single authoritative manager for the offline synchronization queue.
+ * Tenant-scoped queue records are always bound to SecurityContext.
  */
 export class SyncRepository {
   private get db(): EMamDatabase {
     return DatabaseResolver.getDatabase();
   }
 
-  /**
-   * Adds an item to the sync queue with strict architecture boundary validation.
-   */
   async enqueue(
     item: Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'retryCount' | 'attempts' | 'operation' | 'action'> & {
       action?: string;
@@ -28,15 +24,28 @@ export class SyncRepository {
     context?: SecurityContext,
     options: { triggerSync?: boolean; db?: any } = { triggerSync: true }
   ) {
-    // 1. Get active SecurityContext
     const activeSecCtx = context || getSecurityContext(false);
-    const tenantId = item.tenantId || activeSecCtx?.tenantId;
-    const actorUid = activeSecCtx?.uid || (item as any).createdBy || 'system';
+    if (!activeSecCtx?.uid || !activeSecCtx.tenantId) {
+      throw new Error('SYNC_QUEUE_SECURITY_CONTEXT_INVALID: SecurityContext wajib tersedia saat enqueue.');
+    }
 
-    // 2. Sanitize payload to ensure ID String Protocol
+    // SecurityContext is authoritative. A caller cannot silently inject another tenant.
+    const requestedTenantId = item.tenantId;
+    const tenantId = activeSecCtx.tenantId;
+    const isExplicitGlobalScope = activeSecCtx.isDeveloper && tenantId === 'global';
+
+    if (!isExplicitGlobalScope && requestedTenantId && requestedTenantId !== tenantId) {
+      ArchitectureBoundaryEnforcer.enforceTenantAccess(
+        tenantId,
+        requestedTenantId,
+        'sync_queue',
+        activeSecCtx.isDeveloper
+      );
+    }
+
+    const actorUid = activeSecCtx.uid;
     const sanitizedPayload = ensureStringIds(item.payload);
 
-    // 3. Extract or infer document ID
     let docId =
       (item as any).documentId ||
       (item as any).entityId ||
@@ -66,34 +75,23 @@ export class SyncRepository {
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const originalAction = (item.action || (item as any).operation || 'UPDATE').toUpperCase();
 
-    // Map original action to canonical SyncOperation (lowercase)
     let operation: 'create' | 'update' | 'delete' | 'patch' | 'bulk_create' | 'bulk_update' = 'update';
     let metadataAction = ((item.metadata as any)?.action || item.action || '').toLowerCase();
 
-    if (originalAction === 'CREATE' || originalAction === 'CREATE_STUDENT' || originalAction === 'CREATE_TEACHER') {
-      operation = 'create';
-    } else if (originalAction === 'DELETE' || originalAction === 'DELETE_STUDENT' || originalAction === 'DELETE_TEACHER') {
-      operation = 'delete';
-    } else if (originalAction === 'PATCH') {
-      operation = 'patch';
-    } else if (originalAction === 'BULK_CREATE') {
-      operation = 'bulk_create';
-    } else if (originalAction === 'BULK_UPDATE') {
-      operation = 'bulk_update';
-    } else if (originalAction === 'SCAN_PRESENSI' || originalAction === 'ADD_POINT') {
-      operation = 'create';
-    } else if (originalAction === 'ATTENDANCE_PROCESS' || originalAction === 'AUTO_SWEEP' || originalAction === 'REPAIR_POINTS') {
-      operation = 'patch';
-    } else if (originalAction === 'BATCH_SYNC') {
-      operation = 'bulk_create';
-    } else if (originalAction === 'BATCH_DELETE') {
-      operation = 'delete';
-    }
+    if (originalAction === 'CREATE' || originalAction === 'CREATE_STUDENT' || originalAction === 'CREATE_TEACHER') operation = 'create';
+    else if (originalAction === 'DELETE' || originalAction === 'DELETE_STUDENT' || originalAction === 'DELETE_TEACHER') operation = 'delete';
+    else if (originalAction === 'PATCH') operation = 'patch';
+    else if (originalAction === 'BULK_CREATE') operation = 'bulk_create';
+    else if (originalAction === 'BULK_UPDATE') operation = 'bulk_update';
+    else if (originalAction === 'SCAN_PRESENSI' || originalAction === 'ADD_POINT') operation = 'create';
+    else if (originalAction === 'ATTENDANCE_PROCESS' || originalAction === 'AUTO_SWEEP' || originalAction === 'REPAIR_POINTS') operation = 'patch';
+    else if (originalAction === 'BATCH_SYNC') operation = 'bulk_create';
+    else if (originalAction === 'BATCH_DELETE') operation = 'delete';
 
     const candidateItem: SyncQueueItem = {
       ...item,
       id,
-      tenantId: tenantId as string,
+      tenantId,
       operation,
       collection: item.collection,
       recordId: docId ? String(docId) : undefined,
@@ -107,8 +105,6 @@ export class SyncRepository {
         actorId: actorUid,
         idempotencyKey: (item as any).metadata?.idempotencyKey || id,
       },
-
-      // Backward compatibility fields
       action: originalAction as any,
       retryCount: 0,
       error: undefined,
@@ -121,13 +117,11 @@ export class SyncRepository {
       documentId: docId ? String(docId) : undefined,
     } as any;
 
-    // 4. Enforce Sync Queue Boundary before inserting to Dexie
     ArchitectureBoundaryEnforcer.enforceSyncQueue(candidateItem, activeSecCtx);
 
     const dbInstance = options.db || this.db;
     const res = await dbInstance.sync_queue.add(candidateItem);
 
-    // 5. Trigger instant background auto-sync if online
     if (options.triggerSync && typeof navigator !== 'undefined' && navigator.onLine) {
       setTimeout(() => {
         import('@/services/SyncEngine').then(({ SyncEngine }) => {
@@ -141,19 +135,24 @@ export class SyncRepository {
     return res;
   }
 
-  async getPendingItems(): Promise<SyncQueueItem[]> {
-    return await this.db.sync_queue
-      .where('status')
-      .anyOf(['pending', 'waiting', 'failed'])
+  /** Returns only retryable queue items belonging to the active SecurityContext tenant. */
+  async getPendingItems(context?: SecurityContext): Promise<SyncQueueItem[]> {
+    const activeSecCtx = context || getSecurityContext(false);
+    if (!activeSecCtx?.tenantId) return [];
+
+    const items = await this.db.sync_queue
+      .where('tenantId')
+      .equals(activeSecCtx.tenantId)
       .toArray();
+
+    return items
+      .filter((i) => ['pending', 'waiting', 'failed'].includes(i.status))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
   async findPendingItems(tenantId: string): Promise<SyncQueueItem[]> {
     if (!tenantId) return [];
-    const items = await this.db.sync_queue
-      .where('tenantId')
-      .equals(tenantId)
-      .toArray();
+    const items = await this.db.sync_queue.where('tenantId').equals(tenantId).toArray();
     return items
       .filter((i) => ['pending', 'waiting', 'failed'].includes(i.status))
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -185,10 +184,6 @@ export class SyncRepository {
     return null;
   }
 
-  /**
-   * Moves a permanently failed item to the Dead Letter Queue,
-   * strictly preserving tenant context, actor context, version, and error details.
-   */
   async moveToDeadLetterQueue(id: string, reason: string, errorCode: string = 'SYNC_MAX_RETRIES_EXCEEDED') {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
@@ -223,10 +218,7 @@ export class SyncRepository {
 
   async getDeadLetterItems(tenantId?: string): Promise<any[]> {
     if (tenantId) {
-      return await this.db.dead_letter_queue
-        .where('tenantId')
-        .equals(tenantId)
-        .sortBy('failedAt');
+      return await this.db.dead_letter_queue.where('tenantId').equals(tenantId).sortBy('failedAt');
     }
     return await this.db.dead_letter_queue.toArray();
   }
