@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,9 @@ async function startServer() {
     helmet({
       frameguard: false,
       contentSecurityPolicy: false,
+      crossOriginOpenerPolicy: {
+        policy: 'same-origin-allow-popups',
+      },
     }),
   );
   app.use(compression());
@@ -275,20 +278,21 @@ async function startServer() {
 
   app.listen(Number(port), '0.0.0.0', () => {
     console.log('\n' + '='.repeat(50));
-    console.log(`🚀 [e-Mam System] ENTERPRISE FOUNDATION READY`);
+    console.log(`ðŸš€ [e-Mam System] ENTERPRISE FOUNDATION READY`);
     console.log(`   Port: ${port} | Mode: ${process.env.NODE_ENV || 'production'}`);
     console.log('='.repeat(50));
     console.log(`[e-MAM Boot Report]`);
-    console.log(`✓ Core Express Engine: Online`);
-    console.log(`${process.env.VITE_FIREBASE_PROJECT_ID ? '✓' : '⚠'} Firebase Identity: ${process.env.VITE_FIREBASE_PROJECT_ID || 'NOT_SET'}`);
-    console.log(`${process.env.FIREBASE_CLIENT_EMAIL ? '✓' : '⚠'} Service Account: ${process.env.FIREBASE_CLIENT_EMAIL ? 'Configured' : 'Missing (Using ADC)'}`);
-    console.log(`${(process.env.GEMINI_API_KEY || process.env.API_KEY) ? '✓' : '❌'} Gemini AI Engine: ${(process.env.GEMINI_API_KEY || process.env.API_KEY) ? 'Activated' : 'Disabled'}`);
-    console.log(`✓ Workspace Kernel: Loaded`);
-    console.log(`✓ Schema Registry: Active`);
-    console.log(`✓ Navigation Registry: Synchronized`);
-    console.log(`✓ Sync Engine: Ready`);
+    console.log(`âœ“ Core Express Engine: Online`);
+    console.log(`${process.env.VITE_FIREBASE_PROJECT_ID ? 'âœ“' : 'âš '} Firebase Identity: ${process.env.VITE_FIREBASE_PROJECT_ID || 'NOT_SET'}`);
+    console.log(`${process.env.FIREBASE_CLIENT_EMAIL ? 'âœ“' : 'âš '} Service Account: ${process.env.FIREBASE_CLIENT_EMAIL ? 'Configured' : 'Missing (Using ADC)'}`);
+    console.log(`${(process.env.GEMINI_API_KEY || process.env.API_KEY) ? 'âœ“' : 'âŒ'} Gemini AI Engine: ${(process.env.GEMINI_API_KEY || process.env.API_KEY) ? 'Activated' : 'Disabled'}`);
+    console.log(`âœ“ Workspace Kernel: Loaded`);
+    console.log(`âœ“ Schema Registry: Active`);
+    console.log(`âœ“ Navigation Registry: Synchronized`);
+    console.log(`âœ“ Sync Engine: Ready`);
     console.log('='.repeat(50) + '\n');
   });
 }
 
 startServer();
+
