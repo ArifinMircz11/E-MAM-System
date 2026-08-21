@@ -3,7 +3,7 @@ import { runFeaturesAudit } from './features.js';
 import { runUnusedAudit } from './unused.js';
 
 function runMainAuditSuite() {
-  console.log('=== 🛡️ IMAM SYSTEM ENTERPRISE ARCHITECTURE AUDIT SUITE ===\n');
+  console.log('=== 🛡️ E-MAM ENTERPRISE REPOSITORY AUDIT SUITE ===\n');
 
   const structIssues = runStructureAudit();
   console.log('--------------------------------------------------');
@@ -11,13 +11,16 @@ function runMainAuditSuite() {
   console.log('--------------------------------------------------');
   const unusedIssues = runUnusedAudit();
 
-  console.log('\n==================================================');
   const total = structIssues + featureIssues + unusedIssues;
+  console.log('\n==================================================');
+
   if (total === 0) {
-    console.log('🎉 ALL AUDITS PASSED PERFECTLY! Architecture is Enterprise Grade & Compliant.');
-  } else {
-    console.log(`⚠️ AUDIT SUITE COMPLETE with ${total} overall findings/recommendations.`);
+    console.log('✅ AUDIT PASSED: no findings from the repository audit suite.');
+    return 0;
   }
+
+  console.log(`⚠️ AUDIT FAILED: ${total} finding(s)/recommendation(s) require review.`);
+  return 1;
 }
 
-runMainAuditSuite();
+process.exitCode = runMainAuditSuite();
