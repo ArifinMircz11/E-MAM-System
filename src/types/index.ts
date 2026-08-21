@@ -11,6 +11,7 @@ export * from './collections';
 export * from './validators';
 export * from './enterpriseHierarchy';
 export * from './survey';
+export * from './syncQueue';
 export * from '@/identity/domain/CanonicalUser';
 
 import type { z } from 'zod';
@@ -18,7 +19,6 @@ import type { AppEntity } from '@/domain/entities/base';
 import { SyncStatus } from '@/domain/entities/base';
 import type { UserRole } from './roles';
 import type {
-  UserSchema,
   UserAssignmentSchema,
   StudentSchema,
   TeacherSchema,
@@ -37,7 +37,7 @@ export interface ChatTemplate {
   category: 'Akademik' | 'Teknis' | 'Lainnya';
 }
 
-import type { CanonicalUser } from "@/identity/domain/CanonicalUser";
+import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
 export type User = CanonicalUser;
 export type UserData = CanonicalUser;
 export type UserAssignment = z.infer<typeof UserAssignmentSchema>;
@@ -114,15 +114,13 @@ export interface AttendanceSession {
   status: AttendanceStatus | 'haid';
 }
 
-// Standardized structures will be added below via Zod inference
-
 export interface TeacherAttendanceRecord extends AppEntity {
   teachersId: string;
   teacherName: string;
   date: string;
   statusGlobal: 'Hadir' | 'Sakit' | 'Izin' | 'Alpha' | 'Terlambat';
   sessions: {
-    masuk?: AttendanceSession; // Assuming 'Masuk' is the primary teacher session
+    masuk?: AttendanceSession;
     pulang?: AttendanceSession;
   };
   location?: {
@@ -169,21 +167,25 @@ export enum ServiceCategory {
   TAMU = 'TAMU',
 }
 
+export interface FAQItemDataPlaceholder {
+  iconName: string;
+  question: string;
+  answer: string;
+}
+
 export interface ScheduleItem {
   id: string;
-  day: string; // e.g., "Senin"
-  time: string; // e.g., "07:30 - 09:00"
-  subject: string; // e.g., "Matematika"
-  classes?: string; // e.g., "XII IPA 1"
-  class?: string; // legacy support
-  room: string; // e.g., "R. 12"
+  day: string;
+  time: string;
+  subject: string;
+  classes?: string;
+  class?: string;
+  room: string;
   teacherName?: string;
   isLocked?: boolean;
 }
 
 export type LetterStatus = 'Pending' | 'Verified' | 'Validated' | 'Signed' | 'Ditolak' | 'Proses';
-
-// Schemas are defined in schemas.ts
 
 export interface ProfileUpdateApproval {
   id: string;
@@ -203,7 +205,6 @@ export interface ProfileUpdateApproval {
   approvedBy: string | null;
   reviewedBy: string | null;
   reviewNotes: string;
-  // Compatibility fields for legacy queries
   createdAt?: string;
   displayName?: string;
   nisn?: string;
@@ -213,7 +214,7 @@ export interface ProfileUpdateApproval {
 export interface ClassApprovalRequest {
   id: string;
   classId: string;
-  userId: string; // Added for deterministic ID and audit
+  userId: string;
   requestedChanges: {
     waliKelasId?: string;
     ketuaKelasId?: string;
@@ -221,7 +222,7 @@ export interface ClassApprovalRequest {
     level?: string;
   };
   status: 'pending' | 'approved' | 'rejected';
-  requestedBy: string; // userId
+  requestedBy: string;
   tenantId: string;
 }
 
@@ -343,8 +344,6 @@ export interface TickerItem extends AppEntity {
   date: string;
 }
 
-// Schemas are defined in schemas.ts
-
 export interface SystemDocumentation extends AppEntity {
   id: string;
   title: string;
@@ -353,41 +352,4 @@ export interface SystemDocumentation extends AppEntity {
   lastUpdated: string;
   updatedBy: string;
   tenantId: string;
-}
-
-export type SyncOperation =
-  | 'create'
-  | 'update'
-  | 'delete'
-  | 'patch'
-  | 'bulk_create'
-  | 'bulk_update';
-
-export interface SyncQueueItem {
-  id: string; // UUID or custom stable ID
-  tenantId: string;
-  operation: SyncOperation; // Standardized lowercase operation name
-  collection: string;
-  recordId?: string; // Standardized record ID
-  payload: any;
-  status: 'pending' | 'processing' | 'completed' | 'success' | 'failed'; // Standard status + backward-compatible 'completed'
-  attempts: number; // Standard retry count
-  createdAt: number; // timestamp
-  updatedAt?: number; // timestamp
-  nextRetryAt?: string;
-  lastError?: string;
-  metadata?: {
-    action?: string;
-    actorId?: string;
-    idempotencyKey?: string;
-    version?: number;
-  };
-
-  // Backward compatibility fields
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'PATCH' | 'BULK_CREATE' | 'BULK_UPDATE' | string;
-  retryCount: number;
-  error?: string;
-  entityId?: string;
-  entityType?: string;
-  documentId?: string;
 }
