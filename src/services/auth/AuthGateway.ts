@@ -4,12 +4,12 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
   updatePassword,
   signOut,
   onAuthStateChanged,
   User,
+  AuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 
 export const authGateway = {
@@ -25,9 +25,9 @@ export const authGateway = {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
     return updateProfile(user, profile);
   },
-  signInWithPopup: (provider: GoogleAuthProvider) => {
+  signInWithPopup: (provider: AuthProvider) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
-    return signInWithPopup(auth, provider);
+    throw new Error('Interactive provider login is disabled. Use the canonical email/password authentication flow.');
   },
   updatePassword: (user: User, password: string) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
@@ -49,7 +49,6 @@ export const authGateway = {
     }
     return onAuthStateChanged(auth, callback);
   },
-  GoogleAuthProvider: GoogleAuthProvider,
   getCurrentUser: () => {
     if (!auth) return null;
     return auth.currentUser;
