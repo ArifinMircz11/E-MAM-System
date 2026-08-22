@@ -4,6 +4,7 @@ import type { ISyncOperation } from './types';
 import { SecurityContext } from '@/core/security/SecurityContext';
 import { getSecurityContext } from '@/core/security/contextHelper';
 import { authGateway } from '@/services/auth/AuthGateway';
+import { syncRepository } from '@/repositories/SyncRepository';
 
 export class SyncWorker {
   private static isSyncing = false;
@@ -65,12 +66,12 @@ export class SyncWorker {
           
           if (errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded') || errMsg.includes('RESOURCE_EXHAUSTED')) {
             (window as any).__FIRESTORE_QUOTA_EXCEEDED = true;
-            console.warn(`[SyncWorker] ⚠️ Firestore Quota Exceeded (resource-exhausted). Automatically pausing cloud sync and activating 100% Local Dexie (Offline-First Mode). All user data is safely preserved in local Dexie.`);
+            console.warn('[SyncWorker] Firestore quota exceeded. Pausing cloud sync; local Dexie queue is preserved.');
             try {
               const { SyncEngine } = await import('./SyncEngine');
               SyncEngine.stop();
             } catch (e) {
-              // ignore
+              console.warn('[SyncWorker] Failed to pause SyncEngine:', e);
             }
             break;
           }
@@ -100,12 +101,13 @@ export class SyncWorker {
   private static async moveToDeadLetterQueue(op: ISyncOperation, reason: string) {
     console.warn(`[SyncWorker] Moving op ${op.id} to DLQ. Reason: ${reason}`);
     try {
-      await localDb.dead_letter_queue.add({
-        ...op,
-        deadReason: reason,
-        deadAt: Date.now(),
-      });
-      await localDb.sync_queue.delete(op.id);
+      // Use the canonical SyncRepository DLQ contract instead of writing
+      // legacy deadReason/deadAt fields directly into Dexie.
+      await syncRepository.moveToDeadLetterQueue(
+        op.id,
+        reason,
+        'SYNC_WORKER_MAX_RETRIES_EXCEEDED',
+      );
     } catch (e) {
       console.error(`[SyncWorker] Failed to move op ${op.id} to DLQ`, e);
     }
