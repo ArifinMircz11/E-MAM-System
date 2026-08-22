@@ -1,54 +1,44 @@
 // src/hooks/useUnreadNotifications.ts
-// ✅ TAMBAH: Throttle 30 detik + cache IndexedDB (opsional)
-// ✅ HEMAT: -50% read Firestore
+// Offline-first: reads notification state from Dexie through the repository.
 
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot } from '@/services/dbGateway';
-import { db } from '@/services/dbGateway';
-import { realtimeHub } from '@/services/realtime/realtimeHub';
+import { notificationRepository } from '@/repositories/notificationRepository';
 import { useAuthStore } from '@/stores/authStore';
 
-const THROTTLE_MS = 30000; // 30 detik
+const REFRESH_MS = 30000;
 
 export function useUnreadNotifications() {
   const [count, setCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
   const user = useAuthStore((s) => s.user);
-  const lastUpdate = useRef(0);
   const cachedCount = useRef(0);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid || !user.tenantId) {
+      setCount(0);
+      setNotifications([]);
+      cachedCount.current = 0;
+      return;
+    }
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', user.uid),
-      where('read', '==', false),
-    );
+    let disposed = false;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = Date.now();
+    const refresh = async () => {
+      const rows = await notificationRepository.getByUserId(user.uid, user.tenantId);
+      if (disposed) return;
 
-      // Throttle: jangan update lebih cepat dari 30 detik
-      if (now - lastUpdate.current < THROTTLE_MS) {
-        // Update cache diam-diam
-        cachedCount.current = snapshot.size;
-        return;
-      }
+      const unread = rows.filter((notification) => notification.isRead !== true);
+      cachedCount.current = unread.length;
+      setCount(unread.length);
+      setNotifications(unread);
+    };
 
-      lastUpdate.current = now;
-      cachedCount.current = snapshot.size;
-
-      setCount(snapshot.size);
-      setNotifications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-
-    realtimeHub.subscribe('unread_notifications', unsubscribe, {
-      tenantId: user.tenantId || 'default',
-    });
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), REFRESH_MS);
 
     return () => {
-      realtimeHub.unsubscribe('unread_notifications');
+      disposed = true;
+      window.clearInterval(interval);
     };
   }, [user?.uid, user?.tenantId]);
 
