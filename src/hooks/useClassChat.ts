@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, limit } from '@/services/dbGateway';
-import { db } from '@/services/dbGateway';
+import { collection, onSnapshot, query, orderBy, limit, firestoreGateway } from '@/services/gateways/FirestoreGateway';
 import { type ClassMessage } from '../services/classChatService';
 import { realtimeHub } from '../services/realtime/realtimeHub';
 
@@ -9,14 +8,14 @@ export const useClassChat = (classId: string | undefined, activeTab: string) => 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!classId || activeTab !== 'obrolan' || !db) {
+    if (!classId || activeTab !== 'obrolan') {
       setMessages([]);
       return;
     }
 
     const todayDateStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
     const path = `class_chats/${classId}/messages_${todayDateStr}`;
-    const q = query(collection(db, path), orderBy('timestamp', 'asc'), limit(100));
+    const q = query(collection(firestoreGateway.db, path), orderBy('timestamp', 'asc'), limit(100));
 
     const unsubscribe = onSnapshot(
       q,
