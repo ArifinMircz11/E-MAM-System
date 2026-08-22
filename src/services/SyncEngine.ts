@@ -19,8 +19,28 @@ const BASE_RETRY_DELAY_MS = 1_000;
 
 export class SyncEngine {
   private static isProcessing = false;
+  private static isStopped = false;
+
+  /**
+   * Pause cloud synchronization without destroying the queue.
+   * Used by quota/error protection paths. Local Dexie data remains intact.
+   */
+  static stop(): void {
+    this.isStopped = true;
+  }
+
+  /** Resume cloud synchronization after an intentional pause. */
+  static resume(): void {
+    this.isStopped = false;
+  }
+
+  /** Current pause state, useful for diagnostics/UI. */
+  static isStoppedState(): boolean {
+    return this.isStopped;
+  }
 
   static async processQueue() {
+    if (this.isStopped) return;
     if (this.isProcessing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     if (!SecurityContextService.isReady()) return;
 
@@ -32,6 +52,7 @@ export class SyncEngine {
       await syncRepository.recoverStaleProcessingItems(activeSecCtx.tenantId);
       const items = await syncRepository.getPendingItems(activeSecCtx);
       for (const snapshot of items) {
+        if (this.isStopped) break;
         const claimed = await syncRepository.claimItem(snapshot.id, activeSecCtx.tenantId);
         if (!claimed) continue;
         try {
