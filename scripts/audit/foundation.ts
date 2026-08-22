@@ -4,55 +4,85 @@ import path from 'node:path';
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
 
-const RULES = [
+interface Rule {
+  id: string;
+  name: string;
+  roots: string[];
+  forbidden: RegExp[];
+  allow?: string[];
+}
+
+const FIREBASE = [
+  /from\s+["']firebase\/(?:firestore|app|auth|storage)["']/,
+  /from\s+["']@firebase\//,
+  /import\(\s*["']firebase\//,
+];
+
+const DEXIE = [
+  /from\s+["']dexie["']/,
+  /from\s+["']@\/.*(?:database\/dexie|core\/database\/dexie)["']/i,
+];
+
+const REPOSITORY = [
+  /from\s+["']@\/.*repositories(?:\/|["'])/i,
+  /from\s+["']\.\.?\/.*repositories(?:\/|["'])/i,
+];
+
+const SYNC = [
+  /from\s+["']@\/.*(?:syncQueue|SyncQueue|SyncEngine|services\/sync)(?:\/|["'])/i,
+  /from\s+["']\.\.?\/.*(?:syncQueue|SyncQueue|SyncEngine|services\/sync)(?:\/|["'])/i,
+];
+
+const RULES: Rule[] = [
   {
     id: 'FND-001',
-    name: 'UI/Hook/Component → Service only',
-    roots: ['src/components', 'src/features'],
-    forbidden: [
-      /from\s+["']firebase\/(?:firestore|app|auth)["']/,
-      /from\s+["']@firebase\//,
-      /from\s+["']dexie["']/,
-      /from\s+["']@\/.*(?:database\/dexie|repositories|syncQueue|SyncEngine)["']/i,
-    ],
+    name: 'UI/Hook/Component/Page → Service boundary',
+    roots: ['src/components', 'src/features', 'src/hooks', 'src/pages', 'src/app'],
+    forbidden: [...FIREBASE, ...DEXIE, ...REPOSITORY, ...SYNC],
   },
   {
     id: 'FND-002',
+    name: 'Zustand stores → Service boundary',
+    roots: ['src/stores', 'src/store'],
+    forbidden: [...FIREBASE, ...DEXIE, ...REPOSITORY, ...SYNC],
+  },
+  {
+    id: 'FND-003',
     name: 'Domain/Types are infrastructure-free',
     roots: ['src/domain', 'src/types'],
     forbidden: [
       /from\s+["']react["']/,
+      /from\s+["']react-dom["']/,
       /from\s+["']zustand["']/,
       /from\s+["']dexie["']/,
-      /from\s+["']firebase\//,
-      /from\s+["']@firebase\//,
+      ...FIREBASE,
     ],
   },
   {
-    id: 'FND-003',
+    id: 'FND-004',
     name: 'Application Services do not bypass Repository for operational DB access',
     roots: ['src/services'],
-    forbidden: [
-      /from\s+["']dexie["']/,
-      /from\s+["']@\/core\/database\/dexie["']/,
-      /from\s+["']@\/database\/dexie["']/,
-    ],
+    forbidden: [...DEXIE, ...REPOSITORY],
+    allow: ['src/services/SyncEngine.ts', 'src/services/sync', 'src/core/sync', 'src/infrastructure/sync'],
+  },
+  {
+    id: 'FND-005',
+    name: 'Application Services do not access Firestore directly',
+    roots: ['src/services'],
+    forbidden: FIREBASE,
     allow: [
       'src/services/SyncEngine.ts',
       'src/services/sync',
       'src/core/sync',
       'src/infrastructure/sync',
+      'src/infrastructure/firestore',
     ],
   },
   {
-    id: 'FND-004',
+    id: 'FND-006',
     name: 'Repositories never access Firestore directly',
-    roots: ['src/repositories'],
-    forbidden: [
-      /from\s+["']firebase\/firestore["']/,
-      /from\s+["']@firebase\/firestore["']/,
-      /import\(\s*["']firebase\/firestore["']\s*\)/,
-    ],
+    roots: ['src/repositories', 'src/core/database', 'src/database'],
+    forbidden: FIREBASE,
   },
 ];
 
