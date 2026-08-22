@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
+import { isMockMode } from '@/services/firebase';
 import { loginWithIdentifier } from '@/services/authService';
+import { loginOfflineCanonical } from '@/services/auth/OfflineCanonicalSessionService';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 
 export const useLogin = () => {
@@ -10,12 +12,12 @@ export const useLogin = () => {
     setLoading(true);
     setErrorStr(null);
     try {
-      const result = await loginWithIdentifier(identifier, password);
+      // Offline/mock authentication has its own canonical boundary. It must
+      // establish SecurityContextService before any store projection occurs.
+      const result = isMockMode || !navigator.onLine
+        ? await loginOfflineCanonical(identifier, password, { mock: isMockMode })
+        : await loginWithIdentifier(identifier, password);
 
-      // Authentication is not considered successful until the single
-      // authoritative SecurityContext has reached READY. This closes the
-      // legacy offline/mock path that could mutate local stores and return
-      // success without establishing authorization context.
       if (result.success && !SecurityContextService.isReady()) {
         SecurityContextService.clear();
         const error = 'Sesi autentikasi belum memiliki SecurityContext authoritative.';
