@@ -7,9 +7,9 @@ import {
   doc,
   writeBatch,
   serverTimestamp,
-} from '@/services/dbGateway';
+  firestoreGateway,
+} from '@/services/gateways/FirestoreGateway';
 import { handleFirestoreError } from '@/services/authService';
-import { db } from '@/services/dbGateway';
 import { OperationType } from '@/types';
 import { realtimeHub } from '@/services/realtime/realtimeHub';
 
@@ -18,14 +18,17 @@ export function useAdminNotification() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'profile_update_requests'), where('status', '==', 'pending'));
+    const q = query(
+      collection(firestoreGateway.db, 'profile_update_requests'),
+      where('status', '==', 'pending'),
+    );
 
     const subscribe = () => {
       realtimeHub.unsubscribe('admin-notification-requests');
       const unsub = onSnapshot(
         q,
         (snapshot) => {
-          const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          const data = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }));
           setRequests(data);
           setLoading(false);
         },
@@ -37,11 +40,8 @@ export function useAdminNotification() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        subscribe();
-      } else {
-        realtimeHub.unsubscribe('admin-notification-requests');
-      }
+      if (document.visibilityState === 'visible') subscribe();
+      else realtimeHub.unsubscribe('admin-notification-requests');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -55,19 +55,13 @@ export function useAdminNotification() {
 
   const approveRequest = async (requestId: string, studentId: string, updates: any) => {
     try {
-      const batch = writeBatch(db);
-
+      const batch = writeBatch(firestoreGateway.db);
       batch.set(
-        doc(db, 'students', studentId),
-        {
-          ...updates,
-          updatedAt: serverTimestamp(),
-        },
+        doc(firestoreGateway.db, 'students', studentId),
+        { ...updates, updatedAt: serverTimestamp() },
         { merge: true },
       );
-
-      batch.delete(doc(db, 'profile_update_requests', requestId));
-
+      batch.delete(doc(firestoreGateway.db, 'profile_update_requests', requestId));
       await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'profile_update_requests');
