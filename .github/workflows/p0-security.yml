@@ -1,0 +1,37 @@
+name: P0 Security Gate
+
+on:
+  push:
+    branches:
+      - hardening/login-e2e-security
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  p0-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: P0 absence gate
+        run: npm run audit:p0
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Security/auth regression tests
+        run: npm run test:unit -- --run tests/developerLoginRegression.test.ts tests/security tests/auth
