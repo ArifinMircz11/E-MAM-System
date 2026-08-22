@@ -34,13 +34,11 @@ export class SyncRepository {
     const existing = candidates[0];
     if (!existing) return null;
 
-    const changes = {
+    const changes: Partial<SyncQueueItem> = {
       payload: candidate.payload,
       recordId: candidate.recordId,
       metadata: candidate.metadata,
-      status: 'pending' as SyncQueueStatus,
-      lastError: undefined,
-      nextRetryAt: undefined,
+      status: 'pending',
       updatedAt: Date.now(),
     };
 
@@ -100,7 +98,7 @@ export class SyncRepository {
       }
     }
     if (sanitizedPayload && typeof sanitizedPayload === 'object' && docId && !sanitizedPayload.id) {
-      sanitizedPayload.id = String(docId);
+      (sanitizedPayload as Record<string, unknown>).id = String(docId);
     }
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const operation = item.operation ?? 'update';
@@ -161,10 +159,9 @@ export class SyncRepository {
     return items.filter((i) =>
       i.status === 'pending' || i.status === 'failed' ||
       (i.status === 'waiting' && (!i.nextRetryAt || Date.parse(i.nextRetryAt) <= now)),
-    ).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    ).sort((a, b) => Number(a.createdAt ?? 0) - Number(b.createdAt ?? 0));
   }
 
-  /** Atomically claims an item so multiple tabs/workers cannot process it simultaneously. */
   async claimItem(id: string, tenantId: string): Promise<SyncQueueItem | null> {
     if (!id || !tenantId) return null;
     return await this.db.transaction('rw', this.db.sync_queue, async () => {
@@ -186,11 +183,13 @@ export class SyncRepository {
     const now = Date.now();
     return items.filter((i) => i.status === 'pending' || i.status === 'failed' ||
       (i.status === 'waiting' && (!i.nextRetryAt || Date.parse(i.nextRetryAt) <= now)))
-      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      .sort((a, b) => Number(a.createdAt ?? 0) - Number(b.createdAt ?? 0));
   }
 
   async updateStatus(id: string, status: SyncQueueStatus, error?: string) {
-    return await this.db.sync_queue.update(id, { status, lastError: error, updatedAt: Date.now() });
+    const changes: Partial<SyncQueueItem> = { status, updatedAt: Date.now() };
+    if (error !== undefined) changes.lastError = error;
+    return await this.db.sync_queue.update(id, changes);
   }
 
   async incrementRetry(id: string) {
