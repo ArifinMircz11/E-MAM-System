@@ -4,15 +4,9 @@
  * Bootstrap contract:
  * Firebase Auth UID -> users/{uid} -> explicit tenantId/referenceId -> SecurityContext.
  *
- * IMPORTANT: domain-reference verification is deliberately NOT performed here.
- * Authentication bootstrap must not depend on a second Firestore read to
- * students/{referenceId} or teachers/{referenceId}. Those reads can be gated by
- * tenant/RBAC rules and create a circular dependency: SecurityContext needs the
- * user document, while the user document would then appear to need SecurityContext.
- * Domain-reference integrity is verified after authentication by the repository/
- * domain layer.
- *
- * This service never provisions or invents identity data.
+ * Domain-reference verification is deliberately NOT performed here. Authentication
+ * bootstrap must remain independent from student/teacher reads that may themselves
+ * require tenant/RBAC context.
  */
 import { db } from '@/services/firebase';
 import { firestoreGateway } from '@/services/gateways/FirestoreGateway';
@@ -20,7 +14,7 @@ import { localDb } from '@/database/dexie';
 
 const withTimeout = async <T>(
   promise: Promise<T>,
-  timeoutMs = 4000,
+  timeoutMs = 10000,
   errorMessage = 'Timeout',
 ): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -51,7 +45,8 @@ const guestState = (authUser: any) => ({
 
 const hasValidTenant = (tenantId: unknown): tenantId is string => {
   if (typeof tenantId !== 'string') return false;
-  const value = tenantId.trim();
+  const value = tenantId.trim().toLowerCase();
+  // `system` is the canonical tenant for global developer identities.
   return value !== '' && !['unknown', 'default', 'global'].includes(value);
 };
 
@@ -60,6 +55,17 @@ const hasValidReferenceId = (referenceId: unknown): referenceId is string =>
 
 const hasCanonicalIdentityAnchor = (data: any): boolean =>
   hasValidTenant(data?.tenantId) && hasValidReferenceId(data?.referenceId);
+
+const isRecoverableBootstrapError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes('timeout') ||
+    message.includes('offline') ||
+    message.includes('network') ||
+    message.includes('unavailable') ||
+    message.includes('failed to fetch')
+  );
+};
 
 export class FirebaseUserSyncService {
   static async syncAuthUser(authUser: any): Promise<any> {
@@ -71,11 +77,10 @@ export class FirebaseUserSyncService {
     const userDocRef = firestoreGateway.doc(db, 'users', uid);
 
     try {
-      // This is the single authoritative Firestore read required to bootstrap
-      // an authenticated session. Do not add domain reads here.
+      // Single authoritative Firestore read for authentication bootstrap.
       const userSnap = await withTimeout(
         firestoreGateway.getDoc(userDocRef),
-        4000,
+        10000,
         'Firestore users lookup timeout',
       );
 
@@ -87,8 +92,7 @@ export class FirebaseUserSyncService {
       const rawData = userSnap.data() || {};
       const data = { ...rawData, id: uid, uid };
 
-      // Fail closed for registered identities with incomplete canonical data,
-      // but do not perform another Firestore read during authentication.
+      // Fail closed for an existing registered identity without canonical anchors.
       if (!hasCanonicalIdentityAnchor(data)) {
         console.warn(
           `[FirebaseUserSyncService] users/${uid} is missing explicit tenantId/referenceId; registration or identity completion is required.`,
@@ -99,6 +103,20 @@ export class FirebaseUserSyncService {
       await localDb.users.put(data);
       return data;
     } catch (error) {
+      // Offline-first recovery: if this device already has a valid canonical user,
+      // allow the session to bootstrap from Dexie instead of trapping the UI on login.
+      if (isRecoverableBootstrapError(error)) {
+        try {
+          const cachedUser = await localDb.users.where('uid').equals(uid).first();
+          if (cachedUser && hasCanonicalIdentityAnchor(cachedUser)) {
+            console.warn('[FirebaseUserSyncService] Using cached canonical user after recoverable bootstrap failure.');
+            return { ...cachedUser, syncStatus: 'pending' };
+          }
+        } catch (cacheError) {
+          console.error('[FirebaseUserSyncService] Cached identity recovery failed:', cacheError);
+        }
+      }
+
       console.error('[FirebaseUserSyncService] Authoritative users lookup failed:', error);
       throw error;
     }
