@@ -7,13 +7,10 @@ import type { AssignmentRequestData, KanwilDashboardSummary, SatuanKerjaData } f
  */
 export class KanwilDashboardRepository {
   async getSummary(): Promise<KanwilDashboardSummary> {
-    const [madrasahList, usersList] = await Promise.all([
-      localDb.madrasah.toArray(),
-      localDb.users.toArray(),
-    ]);
+    const [madrasahList, usersList] = await Promise.all([localDb.madrasah.toArray(), localDb.users.toArray()]);
     const [pendingAssignments, activeNotifications] = await Promise.all([
-      localDb.approval_requests.where('status').equals('pending').count(),
-      localDb.notifications.where('isRead').equals(0).count(),
+      localDb.approval_requests.filter((item: any) => String(item.status || '').toUpperCase() === 'PENDING').count(),
+      localDb.notifications.filter((item: any) => item.isRead === false || item.isRead === 0).count(),
     ]);
 
     let totalMA = 0;
@@ -40,25 +37,11 @@ export class KanwilDashboardRepository {
     };
   }
 
-  async getSatuanKerjaList(): Promise<SatuanKerjaData[]> {
-    return await localDb.satuan_kerja.toArray() as SatuanKerjaData[];
-  }
-
-  async createSatuanKerja(entity: SatuanKerjaData): Promise<void> {
-    await localDb.satuan_kerja.add(entity);
-  }
-
-  async updateSatuanKerja(id: string, changes: Partial<SatuanKerjaData>): Promise<void> {
-    await localDb.satuan_kerja.update(id, changes);
-  }
-
-  async deleteSatuanKerja(id: string): Promise<void> {
-    await localDb.satuan_kerja.delete(id);
-  }
-
-  async createAssignmentRequest(request: AssignmentRequestData): Promise<void> {
-    await localDb.approval_requests.add(request);
-  }
+  async getSatuanKerjaList(): Promise<SatuanKerjaData[]> { return await localDb.satuan_kerja.toArray() as SatuanKerjaData[]; }
+  async createSatuanKerja(entity: SatuanKerjaData): Promise<void> { await localDb.satuan_kerja.add(entity); }
+  async updateSatuanKerja(id: string, changes: Partial<SatuanKerjaData>): Promise<void> { await localDb.satuan_kerja.update(id, changes); }
+  async deleteSatuanKerja(id: string): Promise<void> { await localDb.satuan_kerja.delete(id); }
+  async createAssignmentRequest(request: AssignmentRequestData): Promise<void> { await localDb.approval_requests.add(request); }
 }
 
 export const kanwilDashboardRepository = new KanwilDashboardRepository();
