@@ -22,6 +22,29 @@ function payloadForOperation(op: ISyncOperation): unknown {
   return op.payload ?? op.data;
 }
 
+function assertPayloadTenant(payload: unknown, tenantId: string): void {
+  if (!tenantId || payload == null) return;
+
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      if (entry && typeof entry === 'object') {
+        const entryTenant = (entry as Record<string, unknown>).tenantId;
+        if (entryTenant != null && entryTenant !== tenantId) {
+          throw new Error('SYNC_PAYLOAD_TENANT_MISMATCH');
+        }
+      }
+    }
+    return;
+  }
+
+  if (typeof payload === 'object') {
+    const payloadTenant = (payload as Record<string, unknown>).tenantId;
+    if (payloadTenant != null && payloadTenant !== tenantId) {
+      throw new Error('SYNC_PAYLOAD_TENANT_MISMATCH');
+    }
+  }
+}
+
 function withTenant(payload: unknown, tenantId?: string): unknown {
   if (!tenantId) return payload;
   if (Array.isArray(payload)) {
@@ -58,7 +81,8 @@ export class SyncDispatcher {
 
     if (payload == null) throw new Error(`SYNC_PAYLOAD_MISSING:${op.id}`);
 
-    const finalPayload = withTenant(payload, op.tenantId);
+    assertPayloadTenant(payload, op.tenantId || context.tenantId);
+    const finalPayload = withTenant(payload, op.tenantId || context.tenantId);
 
     if (op.collection === 'attendance' && (type === 'SCAN_PRESENSI' || type === 'ATTENDANCE_PROCESS')) {
       const result = await handleAttendanceSync(finalPayload, {} as any);
@@ -127,9 +151,6 @@ export class SyncDispatcher {
         type === 'ADD_TEACHER' ||
         type === 'ADD_LETTER'
       ) {
-        // ADD_POINT uses the same deterministic document contract as normal
-        // CRUD. It must not be treated as a side-effect-only action because a
-        // retry after a crash must converge to the same point record.
         await db.setDoc(ref, cleanData, { merge: true });
         return;
       }
