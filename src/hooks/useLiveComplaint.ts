@@ -5,8 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { onSnapshot, collection, orderBy, limit, query } from '@/services/dbGateway';
-import { db } from '@/services/dbGateway';
+import { firestoreGateway } from '@/services/gateways/FirestoreGateway';
 import { realtimeHub } from '@/services/realtime/realtimeHub';
 
 export interface LiveMessage {
@@ -19,29 +18,31 @@ export interface LiveMessage {
 /**
  * useLiveComplaint Hook
  * Subscribes to complaint messages with 300ms throttling to avoid rapid-fire UI re-renders.
+ *
+ * Firestore access is routed through FirestoreGateway; the deprecated dbGateway
+ * compatibility facade is intentionally not used here.
  */
 export function useLiveComplaint(roomId: string, userSessionId: string) {
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Buffer state to throttle quick successive writes
   const bufferRef = useRef<LiveMessage[]>([]);
   const isUpdatingRef = useRef(false);
   const throttleTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!userSessionId || !roomId || !db) {
+    if (!userSessionId || !roomId) {
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
 
-    const q = query(
-      collection(db, `chats/${roomId}/messages`),
-      orderBy('timestamp', 'desc'),
-      limit(20),
+    const q = firestoreGateway.query(
+      firestoreGateway.collection(firestoreGateway.db, `chats/${roomId}/messages`),
+      firestoreGateway.orderBy('timestamp', 'desc'),
+      firestoreGateway.limit(20),
     );
 
     const flushBuffer = () => {
@@ -51,7 +52,6 @@ export function useLiveComplaint(roomId: string, userSessionId: string) {
       }
 
       throttleTimeoutRef.current = setTimeout(() => {
-        // Balikkan urutan karena query desc
         setMessages([...bufferRef.current].reverse());
         isUpdatingRef.current = false;
         setIsLoading(false);
@@ -60,7 +60,7 @@ export function useLiveComplaint(roomId: string, userSessionId: string) {
 
     const subscribe = () => {
       realtimeHub.unsubscribe(`live-complaint-${roomId}`);
-      const unsub = onSnapshot(
+      const unsub = firestoreGateway.onSnapshot(
         q,
         (snapshot) => {
           const logs: LiveMessage[] = [];
