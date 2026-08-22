@@ -1,65 +1,30 @@
 import { localDb } from '@/database/dexie';
+import { syncRepository } from '@/repositories/SyncRepository';
 import type { KanwilDashboardSummary, AssignmentRequestData, SatuanKerjaData } from '../types';
 
 export class KanwilDashboardService {
-  /**
-   * Mengambil ringkasan data Kanwil Kementerian Agama Provinsi Kalimantan Selatan dari Dexie
-   */
   static async getSummary(): Promise<KanwilDashboardSummary> {
     try {
       const madrasahList = await localDb.madrasah?.toArray() || [];
       const usersList = await localDb.users?.toArray() || [];
       const pendingAssignmentsCount = await localDb.approval_requests?.where('status').equals('pending').count() || 0;
       const notificationsCount = await localDb.notifications?.where('isRead').equals(0).count() || 0;
-
-      // Kankemenag Kab/Kota (simulasi atau dari master data)
-      const kabKotaCount = 13; // 13 Kabupaten/Kota di Kalsel
-
+      const kabKotaCount = 13;
       let countMA = 0;
       let countMTs = 0;
       let countMI = 0;
-
       madrasahList.forEach((m: any) => {
         const jenjang = (m.jenjang || m.level || '').toUpperCase();
         if (jenjang === 'MA' || jenjang.includes('ALIYAH')) countMA++;
         else if (jenjang === 'MTS' || jenjang.includes('TSANAWIYAH')) countMTs++;
         else if (jenjang === 'MI' || jenjang.includes('IBTIDAIYAH')) countMI++;
       });
-
-      // Default fallback if table is empty in mockup
       const totalMadrasah = madrasahList.length > 0 ? madrasahList.length : 1420;
-      if (countMA === 0 && countMTs === 0 && countMI === 0) {
-        countMA = 310;
-        countMTs = 580;
-        countMI = 530;
-      }
-
-      return {
-        totalSatuanKerjaKabKota: kabKotaCount,
-        totalMA: countMA,
-        totalMTs: countMTs,
-        totalMI: countMI,
-        totalMadrasah: totalMadrasah,
-        totalUsers: usersList.length > 0 ? usersList.length : 3450,
-        pendingAssignments: pendingAssignmentsCount,
-        activeNotifications: notificationsCount,
-        syncStatus: navigator.onLine ? 'synced' : 'offline',
-        lastSyncedAt: Date.now(),
-      };
+      if (countMA === 0 && countMTs === 0 && countMI === 0) { countMA = 310; countMTs = 580; countMI = 530; }
+      return { totalSatuanKerjaKabKota: kabKotaCount, totalMA: countMA, totalMTs: countMTs, totalMI: countMI, totalMadrasah, totalUsers: usersList.length > 0 ? usersList.length : 3450, pendingAssignments: pendingAssignmentsCount, activeNotifications: notificationsCount, syncStatus: navigator.onLine ? 'synced' : 'offline', lastSyncedAt: Date.now() };
     } catch (err) {
       console.error('Error fetching Kanwil summary:', err);
-      return {
-        totalSatuanKerjaKabKota: 13,
-        totalMA: 310,
-        totalMTs: 580,
-        totalMI: 530,
-        totalMadrasah: 1420,
-        totalUsers: 3450,
-        pendingAssignments: 0,
-        activeNotifications: 0,
-        syncStatus: 'offline',
-        lastSyncedAt: Date.now(),
-      };
+      return { totalSatuanKerjaKabKota: 13, totalMA: 310, totalMTs: 580, totalMI: 530, totalMadrasah: 1420, totalUsers: 3450, pendingAssignments: 0, activeNotifications: 0, syncStatus: 'offline', lastSyncedAt: Date.now() };
     }
   }
 
@@ -67,7 +32,6 @@ export class KanwilDashboardService {
     try {
       const list = await localDb.satuan_kerja.toArray();
       if (list.length === 0) {
-        // Initial Seed
         const seedData: SatuanKerjaData[] = [
           { id: 'SK-01', name: 'Kanwil Kementerian Agama Prov. Kalimantan Selatan', code: '63.00', region: 'Provinsi Kalimantan Selatan', type: 'KANWIL', createdAt: Date.now(), updatedAt: Date.now() },
           { id: 'SK-02', name: 'Kankemenag Kota Banjarmasin', code: '63.71', region: 'Kota Banjarmasin', type: 'KANKENAG_KAB_KOTA', parentId: 'SK-01', createdAt: Date.now(), updatedAt: Date.now() },
@@ -88,84 +52,36 @@ export class KanwilDashboardService {
         return seedData;
       }
       return list;
-    } catch (err) {
-      console.error('Error fetching Satuan Kerja list:', err);
-      return [];
-    }
+    } catch (err) { console.error('Error fetching Satuan Kerja list:', err); return []; }
   }
 
   static async createSatuanKerja(data: Omit<SatuanKerjaData, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const id = `SK-${Date.now()}`;
-    const newItem: SatuanKerjaData = {
-      ...data,
-      id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      syncStatus: 'pending'
-    };
+    const newItem: SatuanKerjaData = { ...data, id, createdAt: Date.now(), updatedAt: Date.now(), syncStatus: 'pending' };
     await localDb.satuan_kerja.add(newItem);
-    
-    // Add to Sync Queue
-    await localDb.sync_queue.add({
-      id: `q_${Date.now()}`,
-      tenantId: 'kanwil_kalsel',
-      collection: 'satuan_kerja',
-      operation: 'create',
-      payload: newItem,
-      createdAt: Date.now(),
-      status: 'pending',
-      priority: 2
-    });
-    
+    await syncRepository.enqueue({ tenantId: 'kanwil_kalsel', collection: 'satuan_kerja', recordId: id, operation: 'create', payload: newItem });
     return id;
   }
 
   static async updateSatuanKerja(id: string, data: Partial<SatuanKerjaData>): Promise<void> {
     const updatedAt = Date.now();
     await localDb.satuan_kerja.update(id, { ...data, updatedAt, syncStatus: 'modified' });
-    
-    // Add to Sync Queue
-    await localDb.sync_queue.add({
-      id: `q_${Date.now()}`,
-      tenantId: 'kanwil_kalsel',
-      collection: 'satuan_kerja',
-      operation: 'update',
-      payload: { id, ...data, updatedAt },
-      createdAt: Date.now(),
-      status: 'pending',
-      priority: 2
-    });
+    await syncRepository.enqueue({ tenantId: 'kanwil_kalsel', collection: 'satuan_kerja', recordId: id, operation: 'update', payload: { id, ...data, updatedAt } });
   }
 
   static async deleteSatuanKerja(id: string): Promise<void> {
     await localDb.satuan_kerja.delete(id);
-    
-    // Add to Sync Queue
-    await localDb.sync_queue.add({
-      id: `q_${Date.now()}`,
-      tenantId: 'kanwil_kalsel',
-      collection: 'satuan_kerja',
-      operation: 'delete',
-      payload: { id },
-      createdAt: Date.now(),
-      status: 'pending',
-      priority: 2
-    });
+    await syncRepository.enqueue({ tenantId: 'kanwil_kalsel', collection: 'satuan_kerja', recordId: id, operation: 'delete', payload: { id } });
   }
 
   static async submitAssignmentRequest(requestPayload: any): Promise<void> {
     await localDb.approval_requests.add(requestPayload);
-    await localDb.sync_queue.add({
-      id: `q_${Date.now()}`,
+    await syncRepository.enqueue({
       tenantId: requestPayload.tenantId || 'kanwil_kalsel',
       collection: 'approval_requests',
+      recordId: requestPayload.id,
       operation: 'create',
       payload: requestPayload,
-      createdAt: Date.now(),
-      retryCount: 0,
-      status: 'pending',
-      priority: 1,
-      deviceId: 'browser_client'
     });
   }
 }
