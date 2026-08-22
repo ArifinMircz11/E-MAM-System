@@ -1,41 +1,23 @@
-/**
- * @license
- * e-Mam System - Integrated Madrasah Academic Manager
- * © 2026 Akhmad Arifin | 199010042025211012. All rights reserved.
- */
-
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
+  defaultOptions: { queries: { staleTime: 1000 * 60 * 5, retry: 1 } },
 });
+
 import { ViewState, UserRole } from '@/types';
 import type { TickerItem } from '@/types';
 import { toast, Toaster } from 'sonner';
-import {
-  Loader2,
-  ZapIcon,
-  ChevronLeftIcon as ChevronLeft,
-  ChevronRightIcon as ChevronRight,
-} from '@/shared/Icons';
-import { motion, AnimatePresence } from 'motion/react';
+import { Loader2, ZapIcon } from '@/shared/Icons';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useUserStore } from '@/stores/userStore';
 import { normalizeRoleStr, logoutUser } from '@/services/authService';
-import { setupOnMessageListener } from '@/services/notificationService';
-import { subscribeToAnnouncements } from '@/services/realtime/announcementListener';
 import { MOCK_TICKER } from '@/services/mockData';
 import { resilientLazy } from '@/utils/resilientLazy';
 import { MonitoringModule } from '@/app/boot/modules/MonitoringModule';
-import { TenantContext } from '@/core/context/TenantContext';
+import { SecurityContextService } from '@/core/security/SecurityContextService';
 
 const FloatingActionMenu = resilientLazy(() => import('@/components/ui/FloatingActionMenu'));
 const ChatbotContainer = resilientLazy(() => import('@/features/ai/components/ChatbotContainer'));
@@ -60,19 +42,17 @@ import { useAuthInitialization } from '@/hooks/useAuthInitialization';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { IdentityCompletionService } from '@/services/IdentityCompletionService';
 import { IdentityCompletionPage } from '@/features/profile/components';
-
-const ViewRenderer = resilientLazy(() => import('@/routes/ViewRenderer').then((m) => ({ default: m.ViewRenderer })));
-
 import { ViewLoader } from '@/components/ui/ViewLoader';
 import MaintenanceGuard from '@/components/ui/MaintenanceGuard';
 import { useProfileStore } from '@/stores/profileStore';
 import { useAppStore } from '@/stores/appStore';
 import { useProfileValidation } from '@/hooks/useProfileValidation';
 import { useStudentAttendance } from '@/hooks/useStudentAttendance';
-import { useMemo } from 'react';
 import { LoadingScreen, MaintenanceScreen, SelfHealingScreen } from '@/components/ui/SystemScreens';
 import { AppInitializationService } from '@/services/AppInitializationService';
 import { ImpersonationProvider, ImpersonationBanner } from '@/core/impersonation';
+
+const ViewRenderer = resilientLazy(() => import('@/routes/ViewRenderer').then((m) => ({ default: m.ViewRenderer })));
 
 const RealtimeSubscriptionTracker: React.FC = () => {
   useRealtimeSubscriptions();
@@ -98,20 +78,16 @@ const App: React.FC = () => {
   const setUser = useAuthStore((state) => state.setUser);
   const accountStatus = useAuthStore((state) => state.accountStatus);
   const setAccountStatus = useAuthStore((state) => state.setAccountStatus);
-  const tenantId = useUserStore((state) => state.tenantId);
-  const setUserData = useUserStore((state) => state.setUserData);
   const clearUserData = useUserStore((state) => state.clearUserData);
   const autoFixStatus = useUIStore((state) => state.autoFixStatus);
   const profile = useProfileStore((state) => state.profile);
 
-  let securityContext: any = null;
-  try { securityContext = TenantContext.getContext(); } catch { securityContext = null; }
-
-  const activeRoles = securityContext?.roles?.length > 0 ? securityContext.roles : [UserRole.TAMU];
+  const securityContext = SecurityContextService.getNullableContext();
+  const activeRoles = securityContext?.roles?.length ? securityContext.roles : [UserRole.TAMU];
   const userRole = securityContext?.role || activeRoles[0];
   const isLoginPage = currentView === ViewState.LOGIN || currentView === ViewState.PUBLIC_SERVICES || currentView === ViewState.SCANNER || currentView === ViewState.NEWS;
   const isStandaloneWorkspace = [ViewState.DEVELOPER, ViewState.KANWIL_DASHBOARD, ViewState.KANWIL_SATUAN_KERJA, ViewState.DEV_ASSIGNMENTS, ViewState.DEV_ROLES, ViewState.DEV_PERMISSIONS, ViewState.DEV_SYNC, ViewState.DEV_AUDIT_LOG, ViewState.DEV_SECURITY, ViewState.DEV_SYSTEM_SETTINGS].includes(currentView);
-  const { isProfileComplete } = useProfileValidation(profile);
+  useProfileValidation(profile);
 
   useEffect(() => {
     if (!authLoading && !user && !isLoginPage) {
@@ -121,9 +97,10 @@ const App: React.FC = () => {
   }, [authLoading, user, isLoginPage, setCurrentView, setNavigationHistory]);
 
   useEffect(() => {
-    eventBus.subscribe('PROFILE_COMPLETED', async (event) => {
+    const unsubscribe = eventBus.subscribe('PROFILE_COMPLETED', async (event) => {
       await IdentityEngine.provisionAccess(event.data.uid, event.data.userData);
     });
+    return () => { unsubscribe?.(); };
   }, []);
 
   useEffect(() => {
@@ -149,7 +126,7 @@ const App: React.FC = () => {
   const isStudentRole = userRole === UserRole.SISWA || userRole === UserRole.KETUA_KELAS;
   const { attendanceRecords: appStudentRecords } = useStudentAttendance(isStudentRole ? (user?.idUnik || user?.studentsId || undefined) : undefined);
   const remainingSessionsCount = useMemo(() => {
-    if (!isStudentRole || !appStudentRecords || appStudentRecords.length === 0) return 0;
+    if (!isStudentRole || !appStudentRecords?.length) return 0;
     const todayStr = new Date().toLocaleDateString('en-CA');
     const todayRec = appStudentRecords.find((r: any) => r.date === todayStr);
     if (!todayRec) { const day = new Date().getDay(); return day === 0 || day === 6 ? 0 : 5; }
@@ -173,8 +150,8 @@ const App: React.FC = () => {
 
   const handleNavigate = (view: ViewState) => {
     if (view === currentView) return;
-    const isDeveloper = securityContext?.isDeveloper || activeRoles.includes(UserRole.DEVELOPER) || user?.email === 'developer@example.com' || user?.email === 'admin@example.com';
-    if (!isDeveloper && useUIStore.getState().lockedFeatures.includes(view)) {
+    const isDeveloper = securityContext?.isDeveloper === true || activeRoles.includes(UserRole.DEVELOPER);
+    if (!isDeveloper && lockList.includes(view)) {
       toast.error('Halaman ini sedang dalam perbaikan (Maintenance) dan tidak dapat diakses.');
       return;
     }
@@ -191,7 +168,9 @@ const App: React.FC = () => {
       if (navigationHistory.length > 0) {
         const historyCopy = [...navigationHistory];
         const previousView = historyCopy.pop()!;
-        setNavigationHistory(historyCopy); setViewKey((prev) => prev + 1); setCurrentView(previousView);
+        setNavigationHistory(historyCopy);
+        setViewKey((prev) => prev + 1);
+        setCurrentView(previousView);
       } else if (currentView === ViewState.PUBLIC_SERVICES) {
         setCurrentView(ViewState.LOGIN); setNavigationHistory([]); setViewKey((prev) => prev + 1);
       } else if (currentView !== ViewState.DASHBOARD && currentView !== ViewState.GUEST_DASHBOARD) {
@@ -203,27 +182,30 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (role: UserRole) => {
     const normalizedRole = normalizeRoleStr(role);
+    const context = SecurityContextService.getNullableContext();
+    if (!context || !context.uid || !context.tenantId || !context.role) {
+      toast.error('Security Context belum siap. Login dibatalkan.');
+      return;
+    }
     if (lockList.includes('auth_login') && normalizedRole !== UserRole.DEVELOPER) {
-      toast.error('Sistem Sedang Maintenance', { description: 'Hanya akun Developer yang dapat mengakses sistem saat ini.' });
+      toast.error('Sistem Sedang Maintenance', { description: 'Akses login sedang dibatasi.' });
       void handleLogout();
       return;
     }
-    React.startTransition(() => {
-      (setUserData as any)({ uid: user?.uid || 'logged-in', roles: [normalizedRole], displayName: user?.displayName || 'Pengguna', photoURL: user?.photoURL || null, tenantId: securityContext?.tenantId || tenantId || '30315537' });
-      setNavigationHistory([]);
-      handleNavigate(normalizedRole === UserRole.TAMU ? ViewState.GUEST_DASHBOARD : ViewState.DASHBOARD);
-    });
+    setNavigationHistory([]);
+    handleNavigate(normalizedRole === UserRole.TAMU ? ViewState.GUEST_DASHBOARD : ViewState.DASHBOARD);
   };
 
-  const handleImpersonate = (role: UserRole, name: string, sid?: string) => {
-    (setUserData as any)({ roles: [role], displayName: name, assignment: { studentId: sid || null, teacherId: null, classId: null } });
-    toast.success(`Impersonasi sebagai ${role} (${name}) aktif.`);
+  const handleImpersonate = (_role: UserRole, _name: string, _sid?: string) => {
+    throw new Error('IMPERSONATION_DISABLED: client-side identity mutation is forbidden');
   };
 
   const handleLogout = async () => {
     try { const { realtimeHub } = await import('@/services/realtime/realtimeHub'); realtimeHub.unsubscribeAll(); } catch (e) { console.warn('Failed to clear realtime hub subscriptions:', e); }
     try { await logoutUser(); } catch (error) { console.warn('Silent signout failure during cleanup:', error); }
-    React.startTransition(() => { clearUserData(); setUser(null); setAccountStatus(null); setNavigationHistory([]); setCurrentView(ViewState.LOGIN); });
+    React.startTransition(() => {
+      clearUserData(); setUser(null); setAccountStatus(null); setNavigationHistory([]); setCurrentView(ViewState.LOGIN);
+    });
   };
 
   if (authLoading) {
@@ -247,8 +229,6 @@ const App: React.FC = () => {
       return <Suspense fallback={<ViewLoader />}><WaitingGate onLogout={handleLogout} accountStatus={accountStatus as any} user={user} /></Suspense>;
     }
 
-    // The login/public shell must never be replaced by the background application
-    // initialization screen. Dexie, system config and sync bootstrap are post-auth work.
     if (currentState === 'initializing' && !isLoginPage) return <LoadingScreen log={initializationLog} />;
     if (currentState === 'self-healing' && !isLoginPage) return <SelfHealingScreen log={initializationLog} />;
     if (currentState === 'maintenance' && !isLoginPage) return <MaintenanceScreen error={globalError} onRetry={() => AppInitializationService.retryInitialization()} />;

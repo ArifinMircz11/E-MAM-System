@@ -1,48 +1,24 @@
+import type { SecurityContext } from './SecurityContext';
+import { SecurityContextService } from './SecurityContextService';
+
 /**
- * SecurityContextBuilder.ts
- * WO-RBAC: Builds SecurityContext from Canonical User
+ * Deprecated compatibility facade.
+ * SecurityContextService is the sole runtime authority.
  */
-
-import { SecurityContext } from "./SecurityContext";
-import { PermissionResolver } from "./PermissionResolver";
-import { CanonicalSecurityUser } from "./types";
-
 export class SecurityContextBuilder {
-  public static fromCanonicalUser(user: CanonicalSecurityUser): SecurityContext {
-    const permissions = PermissionResolver.resolve(user);
-    const scope = user.scope || { classIds: [], academicYear: "" };
-
-    return new SecurityContext(
-      user.uid,
-      user.tenantId,
-      permissions,
-      scope,
-      user.roles || [],
-      user.accountType || "madrasah"
-    );
+  public static fromCanonicalUser(_user: unknown): SecurityContext {
+    return SecurityContextService.getContext() as unknown as SecurityContext;
   }
 
   public static createGuestContext(): SecurityContext {
-    const guestUser: CanonicalSecurityUser = {
-      uid: "guest-uid",
-      tenantId: "public",
-      accountType: "madrasah",
-      roles: ["siswa"],
-      primaryRole: "siswa",
-      scope: { classIds: [] }
-    };
-    return this.fromCanonicalUser(guestUser);
+    throw new Error('Guest SecurityContext construction is disabled; canonical authentication is required.');
   }
 
   public static createDeveloperContext(): SecurityContext {
-    const devUser: CanonicalSecurityUser = {
-      uid: "dev-uid",
-      tenantId: "global",
-      accountType: "developer",
-      roles: ["developer"],
-      primaryRole: "developer",
-      scope: { isGlobalTenantAccess: true }
-    };
-    return this.fromCanonicalUser(devUser);
+    const context = SecurityContextService.getContext();
+    if (!context.isDeveloper) {
+      throw new Error('Developer SecurityContext construction is disabled; canonical developer identity is required.');
+    }
+    return context as unknown as SecurityContext;
   }
 }

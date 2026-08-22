@@ -4,8 +4,6 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
   updatePassword,
   signOut,
   onAuthStateChanged,
@@ -24,10 +22,6 @@ export const authGateway = {
   updateProfile: (user: User, profile: any) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
     return updateProfile(user, profile);
-  },
-  signInWithPopup: (provider: GoogleAuthProvider) => {
-    if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
-    return signInWithPopup(auth, provider);
   },
   updatePassword: (user: User, password: string) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
@@ -49,7 +43,6 @@ export const authGateway = {
     }
     return onAuthStateChanged(auth, callback);
   },
-  GoogleAuthProvider: GoogleAuthProvider,
   getCurrentUser: () => {
     if (!auth) return null;
     return auth.currentUser;

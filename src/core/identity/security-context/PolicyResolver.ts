@@ -1,29 +1,20 @@
-import type { IdentityContext } from './SecurityContext.types';
 import type { SecurityContext } from './SecurityContext.types';
+import { SecurityContextException } from './SecurityContext.types';
+import { securityContextService } from '../../security/SecurityContextService';
 
+/**
+ * Compatibility facade only.
+ *
+ * Authorization policy is resolved exclusively by SecurityContextService.
+ * This legacy resolver cannot derive tenant, role, permissions, or developer
+ * authority from arbitrary IdentityContext input.
+ */
 export class PolicyResolver {
-  static resolve(identity: IdentityContext): SecurityContext {
-    const { user, assignment } = identity;
-    const isDev = user.accountType === 'developer' || user.role === 'developer' || user.email === 'mirzanovilawati@gmail.com' || user.email === 'developer@example.com' || user.email === 'admin@example.com';
-    const hasRole = !!user.role && user.role !== 'tamu';
-    const hasAssignment = isDev || hasRole || !!(assignment.referenceId || user.studentsId || user.teachersId);
-
-    const role = (isDev || hasRole) ? String(user.role) : 'guest';
-    const roles = (isDev || hasRole) ? user.roles.map(String) : ['guest'];
-    const permissions = isDev ? ['*'] : (user.permissions || []);
-
-    return {
-        uid: user.uid || user.id || '',
-        tenantId: assignment.tenantId || user.tenantId || '',
-        role,
-        roles,
-        permissions,
-        modules: [],
-        features: [],
-        license: { isActive: true },
-        scope: {
-          level: isDev ? 'global' : (hasAssignment ? 'tenant' : 'guest'),
-        },
-    };
+  static resolve(): SecurityContext {
+    const context = securityContextService.getContext();
+    if (!context) {
+      throw new SecurityContextException('Canonical SecurityContext is not READY');
+    }
+    return context as SecurityContext;
   }
 }
