@@ -1,23 +1,21 @@
 import type { SecurityContext } from './SecurityContext.types';
 import { SecurityContextException } from './SecurityContext.types';
-import { securityContextService } from '../../security/SecurityContextService';
+import { SecurityContextService } from '../../security/SecurityContextService';
 
 /**
- * Legacy compatibility facade.
- *
- * This class intentionally cannot construct a SecurityContext from caller
- * supplied identity, role, tenant, or permission data. The sole runtime
- * authority is SecurityContextService.
+ * Legacy compatibility facade only.
+ * It cannot construct or mutate identity. SecurityContextService remains the
+ * sole runtime authority.
  */
 export class SecurityContextImpl implements SecurityContext {
   private readonly context: SecurityContext;
 
   constructor() {
-    const context = securityContextService.getContext();
-    if (!context) {
+    try {
+      this.context = SecurityContextService.getContext() as unknown as SecurityContext;
+    } catch {
       throw new SecurityContextException('Canonical SecurityContext is not READY');
     }
-    this.context = context as SecurityContext;
   }
 
   get uid() { return this.context.uid || ''; }
