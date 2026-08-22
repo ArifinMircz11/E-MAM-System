@@ -8,7 +8,7 @@ const RULES = [
   {
     id: 'FND-001',
     name: 'UI/Hook/Component → Service only',
-    roots: ['src/components', 'src/features'],
+    roots: ['src/components', 'src/features', 'src/hooks'],
     forbidden: [
       /from\s+["']firebase\/(?:firestore|app|auth)["']/,
       /from\s+["']@firebase\//,
@@ -37,12 +37,6 @@ const RULES = [
       /from\s+["']@\/core\/database\/dexie["']/,
       /from\s+["']@\/database\/dexie["']/,
     ],
-    allow: [
-      'src/services/SyncEngine.ts',
-      'src/services/sync',
-      'src/core/sync',
-      'src/infrastructure/sync',
-    ],
   },
   {
     id: 'FND-004',
@@ -53,6 +47,18 @@ const RULES = [
       /from\s+["']@firebase\/firestore["']/,
       /import\(\s*["']firebase\/firestore["']\s*\)/,
     ],
+  },
+  {
+    id: 'FND-005',
+    name: 'Services do not import Firebase SDK directly; SyncEngine is the cloud corridor',
+    roots: ['src/services'],
+    forbidden: [
+      /from\s+["']\.\/firebase["']/,
+      /from\s+["']@\/services\/firebase["']/,
+      /from\s+["']firebase\//,
+      /from\s+["']@firebase\//,
+    ],
+    allow: ['src/services/SyncEngine.ts'],
   },
 ];
 
@@ -103,7 +109,6 @@ export function runFoundationAudit(): number {
   console.log(`🔎 [Audit Foundation] ${findings} strict boundary finding(s).`);
   if (findings === 0) console.log('✅ [Audit Foundation] Foundation boundaries PASS.');
   else console.log('🛑 [Audit Foundation] Foundation is NOT GREEN; remediation required.');
-
   return findings;
 }
 
