@@ -1,76 +1,67 @@
 /**
- * SecurityContext.ts
- * WO-RBAC: Immutable runtime security context
+ * Legacy compatibility facade.
+ *
+ * Authorization authority lives exclusively in SecurityContextService.
+ * Constructor arguments are intentionally ignored so callers cannot create a
+ * second tenant/role/developer authority in application code.
  */
 
-import { AppPermission, SecurityScope } from "./types";
-import { ArchitectureBoundaryEnforcer } from "../boundary/ArchitectureBoundaryEnforcer";
-import { ArchitectureBoundaryError } from "../boundary/ArchitectureBoundaryError";
+import type { AppPermission, SecurityScope } from './types';
+import { SecurityContextService } from './SecurityContextService';
 
+/** @deprecated Use SecurityContextService.getContext(). */
 export class SecurityContext {
-  constructor(
-    readonly uid: string,
-    readonly tenantId: string,
-    readonly permissions: Set<AppPermission>,
-    readonly scope: SecurityScope,
-    readonly roles: string[] = [],
-    readonly accountType: string = "madrasah",
-    private readonly _explicitRole?: string
-  ) {
-    // Validasi integritas boundary SecurityContext
-    ArchitectureBoundaryEnforcer.enforceSecurityContext({
-      uid,
-      tenantId,
-      role: _explicitRole || roles[0],
-      effectiveRole: _explicitRole || roles[0],
-    });
+  readonly uid: string;
+  readonly tenantId: string;
+  readonly permissions: Set<AppPermission>;
+  readonly scope: SecurityScope;
+  readonly roles: string[];
+  readonly accountType: string;
+
+  constructor(..._legacyArguments: unknown[]) {
+    const canonical = SecurityContextService.getContext();
+    this.uid = canonical.uid;
+    this.tenantId = canonical.tenantId;
+    this.permissions = canonical.permissions instanceof Set
+      ? new Set(canonical.permissions)
+      : new Set(canonical.permissions);
+    this.scope = canonical.scope;
+    this.roles = canonical.roles || [];
+    this.accountType = canonical.accountType || 'madrasah';
   }
 
-  public get isDeveloper(): boolean {
-    return (
-      this.accountType === "developer" ||
-      this.roles.some((r) => String(r).toLowerCase() === "developer") ||
-      this.role === "developer"
-    );
+  get isDeveloper(): boolean {
+    return Boolean(SecurityContextService.getContext().isDeveloper);
   }
 
-  public get role(): string {
-    if (this._explicitRole) return this._explicitRole;
-    if (this.roles && this.roles.length > 0) {
-      return this.roles[0];
-    }
-    throw new ArchitectureBoundaryError(
-      'security_context',
-      'SECURITY_CONTEXT_INVALID',
-      'SecurityContext tidak memiliki role yang valid. Fallback dilarang.'
-    );
+  get role(): string {
+    return SecurityContextService.getContext().role || this.roles[0] || '';
   }
 
-  public get effectiveRole(): string {
+  get effectiveRole(): string {
     return this.role;
   }
 
-  public hasPermission(permission: AppPermission): boolean {
-    if (this.permissions.has("*" as AppPermission) || this.isDeveloper) {
-      return true;
-    }
-    return this.permissions.has(permission);
+  hasPermission(permission: AppPermission): boolean {
+    const canonical = SecurityContextService.getContext();
+    if (canonical.isDeveloper || canonical.permissions === undefined) return Boolean(canonical.isDeveloper);
+    const permissions = canonical.permissions instanceof Set ? canonical.permissions : new Set(canonical.permissions);
+    return permissions.has('*' as AppPermission) || permissions.has(permission);
   }
 
-  public can(permission: AppPermission): boolean {
+  can(permission: AppPermission): boolean {
     return this.hasPermission(permission);
   }
 
-  public canAll(permissions: AppPermission[]): boolean {
-    return permissions.every((p) => this.hasPermission(p));
+  canAll(permissions: AppPermission[]): boolean {
+    return permissions.every((permission) => this.hasPermission(permission));
   }
 
-  public canAny(permissions: AppPermission[]): boolean {
-    return permissions.some((p) => this.hasPermission(p));
+  canAny(permissions: AppPermission[]): boolean {
+    return permissions.some((permission) => this.hasPermission(permission));
   }
 
-  public getScope(): SecurityScope {
-    return this.scope;
+  getScope(): SecurityScope {
+    return SecurityContextService.getContext().scope;
   }
 }
-
