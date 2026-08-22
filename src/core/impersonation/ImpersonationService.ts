@@ -5,62 +5,66 @@ import { useUserStore } from '@/stores/userStore';
 import { auditLog } from '@/services/auditLogService';
 import { LegacyUserAdapter } from '@/core/identity/adapters/LegacyUserAdapter';
 
+const INVALID_TENANTS = new Set(['', 'global', 'default', 'unknown']);
+
+/**
+ * Impersonation is a privileged operation. This client service is only a
+ * session projection; the backend must independently authorize the operation.
+ * Never synthesize a developer identity or tenant here.
+ */
 export class ImpersonationService {
-  async startImpersonation(targetUser: any, reason: string = 'Enterprise Testing & Support'): Promise<ImpersonationSession> {
+  async startImpersonation(targetUser: any, reason = 'Enterprise Testing & Support'): Promise<ImpersonationSession> {
     const authState = useAuthStore.getState();
     const userState = useUserStore.getState();
+    const currentDevUser = authState.user || userState.user;
 
-    const currentDevUser = authState.user || {
-      uid: userState.uid || 'developer_uid',
-      name: 'Developer Administrator',
-      email: 'developer@emam.app',
-      role: 'developer',
-      accountType: 'developer',
-      tenantId: 'global',
-    };
+    if (!currentDevUser?.uid || currentDevUser.accountType !== 'developer' || currentDevUser.role !== 'developer') {
+      throw new Error('IMPERSONATION_FORBIDDEN: canonical developer identity required');
+    }
 
+    if (String(currentDevUser.tenantId || '').trim() !== 'system') {
+      throw new Error('IMPERSONATION_FORBIDDEN: developer must use system tenant');
+    }
+
+    if (!targetUser?.uid && !targetUser?.id) {
+      throw new Error('IMPERSONATION_INVALID_TARGET');
+    }
+
+    const targetTenant = String(targetUser.tenantId || '').trim();
+    if (INVALID_TENANTS.has(targetTenant.toLowerCase())) {
+      throw new Error('IMPERSONATION_INVALID_TARGET_TENANT');
+    }
+
+    const targetUid = targetUser.uid || targetUser.id;
     const session: ImpersonationSession = {
-      sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      sessionId: `session_${crypto.randomUUID()}`,
       type: 'IMPERSONATION',
       status: 'ACTIVE',
       startedAt: new Date().toISOString(),
-      originalUserId: currentDevUser.uid || 'developer_uid',
-      targetUserId: targetUser.uid || targetUser.id || 'target_uid',
-      reason,
-      createdBy: currentDevUser.uid || 'developer_uid',
+      originalUserId: currentDevUser.uid,
+      targetUserId: targetUid,
+      reason: reason.trim() || 'Enterprise Testing & Support',
+      createdBy: currentDevUser.uid,
       originalUserSnapshot: currentDevUser,
       targetUserSnapshot: targetUser,
     };
 
-    // Save session in repository
+    // The repository is only a local/session projection. Authorization is not
+    // delegated to client state and must be enforced server-side.
     await impersonationRepository.saveActiveSession(session);
-
-    // Normalize target user
-    const rawTargetTenant = targetUser.tenantId || targetUser.organizationId;
-    if (!rawTargetTenant || rawTargetTenant === 'system' || rawTargetTenant === 'global' || rawTargetTenant === 'default' || rawTargetTenant === 'unknown') {
-      // If target user doesn't have an explicit valid tenant, do NOT fabricate one; enforce fail-closed unless developer account
-      if (targetUser.role !== 'developer' && targetUser.accountType !== 'developer') {
-        throw new Error(`[ImpersonationService] Fail-Closed: Target user has missing or invalid explicit tenantId: "${rawTargetTenant}".`);
-      }
-    }
 
     const normalizedTarget = LegacyUserAdapter.normalizeCanonicalUser({
       ...targetUser,
-      uid: targetUser.uid || targetUser.id || 'target_uid',
-      name: targetUser.name || targetUser.displayName || 'Target User',
-      role: targetUser.role || 'guru',
-      accountType: targetUser.accountType || (targetUser.role === 'developer' ? 'developer' : 'madrasah'),
-      tenantId: rawTargetTenant || 'global',
+      uid: targetUid,
+      id: targetUid,
+      tenantId: targetTenant,
       isImpersonated: true,
       originalDeveloper: currentDevUser,
     });
 
-    if (!normalizedTarget) throw new Error('Target user normalization failed');
+    if (!normalizedTarget) throw new Error('IMPERSONATION_TARGET_NORMALIZATION_FAILED');
 
-    // Update Auth Store with Target User
     useAuthStore.getState().setUser(normalizedTarget);
-
-    // Update User Store
     useUserStore.getState().setUserData({
       uid: normalizedTarget.uid,
       tenantId: normalizedTarget.tenantId,
@@ -72,7 +76,6 @@ export class ImpersonationService {
       isLoaded: true,
     });
 
-    // Record Audit Log
     const auditData: ImpersonationAuditEvent = {
       event: 'IMPERSONATION_STARTED',
       actor: session.originalUserId,
@@ -80,69 +83,60 @@ export class ImpersonationService {
       timestamp: session.startedAt,
     };
 
-    try {
-      await auditLog({
-        action: 'IMPERSONATION_STARTED',
-        actorId: session.originalUserId,
-        tenantId: normalizedTarget.tenantId,
-        details: JSON.stringify(auditData),
-      } as any);
-    } catch (e) {
-      console.warn('[ImpersonationService] Failed to record start audit log:', e);
-    }
+    await auditLog({
+      action: 'IMPERSONATION_STARTED',
+      actorId: session.originalUserId,
+      tenantId: targetTenant,
+      details: JSON.stringify(auditData),
+    } as any);
 
     return session;
   }
 
   async stopImpersonation(): Promise<void> {
     const session = await impersonationRepository.getActiveSession();
-    
-    // Clear session in repo
     await impersonationRepository.clearActiveSession();
 
-    if (session && session.originalUserSnapshot) {
-      const devUser = session.originalUserSnapshot;
-      const normalizedDev = LegacyUserAdapter.normalizeCanonicalUser({
-        ...devUser,
-        isImpersonated: false,
-      });
+    if (!session?.originalUserSnapshot) return;
 
-      if (!normalizedDev) throw new Error('Dev user normalization failed');
-
-      // Restore Dev User in Auth Store
-      useAuthStore.getState().setUser(normalizedDev);
-
-      // Restore Dev User in User Store
-      useUserStore.getState().setUserData({
-        uid: normalizedDev.uid,
-        tenantId: normalizedDev.tenantId,
-        accountType: normalizedDev.accountType as any,
-        role: normalizedDev.role || 'developer',
-        roles: normalizedDev.roles || ['developer'],
-        user: normalizedDev,
-        email: normalizedDev.email,
-        isLoaded: true,
-      });
-
-      // Record Audit Log
-      const auditData: ImpersonationAuditEvent = {
-        event: 'IMPERSONATION_ENDED',
-        actor: session.originalUserId,
-        target: session.targetUserId,
-        timestamp: new Date().toISOString(),
-      };
-
-      try {
-        await auditLog({
-          action: 'IMPERSONATION_ENDED',
-          actorId: session.originalUserId,
-          tenantId: session.originalUserSnapshot?.tenantId || 'global',
-          details: JSON.stringify(auditData),
-        } as any);
-      } catch (e) {
-        console.warn('[ImpersonationService] Failed to record end audit log:', e);
-      }
+    const devUser = session.originalUserSnapshot;
+    if (devUser.accountType !== 'developer' || devUser.role !== 'developer' || devUser.tenantId !== 'system') {
+      throw new Error('IMPERSONATION_RESTORE_INVALID_DEVELOPER');
     }
+
+    const normalizedDev = LegacyUserAdapter.normalizeCanonicalUser({
+      ...devUser,
+      tenantId: 'system',
+      isImpersonated: false,
+    });
+
+    if (!normalizedDev) throw new Error('IMPERSONATION_RESTORE_FAILED');
+
+    useAuthStore.getState().setUser(normalizedDev);
+    useUserStore.getState().setUserData({
+      uid: normalizedDev.uid,
+      tenantId: 'system',
+      accountType: normalizedDev.accountType as any,
+      role: 'developer',
+      roles: ['developer'],
+      user: normalizedDev,
+      email: normalizedDev.email,
+      isLoaded: true,
+    });
+
+    const auditData: ImpersonationAuditEvent = {
+      event: 'IMPERSONATION_ENDED',
+      actor: session.originalUserId,
+      target: session.targetUserId,
+      timestamp: new Date().toISOString(),
+    };
+
+    await auditLog({
+      action: 'IMPERSONATION_ENDED',
+      actorId: session.originalUserId,
+      tenantId: 'system',
+      details: JSON.stringify(auditData),
+    } as any);
   }
 
   async getActiveSession(): Promise<ImpersonationSession | null> {
