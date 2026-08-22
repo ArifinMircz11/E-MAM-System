@@ -60,6 +60,16 @@ const RULES = [
     ],
     allow: ['src/services/SyncEngine.ts', 'src/services/gateways/FirestoreGateway.ts'],
   },
+  {
+    id: 'FND-006',
+    name: 'Application code must not depend on deprecated dbGateway compatibility facade',
+    roots: ['src'],
+    forbidden: [
+      /from\s+["'][^"']*dbGateway["']/,
+      /import\s*\(\s*["'][^"']*dbGateway["']\s*\)/,
+    ],
+    allow: ['src/services/dbGateway.ts'],
+  },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
