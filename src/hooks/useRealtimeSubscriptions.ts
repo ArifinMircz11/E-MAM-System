@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react';
-import { db } from '@/services/dbGateway';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useStudentStore } from '@/stores/studentStore';
@@ -7,7 +6,6 @@ import { useUIStore } from '@/stores/uiStore';
 import { useUserStore } from '@/stores/userStore';
 import { useSystemStore } from '@/stores/systemStore';
 import { UserRole } from '@/types';
-import { realtimeHub } from '@/services/realtime/realtimeHub';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { useSystemConfig } from '@/hooks/useSystemConfig';
 import { PendingApprovalListener } from '@/core/realtime/listeners/PendingApprovalListener';
@@ -29,18 +27,15 @@ export const useRealtimeSubscriptions = () => {
   const { masterVersion, featureLocks, rolePermissions } = useSystemConfig();
   const { count: unreadCount } = useUnreadNotifications();
 
-  // Keep stores synchronized with useSystemConfig unified listener outputs
   useEffect(() => {
     if (masterVersion) {
       const verNum =
         typeof masterVersion === 'number' ? masterVersion : parseFloat(masterVersion) || 1;
-      // Guard: Only update if changed
       useStudentStore.setState((state) => {
         if (state.masterVersion === verNum) return state;
         return { ...state, masterVersion: verNum };
       });
 
-      // Trigger Delta Sync if tenantId is available
       const tenantId = user?.tenantId;
       if (tenantId) {
         import('@/services/masterSyncService').then(({ masterSyncService }) => {
@@ -58,15 +53,10 @@ export const useRealtimeSubscriptions = () => {
     }
   }, [unreadCount, setUnreadNotifCount]);
 
-  // Feature locks sync handled in SystemStore
-
-  // Role permissions sync handled in SystemStore
-
   const [isWindowFocused, setIsWindowFocused] = useState(() =>
     typeof document !== 'undefined' ? !document.hidden : true,
   );
 
-  // Focus tracking to prevent idle background costs
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const handleVisibilityChange = () => setIsWindowFocused(!document.hidden);
@@ -81,7 +71,7 @@ export const useRealtimeSubscriptions = () => {
   }, []);
 
   useEffect(() => {
-    if (!isUserLoaded || !user?.uid || !db || !isWindowFocused || !isOnline) {
+    if (!isUserLoaded || !user?.uid || !isWindowFocused || !isOnline) {
       if (hasSubscribedApprovals.current) {
         PendingApprovalListener.deactivate();
         hasSubscribedApprovals.current = false;
