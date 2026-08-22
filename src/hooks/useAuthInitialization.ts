@@ -11,11 +11,10 @@ import { FirebaseUserSyncService } from '@/services/sync/FirebaseUserSyncService
 
 /**
  * Canonical auth bootstrap:
- * Firebase Auth -> users/{uid} -> canonical tenant/reference -> SecurityContext.
+ * Firebase Auth -> users/{uid} -> CanonicalUser -> ONE SecurityContextService.
  *
- * Developer authority is derived exclusively from canonical identity data.
- * Email is never an authorization primitive and no client-side fallback tenant is
- * fabricated for authenticated users.
+ * SecurityContextService is the sole runtime authority for uid, tenant, role and
+ * authorization context. Zustand stores are projections for UI compatibility.
  */
 export const useAuthInitialization = () => {
   const [authLoading, setAuthLoading] = useState(true);
@@ -46,6 +45,7 @@ export const useAuthInitialization = () => {
       }
 
       if (!firebaseUser) {
+        SecurityContextService.clear();
         setUser(null);
         clearUserData();
         clearProfile();
@@ -64,6 +64,7 @@ export const useAuthInitialization = () => {
         if (!authoritativeUser) throw new Error('Canonical user resolution returned no identity');
 
         if (authoritativeUser.isGuest) {
+          SecurityContextService.clear();
           const guestProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
@@ -80,20 +81,8 @@ export const useAuthInitialization = () => {
             approvalStatus: 'pending',
             registrationRequired: true,
           };
-
           setUser(guestProfile as any);
-          setUserData({
-            uid: firebaseUser.uid,
-            roles: [UserRole.TAMU],
-            accountType: 'guest',
-            role: UserRole.TAMU,
-            assignment: { studentId: null, teacherId: null, classId: null, positionId: 'guest' },
-            tenantId: null,
-            status: 'pending',
-            approvalStatus: 'pending',
-            version: 1,
-            schemaVersion: 2,
-          } as any);
+          setUserData({ uid: firebaseUser.uid, roles: [UserRole.TAMU], accountType: 'guest', role: UserRole.TAMU, assignment: { studentId: null, teacherId: null, classId: null, positionId: 'guest' }, tenantId: null, status: 'pending', approvalStatus: 'pending', version: 1, schemaVersion: 2 } as any);
           setProfile(guestProfile as any);
           setAccountStatus('pending' as any);
           finishLoading();
@@ -101,26 +90,18 @@ export const useAuthInitialization = () => {
         }
 
         SecurityContextService.setLifecycleState('IDENTITY_RESOLVED');
-
         const normalized = normalizeUserDataRoles(authoritativeUser, firebaseUser.email || '');
         const roles = normalized.roles;
         const accountType = normalized.accountType;
         const role = roles[0];
-        const isDev =
-          String(authoritativeUser.accountType || accountType).toLowerCase() === 'developer' ||
-          roles.includes(UserRole.DEVELOPER);
+        const isDev = String(authoritativeUser.accountType || accountType).toLowerCase() === 'developer' || roles.includes(UserRole.DEVELOPER);
 
-        const referenceId =
-          typeof authoritativeUser.referenceId === 'string' && authoritativeUser.referenceId.trim()
-            ? authoritativeUser.referenceId.trim()
-            : null;
+        const referenceId = typeof authoritativeUser.referenceId === 'string' && authoritativeUser.referenceId.trim() ? authoritativeUser.referenceId.trim() : null;
         if (!referenceId) throw new Error('Canonical user has no explicit referenceId');
 
         const tenantId = authoritativeUser.tenantId || (isDev ? 'system' : null);
         if (!tenantId) throw new Error('Canonical user has no explicit tenantId');
-        if (['global', 'default', 'unknown'].includes(String(tenantId).toLowerCase())) {
-          throw new Error(`Invalid canonical tenantId: ${tenantId}`);
-        }
+        if (!isDev && ['global', 'default', 'unknown'].includes(String(tenantId).toLowerCase())) throw new Error(`Invalid canonical tenantId: ${tenantId}`);
 
         const studentType = ['student', 'siswa'].includes(String(accountType).toLowerCase());
         const teacherType = ['teacher', 'guru', 'pendidik'].includes(String(accountType).toLowerCase());
@@ -138,37 +119,11 @@ export const useAuthInitialization = () => {
         const teacherId = teacherType ? referenceId : authoritativeUser.teachersId || null;
         const status = authoritativeUser.status || 'active';
 
-        const userData = {
-          uid: firebaseUser.uid,
-          roles,
-          accountType,
-          role,
-          assignment: {
-            studentId,
-            teacherId,
-            classId: authoritativeUser.classId || null,
-            positionId: authoritativeUser.positionId || role,
-          },
-          tenantId,
-          status,
-          approvalStatus: authoritativeUser.approvalStatus || 'approved',
-          version: authoritativeUser.version || 1,
-          schemaVersion: authoritativeUser.schemaVersion || 1,
-        };
+        const userData = { uid: firebaseUser.uid, roles, accountType, role, assignment: { studentId, teacherId, classId: authoritativeUser.classId || null, positionId: authoritativeUser.positionId || role }, tenantId, status, approvalStatus: authoritativeUser.approvalStatus || 'approved', version: authoritativeUser.version || 1, schemaVersion: authoritativeUser.schemaVersion || 1 };
+        const profilePayload = { uid: firebaseUser.uid, email: authoritativeUser.email || firebaseUser.email || '', displayName: authoritativeUser.displayName || firebaseUser.displayName || '', photoURL: authoritativeUser.photoURL || firebaseUser.photoURL || null, role, roles, studentsId: studentId, teachersId: teacherId, tenantId, status, referenceId };
 
-        const profilePayload = {
-          uid: firebaseUser.uid,
-          email: authoritativeUser.email || firebaseUser.email || '',
-          displayName: authoritativeUser.displayName || firebaseUser.displayName || '',
-          photoURL: authoritativeUser.photoURL || firebaseUser.photoURL || null,
-          role,
-          roles,
-          studentsId: studentId,
-          teachersId: teacherId,
-          tenantId,
-          status,
-          referenceId,
-        };
+        // Establish the immutable canonical authority BEFORE exposing READY state.
+        SecurityContextService.initialize({ ...authoritativeUser, roles, accountType, role, tenantId, referenceId, status } as any);
 
         setUser(profilePayload as any);
         setUserData(userData as any);
@@ -190,6 +145,7 @@ export const useAuthInitialization = () => {
         finishLoading();
       } catch (error) {
         console.error('[AuthInit] Initialization failed:', error);
+        SecurityContextService.clear();
         setAccountStatus('pending' as any);
         SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
         finishLoading();
