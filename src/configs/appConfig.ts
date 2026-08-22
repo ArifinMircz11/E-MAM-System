@@ -10,13 +10,8 @@ export const APP_CONFIG = {
   VERSION: '8.0.0',
   PLATFORM_NAME: 'e-Mam System',
 
-  // Fallback NPSN branding metadata (Constant default)
-  DEFAULT_TENANT_ID: '30315537',
-
-  // Client Environment Facade
   ENV: env,
 
-  // FEATURE_FLAGS: Derived from env and application features
   FEATURES: {
     ATTENDANCE: true,
     REPORTS: true,
@@ -29,7 +24,6 @@ export const APP_CONFIG = {
     MOCK_MODE: env.MOCK_MODE,
   },
 
-  // DOMAIN_BOUNDARIES: Metadata for domain governance
   DOMAINS: {
     SISWA: 'siswa',
     GURU: 'guru',
