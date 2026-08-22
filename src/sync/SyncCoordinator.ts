@@ -1,4 +1,4 @@
-import { SyncEngine } from './SyncEngine';
+import { SyncEngine } from '@/services/SyncEngine';
 import { sessionManager } from '@/core/session/sessionManager';
 
 export class SyncCoordinatorClass {
@@ -11,9 +11,7 @@ export class SyncCoordinatorClass {
       return;
     }
     const flightKey = `sync_${tenantId}`;
-    if (this.activePromises.has(flightKey)) {
-      return this.activePromises.get(flightKey)!;
-    }
+    if (this.activePromises.has(flightKey)) return this.activePromises.get(flightKey)!;
 
     const syncPromise = (async () => {
       try {
