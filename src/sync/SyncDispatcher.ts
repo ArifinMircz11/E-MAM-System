@@ -122,12 +122,14 @@ export class SyncDispatcher {
         type === 'UPDATE_TEACHER' ||
         type === 'PATCH' ||
         type === 'CREATE' ||
+        type === 'ADD_POINT' ||
         type === 'ADD_STUDENT' ||
         type === 'ADD_TEACHER' ||
         type === 'ADD_LETTER'
       ) {
-        // Deterministic document IDs make retry safe. A repeated set with merge
-        // converges to the same state rather than creating a duplicate record.
+        // ADD_POINT uses the same deterministic document contract as normal
+        // CRUD. It must not be treated as a side-effect-only action because a
+        // retry after a crash must converge to the same point record.
         await db.setDoc(ref, cleanData, { merge: true });
         return;
       }
