@@ -8,6 +8,8 @@ import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { db } from './firebase';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
+import { localDb } from '@/database/dexie';
+import { FirestoreSyncDataSource } from '@/infrastructure/datasource/SyncDataSource';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -22,24 +24,13 @@ export class SyncEngine {
   private static isStopped = false;
   private static intervalHandle: ReturnType<typeof setInterval> | null = null;
 
-  /**
-   * Start the periodic sync worker. Authentication/bootstrap code may safely
-   * call this repeatedly; an existing timer is reused instead of duplicated.
-   */
   static start(intervalMs = 10_000): void {
     this.isStopped = false;
     if (this.intervalHandle) return;
-
     void this.processQueue();
-    this.intervalHandle = setInterval(() => {
-      void this.processQueue();
-    }, Math.max(1_000, intervalMs));
+    this.intervalHandle = setInterval(() => { void this.processQueue(); }, Math.max(1_000, intervalMs));
   }
 
-  /**
-   * Stop cloud synchronization without destroying the queue.
-   * Local Dexie data remains intact and can be retried after resume/start.
-   */
   static stop(): void {
     this.isStopped = true;
     if (this.intervalHandle) {
@@ -48,15 +39,9 @@ export class SyncEngine {
     }
   }
 
-  /** Resume cloud synchronization after an intentional pause. */
-  static resume(): void {
-    this.start();
-  }
+  static resume(): void { this.start(); }
 
-  /** Current pause state, useful for diagnostics/UI. */
-  static isStoppedState(): boolean {
-    return this.isStopped;
-  }
+  static isStoppedState(): boolean { return this.isStopped; }
 
   static async processQueue() {
     if (this.isStopped) return;
@@ -74,11 +59,8 @@ export class SyncEngine {
         if (this.isStopped) break;
         const claimed = await syncRepository.claimItem(snapshot.id, activeSecCtx.tenantId);
         if (!claimed) continue;
-        try {
-          await this.processItem(claimed, activeSecCtx);
-        } catch (err) {
-          console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err);
-        }
+        try { await this.processItem(claimed, activeSecCtx); }
+        catch (err) { console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err); }
       }
       await syncRepository.clearCompleted(activeSecCtx.tenantId);
     } finally {
@@ -86,12 +68,26 @@ export class SyncEngine {
     }
   }
 
+  /** Pull one tenant-scoped master collection through the canonical data source. */
+  static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
+    if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
+    const table = (localDb as unknown as Record<string, { put: (value: unknown) => Promise<unknown> }>)[collectionName];
+    if (!table?.put) throw new Error(`SYNC_LOCAL_TABLE_NOT_FOUND: ${collectionName}`);
+
+    const source = new FirestoreSyncDataSource();
+    const records = await source.pullDelta(collectionName, tenantId);
+    let synced = 0;
+    for (const record of records) {
+      const rawId = record?.[idField] ?? record?.id;
+      if (!rawId) continue;
+      await table.put({ ...record, id: String(rawId), tenantId, syncStatus: SyncStatus.SYNCED });
+      synced++;
+    }
+    return synced;
+  }
+
   private static async processItem(item: SyncQueueItem, activeSecCtx: SecurityContext) {
-    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(
-      item.tenantId,
-      activeSecCtx.tenantId,
-      activeSecCtx.isDeveloper,
-    );
+    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(item.tenantId, activeSecCtx.tenantId, activeSecCtx.isDeveloper);
 
     const operation = item.operation.toLowerCase();
     const customAction = item.metadata?.action;
@@ -100,12 +96,10 @@ export class SyncEngine {
     const tenantId = item.tenantId;
 
     try {
-      const docId = item.recordId ??
-        payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ??
-        payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ??
-        payload?.teacherId ?? payload?.teachersId ?? payload?.userId ?? payload?.classId ??
-        payload?.classesId ?? payload?.scheduleId ?? payload?.journalId ?? payload?.letterId ??
-        payload?.pointId;
+      const docId = item.recordId ?? payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ??
+        payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ?? payload?.teacherId ??
+        payload?.teachersId ?? payload?.userId ?? payload?.classId ?? payload?.classesId ?? payload?.scheduleId ??
+        payload?.journalId ?? payload?.letterId ?? payload?.pointId;
 
       if (!docId) {
         await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING');
@@ -125,64 +119,25 @@ export class SyncEngine {
           if (docSnap.exists) {
             const remoteData = docSnap.data();
             const remoteVersion = remoteData.version || 0;
-            const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp
-              ? remoteData.updatedAt.toMillis()
-              : (remoteData.updatedAt || 0);
+            const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
             const localVersion = payload?.version || item.metadata?.version || 0;
-            const localUpdatedAt = payload?.updatedAt || 0;
+            const localUpdatedAt = Number(payload?.updatedAt || 0);
             if (remoteVersion > localVersion || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
               overwriteRemote = false;
-              auditLogger.log(
-                'SyncEnabled',
-                tenantId,
-                undefined,
-                JSON.stringify({
-                  event: 'SYNC_PUSH_CONFLICT_RESOLVED',
-                  actorId: activeSecCtx.uid || 'system',
-                  collection: colName,
-                  docId,
-                  resolution: 'KEEP_REMOTE',
-                  localVersion,
-                  remoteVersion,
-                  localUpdatedAt,
-                  remoteUpdatedAt,
-                }),
-              );
+              auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
             }
           }
-        } catch (fetchErr) {
-          console.warn('[SyncEngine] Pre-write read failed:', fetchErr);
-        }
+        } catch (fetchErr) { console.warn('[SyncEngine] Pre-write read failed:', fetchErr); }
 
         if (overwriteRemote) {
           const firestoreData = { ...payload, tenantId, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
           delete firestoreData.isOffline;
           await dbGateway.writeBatch(db).set(docRef, firestoreData, { merge: true }).commit();
-          auditLogger.log(
-            'SyncEnabled',
-            tenantId,
-            undefined,
-            JSON.stringify({
-              event: `SYNC_${operation.toUpperCase()}`,
-              actorId: activeSecCtx.uid || 'system',
-              collection: colName,
-              docId,
-            }),
-          );
+          auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
         }
       } else if (operation === 'delete') {
         await dbGateway.writeBatch(db).delete(docRef).commit();
-        auditLogger.log(
-          'SyncEnabled',
-          tenantId,
-          undefined,
-          JSON.stringify({
-            event: 'SYNC_DELETE',
-            actorId: activeSecCtx.uid || 'system',
-            collection: colName,
-            docId,
-          }),
-        );
+        auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_DELETE', actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
       } else {
         throw new Error(`Unsupported sync operation: ${item.operation}`);
       }
@@ -191,21 +146,9 @@ export class SyncEngine {
       await syncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
-      auditLogger.log(
-        'SyncBlocked',
-        tenantId,
-        undefined,
-        JSON.stringify({
-          event: `SYNC_${item.operation.toUpperCase()}_ERROR`,
-          actorId: activeSecCtx.uid || 'system',
-          collection: item.collection,
-          docId: item.recordId,
-          error: error?.message || String(error),
-          attempts,
-        }),
-      );
+      auditLogger.log('SyncBlocked', tenantId, undefined, JSON.stringify({ event: `SYNC_${item.operation.toUpperCase()}_ERROR`, actorId: activeSecCtx.uid || 'system', collection: item.collection, docId: item.recordId, error: error?.message || String(error), attempts }));
       if (attempts >= MAX_SYNC_ATTEMPTS) {
-        await syncRepository.moveToDeadLetterQueue(item.id, error.message || 'Exceeded retry limit', error.code || 'SYNC_MAX_RETRIES_EXCEEDED');
+        await syncRepository.moveToDeadLetterQueue(item.id, error?.message || 'Exceeded retry limit', error?.code || 'SYNC_MAX_RETRIES_EXCEEDED');
       } else {
         const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
         await syncRepository.incrementRetry(item.id);
