@@ -5,6 +5,7 @@
  */
 
 import { localDb } from './dexie';
+import { syncRepository } from '@/repositories/SyncRepository';
 
 export const OfflineService = {
   async clearAllCaches() {
@@ -45,29 +46,14 @@ export const OfflineService = {
     payload: any,
     docId?: string,
   ) {
-    const res = await localDb.sync_queue.add({
-      id: `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      collection,
-      type,
-      payload,
-      docId:
-        docId ||
-        payload.id ||
-        payload.uid ||
-        payload.studentsId ||
-        payload.teachersId ||
-        payload.classId,
-      status: 'pending',
-      createdAt: Date.now(),
-      retryCount: 0,
-      lastAttempt: null,
-      error: null,
-    });
+    const resolvedDocId = docId || payload?.id || payload?.uid || payload?.studentsId || payload?.teachersId || payload?.classId;
 
-    // Trigger Self-Healing Sync Engine (Debounced)
-    // Using dynamic import here to break circular dependency if any
-    import('@/services/SyncEngine').then(({ SyncEngine }) => {
-      SyncEngine.processQueue();
+    const res = await syncRepository.enqueue({
+      tenantId: payload?.tenantId,
+      collection,
+      operation: type,
+      recordId: resolvedDocId ? String(resolvedDocId) : undefined,
+      payload,
     });
 
     return res;
