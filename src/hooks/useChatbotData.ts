@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAutoFix } from '@/hooks/useAutoFix';
-import { doc } from '@/services/dbGateway';
-import { db } from '@/services/dbGateway';
-import { localDb } from '@/database/dexie';
-import { getDocSafe } from '@/services/sync/firestoreHelpers';
+import { firestoreGateway } from '@/services/gateways/FirestoreGateway';
+import { getStudentData } from '@/services/studentService';
+import { systemRepository } from '@/repositories/systemRepository';
+import { doc, getDoc } from '@/services/gateways/FirestoreGateway';
 
 export function useChatbotData(isOpen: boolean, studentsId?: string) {
   const [studentData, setStudentData] = useState<any>(null);
@@ -15,33 +15,27 @@ export function useChatbotData(isOpen: boolean, studentsId?: string) {
 
     if (studentsId && !studentData) {
       safeCall(async () => {
-        // 1. Try local Dexie first
-        const localStudent = await localDb.students.get(studentsId);
+        const localStudent = await getStudentData(studentsId);
         if (localStudent) {
           setStudentData(localStudent);
           return;
         }
-        // 2. Fallback to Firestore if not cached locally
-        if (db) {
-          const data = await getDocSafe(doc(db, 'students', studentsId));
-          if (data) setStudentData(data);
-        }
+
+        const snapshot = await getDoc(doc(firestoreGateway.db, 'students', studentsId));
+        if (snapshot.exists()) setStudentData(snapshot.data());
       }, 'Chatbot.StudentData');
     }
 
     if (!schoolData) {
       safeCall(async () => {
-        // 1. Try local Dexie settings first
-        const localInfo = await localDb.systemSettings.get('madrasahInfo');
-        if (localInfo?.value) {
-          setSchoolData(localInfo.value);
+        const localInfo = await systemRepository.getSetting('madrasahInfo');
+        if (localInfo) {
+          setSchoolData(localInfo);
           return;
         }
-        // 2. Fallback to Firestore
-        if (db) {
-          const data = await getDocSafe(doc(db, 'settings', 'madrasahInfo'));
-          if (data) setSchoolData(data);
-        }
+
+        const snapshot = await getDoc(doc(firestoreGateway.db, 'settings', 'madrasahInfo'));
+        if (snapshot.exists()) setSchoolData(snapshot.data());
       }, 'Chatbot.SchoolData');
     }
   }, [isOpen, studentsId, safeCall, studentData, schoolData]);
