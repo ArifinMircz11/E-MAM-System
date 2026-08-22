@@ -22,12 +22,27 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
   const scope = `${payload.tenantId}_${payload.studentId}`;
   const attId = `${scope}_${payload.date}`;
   const attRef = db.doc(ATT_COL, attId);
+  const studentRef = db.doc(STU_COL, payload.studentId);
 
   await db.runTransaction(async (transaction: any) => {
     const currentAttSnap = await transaction.get(attRef);
     const currentAtt = currentAttSnap.exists() ? currentAttSnap.data() : null;
 
-    // Deterministic session key makes a retried scan idempotent.
+    // Verify the canonical student belongs to the same tenant before any
+    // student-side effect is committed. Never allow a shared/reused studentId
+    // to become a cross-tenant update target.
+    const studentSnap = await transaction.get(studentRef);
+    if (!studentSnap.exists()) {
+      throw new Error('ATTENDANCE_STUDENT_NOT_FOUND');
+    }
+    const studentData = studentSnap.data() || {};
+    if (studentData.tenantId !== payload.tenantId) {
+      throw new Error('ATTENDANCE_STUDENT_TENANT_MISMATCH');
+    }
+
+    // Deterministic session key makes a retried scan idempotent. If Firestore
+    // already committed the transaction before the client crashed, the retry
+    // exits here and never increments points/stats again.
     if (currentAtt?.[payload.fieldName]) return;
 
     let finalPointsPenalty = payload.pointsPenalty || 0;
@@ -144,7 +159,6 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
         { merge: true },
       );
 
-      const studentRef = db.doc(STU_COL, payload.studentId);
       transaction.update(
         studentRef,
         deepClean({
