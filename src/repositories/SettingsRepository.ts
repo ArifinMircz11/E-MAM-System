@@ -12,67 +12,100 @@ export interface AppSetting {
 
 const cache = new Map<string, { record: AppSetting | null; timestamp: number }>();
 const pendingPromises = new Map<string, Promise<AppSetting | null>>();
-const CACHE_TTL = 10000;
+const CACHE_TTL = 10000; // 10 seconds memory TTL
 
 export const SettingsRepository = {
   async get(context: SecurityContext, key: string): Promise<AppSetting | null> {
     const tenantId = context.tenantId;
     const cacheKey = `${tenantId || 'global'}:${key}`;
+
     const stack = new Error().stack || '';
     const callerLine = stack.split('\n')[2] || '';
     console.log(`[SettingsRepository] Fetching setting ${key}. Caller: ${callerLine.trim()}`);
-    if (key === 'config' || key === 'app_version') console.trace(`[SettingsRepository] Trace for fetching ${key}`);
+    if (key === 'config' || key === 'app_version') {
+      console.trace(`[SettingsRepository] Trace for fetching ${key}`);
+    }
 
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.record;
-    const pending = pendingPromises.get(cacheKey);
-    if (pending) return pending;
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      console.log(`[SettingsRepository] Cache hit for setting ${key}`);
+      return cached.record;
+    }
 
-    const request = (async () => {
-      const record = await localDb.settings.where('[tenantId+key]').equals([tenantId, key]).first();
-      const normalized = record ? {
-        key,
-        tenantId,
-        value: record.value,
-        updatedAt: String(record.updatedAt ?? new Date(0).toISOString()),
-        syncStatus: record.syncStatus,
-      } : null;
-      cache.set(cacheKey, { record: normalized, timestamp: Date.now() });
-      return normalized;
+    let promise = pendingPromises.get(cacheKey);
+    if (promise) {
+      console.log(`[SettingsRepository] Deduplicating fetch promise for setting ${key}`);
+      return promise;
+    }
+
+    promise = (async () => {
+      try {
+        if (key === 'config') console.count('Repository config');
+        else if (key === 'app_version') console.count('Repository app_version');
+
+        const record = await localDb.settings
+          .where('key')
+          .equals(key)
+          .and(item => item.tenantId === tenantId)
+          .first();
+        const result = record || null;
+        cache.set(cacheKey, { record: result, timestamp: Date.now() });
+        return result;
+      } catch (e) {
+        console.error(`[SettingsRepository] Error fetching setting ${key}:`, e);
+        return null;
+      } finally {
+        pendingPromises.delete(cacheKey);
+      }
     })();
 
-    pendingPromises.set(cacheKey, request);
-    try { return await request; } finally { pendingPromises.delete(cacheKey); }
+    pendingPromises.set(cacheKey, promise);
+    return promise;
   },
 
-  async set(context: SecurityContext, key: string, value: any, userId: string): Promise<void> {
-    const tenantId = context.tenantId;
-    if (!tenantId) throw new Error('SETTINGS_TENANT_REQUIRED');
-    const now = new Date().toISOString();
-    const finalValue = value && typeof value === 'object' ? value : { value };
+  async getAll(context: SecurityContext): Promise<AppSetting[]> {
+    try {
+      const tenantId = context.tenantId;
+      return await localDb.settings.where('tenantId').equals(tenantId).toArray();
+    } catch (e) {
+      console.error('[SettingsRepository] Error fetching all settings:', e);
+      return [];
+    }
+  },
 
-    await localDb.settings.put({
-      id: `${tenantId}:${key}`,
+  async save(context: SecurityContext, key: string, value: any, merge: boolean = true): Promise<void> {
+    const tenantId = context.tenantId;
+    const userId = context.uid;
+    if (!tenantId) throw new Error('Tenant ID is required to save settings');
+
+    const cacheKey = `${tenantId}:${key}`;
+    cache.delete(cacheKey);
+    pendingPromises.delete(cacheKey);
+
+    const now = new Date().toISOString();
+    let finalValue = value;
+    if (merge) {
+      const existing = await this.get(context, key);
+      if (existing) finalValue = { ...existing.value, ...value };
+    }
+
+    const setting: AppSetting = {
       key,
       tenantId,
       value: finalValue,
       updatedAt: now,
-      updatedBy: userId,
       syncStatus: 'pending',
-    });
+    };
 
-    cache.set(`${tenantId}:${key}`, {
-      record: { key, tenantId, value: finalValue, updatedAt: now, syncStatus: 'pending' },
-      timestamp: Date.now(),
-    });
+    await localDb.settings.put(setting);
+    cache.set(cacheKey, { record: setting, timestamp: Date.now() });
 
-    const payload = { ...finalValue, updatedAt: now, updatedBy: userId, tenantId };
     await syncRepository.enqueue({
       tenantId,
       collection: 'settings',
       recordId: key,
       operation: 'update',
-      payload,
+      payload: { ...finalValue, updatedAt: now, updatedBy: userId, tenantId },
     }, context);
   },
 };
