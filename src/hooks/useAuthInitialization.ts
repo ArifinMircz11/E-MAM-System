@@ -3,7 +3,7 @@ import { onAuthStateChanged, attemptAutoLinkStudent, getMasterProfile } from '@/
 import { useAuthStore } from '@/stores/authStore';
 import { useUserStore } from '@/stores/userStore';
 import { useProfileStore } from '@/stores/profileStore';
-import { UserRole, DEVELOPER_EMAILS } from '@/types';
+import { UserRole } from '@/types';
 import { normalizeUserDataRoles } from '@/utils/roleNormalizer';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { toast } from 'sonner';
@@ -13,10 +13,9 @@ import { FirebaseUserSyncService } from '@/services/sync/FirebaseUserSyncService
  * Canonical auth bootstrap:
  * Firebase Auth -> users/{uid} -> canonical tenant/reference -> SecurityContext.
  *
- * The authoritative user returned by FirebaseUserSyncService is consumed directly.
- * The bootstrap must not perform a second Dexie round-trip through watchUserDoc,
- * because that creates an unnecessary race during the most critical application
- * lifecycle transition.
+ * Developer authority is derived exclusively from canonical identity data.
+ * Email is never an authorization primitive and no client-side fallback tenant is
+ * fabricated for authenticated users.
  */
 export const useAuthInitialization = () => {
   const [authLoading, setAuthLoading] = useState(true);
@@ -30,7 +29,6 @@ export const useAuthInitialization = () => {
 
   useEffect(() => {
     let safetyTimer: ReturnType<typeof setTimeout> | null = null;
-
     SecurityContextService.setLifecycleState('BOOTSTRAPPING');
 
     const finishLoading = () => {
@@ -63,10 +61,7 @@ export const useAuthInitialization = () => {
 
       try {
         const authoritativeUser = await FirebaseUserSyncService.syncAuthUser(firebaseUser);
-
-        if (!authoritativeUser) {
-          throw new Error('Canonical user resolution returned no identity');
-        }
+        if (!authoritativeUser) throw new Error('Canonical user resolution returned no identity');
 
         if (authoritativeUser.isGuest) {
           const guestProfile = {
@@ -92,12 +87,7 @@ export const useAuthInitialization = () => {
             roles: [UserRole.TAMU],
             accountType: 'guest',
             role: UserRole.TAMU,
-            assignment: {
-              studentId: null,
-              teacherId: null,
-              classId: null,
-              positionId: 'guest',
-            },
+            assignment: { studentId: null, teacherId: null, classId: null, positionId: 'guest' },
             tenantId: null,
             status: 'pending',
             approvalStatus: 'pending',
@@ -106,73 +96,48 @@ export const useAuthInitialization = () => {
           } as any);
           setProfile(guestProfile as any);
           setAccountStatus('pending' as any);
-
-          // An authenticated account without a canonical user is a valid
-          // authenticated-but-pending state, not an application error.
           finishLoading();
           return;
         }
 
         SecurityContextService.setLifecycleState('IDENTITY_RESOLVED');
 
-        const normalized = normalizeUserDataRoles(
-          authoritativeUser,
-          firebaseUser.email || '',
-        );
+        const normalized = normalizeUserDataRoles(authoritativeUser, firebaseUser.email || '');
         const roles = normalized.roles;
         const accountType = normalized.accountType;
         const role = roles[0];
         const isDev =
-          DEVELOPER_EMAILS.includes(firebaseUser.email || '') ||
+          String(authoritativeUser.accountType || accountType).toLowerCase() === 'developer' ||
           roles.includes(UserRole.DEVELOPER);
 
         const referenceId =
-          typeof authoritativeUser.referenceId === 'string' &&
-          authoritativeUser.referenceId.trim()
+          typeof authoritativeUser.referenceId === 'string' && authoritativeUser.referenceId.trim()
             ? authoritativeUser.referenceId.trim()
             : null;
+        if (!referenceId) throw new Error('Canonical user has no explicit referenceId');
 
-        if (!referenceId) {
-          throw new Error('Canonical user has no explicit referenceId');
-        }
-
-        // Developer is a system identity, not a fallback tenant.
         const tenantId = authoritativeUser.tenantId || (isDev ? 'system' : null);
-        if (!tenantId) {
-          throw new Error('Canonical user has no explicit tenantId');
-        }
-        if (['global', 'default', 'unknown'].includes(tenantId)) {
+        if (!tenantId) throw new Error('Canonical user has no explicit tenantId');
+        if (['global', 'default', 'unknown'].includes(String(tenantId).toLowerCase())) {
           throw new Error(`Invalid canonical tenantId: ${tenantId}`);
         }
 
-        const studentType = ['student', 'siswa'].includes(
-          String(accountType).toLowerCase(),
-        );
-        const teacherType = ['teacher', 'guru', 'pendidik'].includes(
-          String(accountType).toLowerCase(),
-        );
+        const studentType = ['student', 'siswa'].includes(String(accountType).toLowerCase());
+        const teacherType = ['teacher', 'guru', 'pendidik'].includes(String(accountType).toLowerCase());
 
         if (role === UserRole.SISWA && !authoritativeUser.studentsId) {
           try {
-            const linkRes = await attemptAutoLinkStudent(
-              firebaseUser.uid,
-              firebaseUser.email || '',
-              tenantId,
-            );
+            const linkRes = await attemptAutoLinkStudent(firebaseUser.uid, firebaseUser.email || '', tenantId);
             if (linkRes) toast.success('Akun berhasil dihubungkan secara otomatis.');
           } catch (linkErr) {
             console.warn('[AuthInit] Auto-link student failed:', linkErr);
           }
         }
 
-        const studentId = studentType
-          ? referenceId
-          : authoritativeUser.studentsId || null;
-        const teacherId = teacherType
-          ? referenceId
-          : authoritativeUser.teachersId || null;
-
+        const studentId = studentType ? referenceId : authoritativeUser.studentsId || null;
+        const teacherId = teacherType ? referenceId : authoritativeUser.teachersId || null;
         const status = authoritativeUser.status || 'active';
+
         const userData = {
           uid: firebaseUser.uid,
           roles,
@@ -194,10 +159,8 @@ export const useAuthInitialization = () => {
         const profilePayload = {
           uid: firebaseUser.uid,
           email: authoritativeUser.email || firebaseUser.email || '',
-          displayName:
-            authoritativeUser.displayName || firebaseUser.displayName || '',
-          photoURL:
-            authoritativeUser.photoURL || firebaseUser.photoURL || null,
+          displayName: authoritativeUser.displayName || firebaseUser.displayName || '',
+          photoURL: authoritativeUser.photoURL || firebaseUser.photoURL || null,
           role,
           roles,
           studentsId: studentId,
@@ -211,17 +174,10 @@ export const useAuthInitialization = () => {
         setUserData(userData as any);
         setAccountStatus(status as any);
 
-        // Only student/teacher accounts have a domain master profile. Organization
-        // and developer identities are complete at the canonical user boundary and
-        // must not trigger an unrelated teacher/student repository read here.
         setProfileLoading(true);
         try {
           if (studentType || teacherType) {
-            const masterData = await getMasterProfile(
-              firebaseUser.uid,
-              accountType,
-              referenceId,
-            );
+            const masterData = await getMasterProfile(firebaseUser.uid, accountType, referenceId);
             setProfile(masterData || profilePayload);
           } else {
             setProfile(profilePayload as any);
@@ -235,10 +191,7 @@ export const useAuthInitialization = () => {
       } catch (error) {
         console.error('[AuthInit] Initialization failed:', error);
         setAccountStatus('pending' as any);
-        SecurityContextService.setLifecycleState(
-          'ERROR',
-          error instanceof Error ? error : String(error),
-        );
+        SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
         finishLoading();
       }
     });
@@ -247,15 +200,7 @@ export const useAuthInitialization = () => {
       if (safetyTimer) clearTimeout(safetyTimer);
       unsubAuth();
     };
-  }, [
-    setUser,
-    setAccountStatus,
-    setUserData,
-    clearUserData,
-    setProfile,
-    clearProfile,
-    setProfileLoading,
-  ]);
+  }, [setUser, setAccountStatus, setUserData, clearUserData, setProfile, clearProfile, setProfileLoading]);
 
   return { authLoading };
 };
