@@ -8,8 +8,6 @@ import {
   signOut,
   onAuthStateChanged,
   User,
-  AuthProvider,
-  signInWithPopup,
 } from 'firebase/auth';
 
 export const authGateway = {
@@ -24,10 +22,6 @@ export const authGateway = {
   updateProfile: (user: User, profile: any) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
     return updateProfile(user, profile);
-  },
-  signInWithPopup: (provider: AuthProvider) => {
-    if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
-    throw new Error('Interactive provider login is disabled. Use the canonical email/password authentication flow.');
   },
   updatePassword: (user: User, password: string) => {
     if (!auth) throw new Error('API_KEY_UNAVAILABLE (Mock Mode Fallback)');
