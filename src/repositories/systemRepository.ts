@@ -12,6 +12,16 @@ export const systemRepository = {
     }
   },
 
+  async getSetting<T = unknown>(key: string): Promise<T | null> {
+    try {
+      const record = await localDb.systemSettings.get(key);
+      return (record?.value as T) ?? null;
+    } catch (e) {
+      console.warn(`Error fetching system setting ${key} from Dexie:`, e);
+      return null;
+    }
+  },
+
   async saveAboutContent(content: AboutContent): Promise<void> {
     const payload = {
       key: 'about_content_main',
