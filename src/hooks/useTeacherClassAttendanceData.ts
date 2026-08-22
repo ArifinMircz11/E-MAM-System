@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAutoFix } from '@/hooks/useAutoFix';
-import { doc } from '@/services/dbGateway';
-import { isMockMode, getCurrentUser } from '@/services/authService';
-import { db, collection } from '@/services/dbGateway';
-import { localDb } from '@/database/dexie';
-import { getDocSafe, getDocsOptimized } from '@/services/sync/firestoreHelpers';
+import { getCurrentUser, isMockMode } from '@/services/authService';
+import { getSecurityContext } from '@/core/security/contextHelper';
+import { teacherRepository } from '@/repositories/teacherRepository';
+import { userRepository } from '@/repositories/userRepository';
+import { classRepository } from '@/repositories/classRepository';
 import { getSchedules } from '@/services/scheduleService';
 import type { ScheduleItem, ClassData } from '@/types';
 
@@ -24,52 +24,29 @@ export function useTeacherClassAttendanceInit(
       const user = getCurrentUser();
       if (!user) return;
 
+      const tenantId = getSecurityContext().tenantId;
+      if (!tenantId) return;
+
       let tProfile: any = null;
-
-      // 1. Try local Dexie first for teacher profile
-      const localUser = await localDb.users.get(user.uid);
+      const localUser = await userRepository.findById(user.uid, tenantId);
       const teacherId = localUser?.teacherId || localUser?.teachersId;
-      if (teacherId) {
-        const localTeacher = await localDb.teachers.get(teacherId);
-        if (localTeacher) {
-          tProfile = { id: teacherId, ...localTeacher };
-        }
-      }
 
-      // Fallback to Firestore if local cache miss
-      if (!tProfile && !isMockMode && db) {
-        const userDoc = await getDocSafe<any>(doc(db, 'users', user.uid));
-        if (userDoc) {
-          const tId = userDoc.teacherId || userDoc.teachersId;
-          if (tId) {
-            const teacherDoc = await getDocSafe<any>(doc(db, 'teachers', tId));
-            if (teacherDoc) {
-              tProfile = { id: tId, ...teacherDoc };
-            }
-          }
-        }
+      if (teacherId) {
+        const teacher = await teacherRepository.findById(teacherId, tenantId);
+        if (teacher) tProfile = { id: teacherId, ...teacher };
       }
       setTeacherProfile(tProfile);
 
-      // 2. Query classes from local Dexie first
-      const localClasses = await localDb.classes.toArray();
-      if (localClasses && localClasses.length > 0) {
+      const localClasses = await classRepository.findAll(tenantId);
+      if (localClasses.length > 0) {
         const classMap: Record<string, ClassData> = {};
-        localClasses.forEach((d: any) => {
-          classMap[d.name || d.id] = d as ClassData;
-        });
-        setClasses(classMap);
-      } else if (db && !isMockMode) {
-        const classList = await getDocsOptimized<any>(collection(db, 'classes'));
-        const classMap: Record<string, ClassData> = {};
-        classList.forEach((d: any) => {
-          classMap[d.name] = d as ClassData;
+        localClasses.forEach((item: any) => {
+          classMap[item.name || item.id] = item as ClassData;
         });
         setClasses(classMap);
       }
 
       const allSchedules = await getSchedules();
-
       let mySchedules: ScheduleItem[] = [];
       if (selectedClassId) {
         mySchedules = allSchedules.filter(
@@ -77,7 +54,7 @@ export function useTeacherClassAttendanceInit(
         );
       } else {
         const nameToMatch =
-          (((teacherProfile as any)?.name || (teacherProfile as any)?.namaLengkap || getCurrentUser()?.displayName || '') as string);
+          ((tProfile?.name || tProfile?.namaLengkap || user.displayName || '') as string);
         mySchedules = allSchedules.filter(
           (s) => s.teacherName === nameToMatch && s.day === currentDay,
         );
