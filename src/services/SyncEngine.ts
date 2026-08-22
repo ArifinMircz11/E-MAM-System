@@ -5,12 +5,10 @@
  */
 
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
-import { db } from './firebase';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
 import { localSyncRepository } from '@/repositories/LocalSyncRepository';
 import { FirestoreSyncDataSource } from '@/infrastructure/datasource/SyncDataSource';
-import { userRepository } from '@/repositories/userRepository';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -43,24 +41,19 @@ export class SyncEngine {
   static resume(): void { this.start(); }
   static isStoppedState(): boolean { return this.isStopped; }
 
-  /**
-   * Authentication bootstrap corridor. Only SyncEngine talks to Firestore;
-   * callers receive a canonical user projection and persist it through UserRepository.
-   */
+  /** Authentication bootstrap cloud corridor. */
   static async resolveCanonicalUser(uid: string): Promise<Record<string, any> | null> {
     if (!uid?.trim()) return null;
-    const userDocRef = dbGateway.doc(db, 'users', uid.trim());
+    const userDocRef = dbGateway.doc(dbGateway.db, 'users', uid.trim());
     const snapshot = await dbGateway.getDoc(userDocRef);
     if (!snapshot.exists()) return null;
-    const data = snapshot.data() || {};
-    return { ...data, id: uid.trim(), uid: uid.trim() };
+    return { ...(snapshot.data() || {}), id: uid.trim(), uid: uid.trim() };
   }
 
   static async processQueue() {
     if (this.isStopped) return;
     if (this.isProcessing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     if (!SecurityContextService.isReady()) return;
-
     const activeSecCtx = SecurityContextService.getNullableContext();
     if (!activeSecCtx?.tenantId) return;
 
@@ -81,23 +74,19 @@ export class SyncEngine {
     }
   }
 
-  /** Pull one tenant-scoped master collection through the canonical data source and repository. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const source = new FirestoreSyncDataSource();
     const records = await source.pullDelta(collectionName, tenantId);
     let synced = 0;
     for (const record of records) {
-      if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) {
-        synced++;
-      }
+      if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
     }
     return synced;
   }
 
   private static async processItem(item: SyncQueueItem, activeSecCtx: SecurityContext) {
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(item.tenantId, activeSecCtx.tenantId, activeSecCtx.isDeveloper);
-
     const operation = item.operation.toLowerCase();
     const customAction = item.metadata?.action;
     const colName = item.collection;
@@ -105,23 +94,20 @@ export class SyncEngine {
     const tenantId = item.tenantId;
 
     try {
-      const docId = item.recordId ?? payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ??
-        payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ?? payload?.teacherId ??
-        payload?.teachersId ?? payload?.userId ?? payload?.classId ?? payload?.classesId ?? payload?.scheduleId ??
-        payload?.journalId ?? payload?.letterId ?? payload?.pointId;
-
+      const docId = item.recordId ?? payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ?? payload?.uid ??
+        payload?.userUid ?? payload?.studentId ?? payload?.studentsId ?? payload?.teacherId ?? payload?.teachersId ?? payload?.userId ??
+        payload?.classId ?? payload?.classesId ?? payload?.scheduleId ?? payload?.journalId ?? payload?.letterId ?? payload?.pointId;
       if (!docId) {
         await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING');
         return;
       }
 
-      const docRef = dbGateway.doc(db, colName, String(docId));
+      const docRef = dbGateway.doc(dbGateway.db, colName, String(docId));
       const customActions = ['SCAN_PRESENSI', 'ADD_POINT', 'ATTENDANCE_PROCESS', 'BATCH_SYNC'];
-
       if (customAction && customActions.includes(customAction)) {
         const { SyncDispatcher } = await import('@/sync/SyncDispatcher');
         await SyncDispatcher.dispatch(item as any, activeSecCtx);
-      } else if (operation === 'create' || operation === 'update' || operation === 'patch' || operation === 'bulk_create' || operation === 'bulk_update') {
+      } else if (['create', 'update', 'patch', 'bulk_create', 'bulk_update'].includes(operation)) {
         let overwriteRemote = true;
         try {
           const docSnap = await dbGateway.getDoc(docRef);
@@ -137,15 +123,14 @@ export class SyncEngine {
             }
           }
         } catch (fetchErr) { console.warn('[SyncEngine] Pre-write read failed:', fetchErr); }
-
         if (overwriteRemote) {
           const firestoreData = { ...payload, tenantId, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
           delete firestoreData.isOffline;
-          await dbGateway.writeBatch(db).set(docRef, firestoreData, { merge: true }).commit();
+          await dbGateway.writeBatch(dbGateway.db).set(docRef, firestoreData, { merge: true }).commit();
           auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
         }
       } else if (operation === 'delete') {
-        await dbGateway.writeBatch(db).delete(docRef).commit();
+        await dbGateway.writeBatch(dbGateway.db).delete(docRef).commit();
         auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_DELETE', actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
       } else {
         throw new Error(`Unsupported sync operation: ${item.operation}`);
@@ -156,9 +141,8 @@ export class SyncEngine {
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
       auditLogger.log('SyncBlocked', tenantId, undefined, JSON.stringify({ event: `SYNC_${item.operation.toUpperCase()}_ERROR`, actorId: activeSecCtx.uid || 'system', collection: item.collection, docId: item.recordId, error: error?.message || String(error), attempts }));
-      if (attempts >= MAX_SYNC_ATTEMPTS) {
-        await syncRepository.moveToDeadLetterQueue(item.id, error?.message || 'Exceeded retry limit', error?.code || 'SYNC_MAX_RETRIES_EXCEEDED');
-      } else {
+      if (attempts >= MAX_SYNC_ATTEMPTS) await syncRepository.moveToDeadLetterQueue(item.id, error?.message || 'Exceeded retry limit', error?.code || 'SYNC_MAX_RETRIES_EXCEEDED');
+      else {
         const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
         await syncRepository.incrementRetry(item.id);
         await syncRepository.scheduleRetry(item.id, retryDelayMs);
@@ -172,9 +156,9 @@ export class SyncEngine {
 
   static async executeClearPointsSync(_context: any, tenantId: string) {
     if (!tenantId) return;
-    const q = dbGateway.query(dbGateway.collection(db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
+    const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
     const poinSnap = await dbGateway.getDocs(q);
-    const batch = dbGateway.writeBatch(db);
+    const batch = dbGateway.writeBatch(dbGateway.db);
     poinSnap.docs.forEach((d: any) => batch.delete(d.ref));
     await batch.commit();
   }
@@ -182,11 +166,11 @@ export class SyncEngine {
   static async executeBatchDeleteSync(context: any, collName: string, filter: any) {
     const tenantId = context?.tenantId;
     if (!tenantId) return;
-    let q = dbGateway.query(dbGateway.collection(db, collName), dbGateway.where('tenantId', '==', tenantId));
+    let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
     if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
     if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
     const snap = await dbGateway.getDocs(q);
-    const batch = dbGateway.writeBatch(db);
+    const batch = dbGateway.writeBatch(dbGateway.db);
     snap.docs.forEach((d: any) => batch.delete(d.ref));
     await batch.commit();
   }
