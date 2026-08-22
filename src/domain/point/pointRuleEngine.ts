@@ -2,6 +2,10 @@
  * @license
  * e-Mam System - Point Rule Engine
  * LAYER: DOMAIN (Point Rules & Threshold Evaluator)
+ *
+ * This module evaluates threshold-crossing events only. It does not write
+ * points, summaries, sanctions, or letters. Persistence belongs to the
+ * repository/sync pipeline.
  */
 
 export interface PointRule {
@@ -56,7 +60,12 @@ export interface ThresholdExceededEvent {
 }
 
 /**
- * Evaluate if a point transaction crosses one or more point rule thresholds
+ * Evaluate if a point transaction crosses one or more point rule thresholds.
+ *
+ * `customRules` is intentionally tri-state:
+ *   undefined -> use canonical defaults
+ *   []        -> use no rules (explicit configuration)
+ *   non-empty -> use supplied active rules
  */
 export function evaluatePointThresholds(params: {
   studentId: string;
@@ -66,19 +75,39 @@ export function evaluatePointThresholds(params: {
   newTotal: number;
   tenantId: string;
   customRules?: PointRule[];
+  evaluationVersion?: number | string;
 }): ThresholdExceededEvent[] {
-  const { studentId, studentName, className, previousTotal, newTotal, tenantId, customRules } = params;
+  const {
+    studentId,
+    studentName,
+    className,
+    previousTotal,
+    newTotal,
+    tenantId,
+    customRules,
+    evaluationVersion = 1,
+  } = params;
 
-  const activeRules = customRules && customRules.length > 0
-    ? customRules.filter(r => r.status === 'active')
-    : DEFAULT_POINT_RULES.map(r => ({ ...r, tenantId }));
+  if (!studentId || !tenantId) {
+    throw new Error('POINT_THRESHOLD_CONTEXT_INVALID');
+  }
+  if (!Number.isFinite(previousTotal) || !Number.isFinite(newTotal)) {
+    throw new Error('POINT_THRESHOLD_TOTAL_INVALID');
+  }
+
+  const activeRules = (customRules === undefined
+    ? DEFAULT_POINT_RULES.map((rule) => ({ ...rule, tenantId }))
+    : customRules
+  )
+    .filter((rule) => rule.status === 'active')
+    .filter((rule) => rule.tenantId === tenantId)
+    .filter((rule) => Number.isFinite(rule.thresholdValue) && rule.thresholdValue >= 0)
+    .sort((a, b) => a.thresholdValue - b.thresholdValue || a.idUnik.localeCompare(b.idUnik));
 
   const triggeredEvents: ThresholdExceededEvent[] = [];
 
   for (const rule of activeRules) {
-    // Check if new total meets or exceeds threshold while previous total was below it
     if (previousTotal < rule.thresholdValue && newTotal >= rule.thresholdValue) {
-      const idempotencyKey = `${tenantId}|${studentId}|${rule.idUnik}|v1`;
       triggeredEvents.push({
         studentId,
         studentName,
@@ -90,7 +119,7 @@ export function evaluatePointThresholds(params: {
         templateType: rule.templateType,
         sanctionLabel: rule.sanctionLabel,
         tenantId,
-        idempotencyKey,
+        idempotencyKey: `${tenantId}|${studentId}|${rule.idUnik}|v${evaluationVersion}`,
       });
     }
   }
