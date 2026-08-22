@@ -1,8 +1,8 @@
-import { db } from './firebase';
-import { firestoreGateway } from './gateways/FirestoreGateway';
-
-export { firestoreGateway };
-
+/**
+ * Deprecated compatibility facade.
+ * Firebase SDK access belongs exclusively to FirestoreGateway.
+ */
+export { firestoreGateway } from './gateways/FirestoreGateway';
 export {
   collection,
   doc,
@@ -25,7 +25,6 @@ export {
   Timestamp,
   startAfter,
 } from './gateways/FirestoreGateway';
-
 export type {
   DocumentReference,
   QuerySnapshot,
@@ -35,5 +34,3 @@ export type {
   QueryConstraint,
   DocumentData,
 } from './gateways/FirestoreGateway';
-
-export { db };
