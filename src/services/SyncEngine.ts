@@ -20,18 +20,37 @@ const BASE_RETRY_DELAY_MS = 1_000;
 export class SyncEngine {
   private static isProcessing = false;
   private static isStopped = false;
+  private static intervalHandle: ReturnType<typeof setInterval> | null = null;
 
   /**
-   * Pause cloud synchronization without destroying the queue.
-   * Used by quota/error protection paths. Local Dexie data remains intact.
+   * Start the periodic sync worker. Authentication/bootstrap code may safely
+   * call this repeatedly; an existing timer is reused instead of duplicated.
+   */
+  static start(intervalMs = 10_000): void {
+    this.isStopped = false;
+    if (this.intervalHandle) return;
+
+    void this.processQueue();
+    this.intervalHandle = setInterval(() => {
+      void this.processQueue();
+    }, Math.max(1_000, intervalMs));
+  }
+
+  /**
+   * Stop cloud synchronization without destroying the queue.
+   * Local Dexie data remains intact and can be retried after resume/start.
    */
   static stop(): void {
     this.isStopped = true;
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
   }
 
   /** Resume cloud synchronization after an intentional pause. */
   static resume(): void {
-    this.isStopped = false;
+    this.start();
   }
 
   /** Current pause state, useful for diagnostics/UI. */
