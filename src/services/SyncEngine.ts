@@ -29,19 +29,10 @@ export class SyncEngine {
     void this.processQueue();
     this.intervalHandle = setInterval(() => { void this.processQueue(); }, Math.max(1_000, intervalMs));
   }
-
-  static stop(): void {
-    this.isStopped = true;
-    if (this.intervalHandle) {
-      clearInterval(this.intervalHandle);
-      this.intervalHandle = null;
-    }
-  }
-
+  static stop(): void { this.isStopped = true; if (this.intervalHandle) { clearInterval(this.intervalHandle); this.intervalHandle = null; } }
   static resume(): void { this.start(); }
   static isStoppedState(): boolean { return this.isStopped; }
 
-  /** Authentication bootstrap cloud corridor. */
   static async resolveCanonicalUser(uid: string): Promise<Record<string, any> | null> {
     if (!uid?.trim()) return null;
     const userDocRef = dbGateway.doc(dbGateway.db, 'users', uid.trim());
@@ -51,12 +42,9 @@ export class SyncEngine {
   }
 
   static async processQueue() {
-    if (this.isStopped) return;
-    if (this.isProcessing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
-    if (!SecurityContextService.isReady()) return;
+    if (this.isStopped || this.isProcessing || (typeof navigator !== 'undefined' && !navigator.onLine) || !SecurityContextService.isReady()) return;
     const activeSecCtx = SecurityContextService.getNullableContext();
     if (!activeSecCtx?.tenantId) return;
-
     this.isProcessing = true;
     try {
       await syncRepository.recoverStaleProcessingItems(activeSecCtx.tenantId);
@@ -69,19 +57,14 @@ export class SyncEngine {
         catch (err) { console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err); }
       }
       await syncRepository.clearCompleted(activeSecCtx.tenantId);
-    } finally {
-      this.isProcessing = false;
-    }
+    } finally { this.isProcessing = false; }
   }
 
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
-    const source = new FirestoreSyncDataSource();
-    const records = await source.pullDelta(collectionName, tenantId);
+    const records = await new FirestoreSyncDataSource().pullDelta(collectionName, tenantId);
     let synced = 0;
-    for (const record of records) {
-      if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
-    }
+    for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
     return synced;
   }
 
@@ -92,18 +75,12 @@ export class SyncEngine {
     const colName = item.collection;
     const payload = (item.payload && typeof item.payload === 'object' ? item.payload : {}) as Record<string, any>;
     const tenantId = item.tenantId;
-
     try {
-      const docId = item.recordId ?? payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ?? payload?.uid ??
-        payload?.userUid ?? payload?.studentId ?? payload?.studentsId ?? payload?.teacherId ?? payload?.teachersId ?? payload?.userId ??
-        payload?.classId ?? payload?.classesId ?? payload?.scheduleId ?? payload?.journalId ?? payload?.letterId ?? payload?.pointId;
-      if (!docId) {
-        await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING');
-        return;
-      }
-
+      const docId = item.recordId ?? payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ?? payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ?? payload?.teacherId ?? payload?.teachersId ?? payload?.userId ?? payload?.classId ?? payload?.classesId ?? payload?.scheduleId ?? payload?.journalId ?? payload?.letterId ?? payload?.pointId;
+      if (!docId) { await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING'); return; }
       const docRef = dbGateway.doc(dbGateway.db, colName, String(docId));
       const customActions = ['SCAN_PRESENSI', 'ADD_POINT', 'ATTENDANCE_PROCESS', 'BATCH_SYNC'];
+
       if (customAction && customActions.includes(customAction)) {
         const { SyncDispatcher } = await import('@/sync/SyncDispatcher');
         await SyncDispatcher.dispatch(item as any, activeSecCtx);
@@ -111,7 +88,7 @@ export class SyncEngine {
         let overwriteRemote = true;
         try {
           const docSnap = await dbGateway.getDoc(docRef);
-          if (docSnap.exists) {
+          if (docSnap.exists()) {
             const remoteData = docSnap.data();
             const remoteVersion = remoteData.version || 0;
             const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
@@ -132,9 +109,7 @@ export class SyncEngine {
       } else if (operation === 'delete') {
         await dbGateway.writeBatch(dbGateway.db).delete(docRef).commit();
         auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_DELETE', actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
-      } else {
-        throw new Error(`Unsupported sync operation: ${item.operation}`);
-      }
+      } else throw new Error(`Unsupported sync operation: ${item.operation}`);
 
       await syncRepository.updateStatus(item.id, 'completed');
       await localSyncRepository.markRecordSynced(colName, String(docId));
@@ -142,27 +117,21 @@ export class SyncEngine {
       const attempts = (item.attempts || 0) + 1;
       auditLogger.log('SyncBlocked', tenantId, undefined, JSON.stringify({ event: `SYNC_${item.operation.toUpperCase()}_ERROR`, actorId: activeSecCtx.uid || 'system', collection: item.collection, docId: item.recordId, error: error?.message || String(error), attempts }));
       if (attempts >= MAX_SYNC_ATTEMPTS) await syncRepository.moveToDeadLetterQueue(item.id, error?.message || 'Exceeded retry limit', error?.code || 'SYNC_MAX_RETRIES_EXCEEDED');
-      else {
-        const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
-        await syncRepository.incrementRetry(item.id);
-        await syncRepository.scheduleRetry(item.id, retryDelayMs);
-      }
+      else { await syncRepository.incrementRetry(item.id); await syncRepository.scheduleRetry(item.id, BASE_RETRY_DELAY_MS * (2 ** (attempts - 1))); }
       throw error;
     }
   }
 
   static async syncAll() { await this.processQueue(); }
   static async executeAutoSweepSync(_context: any, _tenantId: string) { await this.processQueue(); }
-
   static async executeClearPointsSync(_context: any, tenantId: string) {
     if (!tenantId) return;
     const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
-    const poinSnap = await dbGateway.getDocs(q);
+    const snap = await dbGateway.getDocs(q);
     const batch = dbGateway.writeBatch(dbGateway.db);
-    poinSnap.docs.forEach((d: any) => batch.delete(d.ref));
+    snap.docs.forEach((d: any) => batch.delete(d.ref));
     await batch.commit();
   }
-
   static async executeBatchDeleteSync(context: any, collName: string, filter: any) {
     const tenantId = context?.tenantId;
     if (!tenantId) return;
