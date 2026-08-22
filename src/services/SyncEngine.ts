@@ -1,15 +1,16 @@
 /**
  * @license
  * e-Mam System - Sync Engine Core
- * LAYER: SERVICE (Architecture Compliant - Only Firestore Gateway)
+ * LAYER: SERVICE (transport/orchestration; operational writes stay in repositories)
  */
 
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { db } from './firebase';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
-import { localDb } from '@/database/dexie';
+import { localSyncRepository } from '@/repositories/LocalSyncRepository';
 import { FirestoreSyncDataSource } from '@/infrastructure/datasource/SyncDataSource';
+import { userRepository } from '@/repositories/userRepository';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -40,8 +41,20 @@ export class SyncEngine {
   }
 
   static resume(): void { this.start(); }
-
   static isStoppedState(): boolean { return this.isStopped; }
+
+  /**
+   * Authentication bootstrap corridor. Only SyncEngine talks to Firestore;
+   * callers receive a canonical user projection and persist it through UserRepository.
+   */
+  static async resolveCanonicalUser(uid: string): Promise<Record<string, any> | null> {
+    if (!uid?.trim()) return null;
+    const userDocRef = dbGateway.doc(db, 'users', uid.trim());
+    const snapshot = await dbGateway.getDoc(userDocRef);
+    if (!snapshot.exists()) return null;
+    const data = snapshot.data() || {};
+    return { ...data, id: uid.trim(), uid: uid.trim() };
+  }
 
   static async processQueue() {
     if (this.isStopped) return;
@@ -68,20 +81,16 @@ export class SyncEngine {
     }
   }
 
-  /** Pull one tenant-scoped master collection through the canonical data source. */
+  /** Pull one tenant-scoped master collection through the canonical data source and repository. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
-    const table = (localDb as unknown as Record<string, { put: (value: unknown) => Promise<unknown> }>)[collectionName];
-    if (!table?.put) throw new Error(`SYNC_LOCAL_TABLE_NOT_FOUND: ${collectionName}`);
-
     const source = new FirestoreSyncDataSource();
     const records = await source.pullDelta(collectionName, tenantId);
     let synced = 0;
     for (const record of records) {
-      const rawId = record?.[idField] ?? record?.id;
-      if (!rawId) continue;
-      await table.put({ ...record, id: String(rawId), tenantId, syncStatus: SyncStatus.SYNCED });
-      synced++;
+      if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) {
+        synced++;
+      }
     }
     return synced;
   }
@@ -143,7 +152,7 @@ export class SyncEngine {
       }
 
       await syncRepository.updateStatus(item.id, 'completed');
-      await syncRepository.markRecordSynced(colName, String(docId));
+      await localSyncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
       auditLogger.log('SyncBlocked', tenantId, undefined, JSON.stringify({ event: `SYNC_${item.operation.toUpperCase()}_ERROR`, actorId: activeSecCtx.uid || 'system', collection: item.collection, docId: item.recordId, error: error?.message || String(error), attempts }));
