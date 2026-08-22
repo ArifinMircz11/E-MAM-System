@@ -50,7 +50,7 @@ const RULES = [
   },
   {
     id: 'FND-005',
-    name: 'Services do not import Firebase SDK directly; SyncEngine is the cloud corridor',
+    name: 'Services do not import Firebase SDK directly; FirestoreGateway is the cloud corridor',
     roots: ['src/services'],
     forbidden: [
       /from\s+["']\.\/firebase["']/,
@@ -58,7 +58,7 @@ const RULES = [
       /from\s+["']firebase\//,
       /from\s+["']@firebase\//,
     ],
-    allow: ['src/services/SyncEngine.ts'],
+    allow: ['src/services/SyncEngine.ts', 'src/services/gateways/FirestoreGateway.ts'],
   },
 ];
 
@@ -73,10 +73,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function rel(file: string): string {
-  return path.relative(ROOT, file).replace(/\\/g, '/');
-}
-
+function rel(file: string): string { return path.relative(ROOT, file).replace(/\\/g, '/'); }
 function isAllowed(file: string, allow: string[] = []): boolean {
   const r = rel(file);
   return allow.some((item) => r === item || r.startsWith(`${item}/`));
@@ -85,7 +82,6 @@ function isAllowed(file: string, allow: string[] = []): boolean {
 export function runFoundationAudit(): number {
   console.log('🔐 [Audit Foundation] Strict architecture boundary audit...');
   let findings = 0;
-
   if (!fs.existsSync(SRC)) {
     console.error('❌ [Audit Foundation] src directory not found.');
     return 1;
@@ -112,6 +108,4 @@ export function runFoundationAudit(): number {
   return findings;
 }
 
-if (process.argv[1]?.endsWith('foundation.ts')) {
-  process.exitCode = runFoundationAudit() === 0 ? 0 : 1;
-}
+if (process.argv[1]?.endsWith('foundation.ts')) process.exitCode = runFoundationAudit() === 0 ? 0 : 1;
