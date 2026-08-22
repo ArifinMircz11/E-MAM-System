@@ -30,14 +30,15 @@ export class SyncWorker {
         .anyOf(['pending', 'waiting', 'failed', 'processing'])
         .toArray();
 
-      queue.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const operations = queue as ISyncOperation[];
+      operations.sort((a, b) => Number(a.createdAt ?? 0) - Number(b.createdAt ?? 0));
 
-      for (const op of queue as ISyncOperation[]) {
+      for (const op of operations) {
         const retryCount = op.retryCount || 0;
         
         if (retryCount > 0 && op.lastRetry) {
           const backoff = Math.min(1000 * Math.pow(2, retryCount), 1000 * 60 * 60);
-          if (Date.now() - op.lastRetry < backoff) {
+          if (Date.now() - Number(op.lastRetry) < backoff) {
             continue;
           }
         }
@@ -68,7 +69,7 @@ export class SyncWorker {
             (window as any).__FIRESTORE_QUOTA_EXCEEDED = true;
             console.warn('[SyncWorker] Firestore quota exceeded. Pausing cloud sync; local Dexie queue is preserved.');
             try {
-              const { SyncEngine } = await import('./SyncEngine');
+              const { SyncEngine } = await import('@/services/SyncEngine');
               SyncEngine.stop();
             } catch (e) {
               console.warn('[SyncWorker] Failed to pause SyncEngine:', e);
@@ -101,8 +102,6 @@ export class SyncWorker {
   private static async moveToDeadLetterQueue(op: ISyncOperation, reason: string) {
     console.warn(`[SyncWorker] Moving op ${op.id} to DLQ. Reason: ${reason}`);
     try {
-      // Use the canonical SyncRepository DLQ contract instead of writing
-      // legacy deadReason/deadAt fields directly into Dexie.
       await syncRepository.moveToDeadLetterQueue(
         op.id,
         reason,
