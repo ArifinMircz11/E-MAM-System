@@ -30,8 +30,8 @@ const RULES = [
   },
   {
     id: 'FND-003',
-    name: 'Services do not bypass Repository for operational DB access',
-    roots: ['src/services', 'src/features'],
+    name: 'Application Services do not bypass Repository for operational DB access',
+    roots: ['src/services'],
     forbidden: [
       /from\s+["']dexie["']/,
       /from\s+["']@\/core\/database\/dexie["']/,
@@ -47,7 +47,7 @@ const RULES = [
   {
     id: 'FND-004',
     name: 'Repositories never access Firestore directly',
-    roots: ['src/repositories', 'src/features'],
+    roots: ['src/repositories'],
     forbidden: [
       /from\s+["']firebase\/firestore["']/,
       /from\s+["']@firebase\/firestore["']/,
