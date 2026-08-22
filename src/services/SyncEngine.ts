@@ -31,14 +31,16 @@ export class SyncEngine {
     try {
       await syncRepository.recoverStaleProcessingItems(activeSecCtx.tenantId);
       const items = await syncRepository.getPendingItems(activeSecCtx);
-      for (const item of items) {
+      for (const snapshot of items) {
+        const claimed = await syncRepository.claimItem(snapshot.id, activeSecCtx.tenantId);
+        if (!claimed) continue;
         try {
-          await this.processItem(item, activeSecCtx);
+          await this.processItem(claimed, activeSecCtx);
         } catch (err) {
-          console.error(`[SyncEngine] Failed to process queue item ${item.id}:`, err);
+          console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err);
         }
       }
-      await syncRepository.clearCompleted();
+      await syncRepository.clearCompleted(activeSecCtx.tenantId);
     } finally {
       this.isProcessing = false;
     }
@@ -51,15 +53,13 @@ export class SyncEngine {
       activeSecCtx.isDeveloper,
     );
 
-    await syncRepository.updateStatus(item.id, 'processing');
+    const operation = item.operation.toLowerCase();
+    const customAction = item.metadata?.action;
+    const colName = item.collection;
+    const payload = (item.payload && typeof item.payload === 'object' ? item.payload : {}) as Record<string, any>;
+    const tenantId = item.tenantId;
 
     try {
-      const operation = item.operation.toLowerCase();
-      const customAction = item.metadata?.action;
-      const colName = item.collection;
-      const payload = item.payload as Record<string, any>;
-      const tenantId = item.tenantId;
-
       const docId = item.recordId ??
         payload?.id ?? payload?.docId ?? payload?.documentId ?? payload?.idUnik ??
         payload?.uid ?? payload?.userUid ?? payload?.studentId ?? payload?.studentsId ??
@@ -68,11 +68,7 @@ export class SyncEngine {
         payload?.pointId;
 
       if (!docId) {
-        await syncRepository.moveToDeadLetterQueue(
-          item.id,
-          'Document ID missing in payload',
-          'SYNC_QUEUE_ENTITY_ID_MISSING',
-        );
+        await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING');
         return;
       }
 
@@ -96,13 +92,9 @@ export class SyncEngine {
             const localUpdatedAt = payload?.updatedAt || 0;
             if (remoteVersion > localVersion || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
               overwriteRemote = false;
-              await AuditLogger.log(
-                activeSecCtx.uid || 'system',
-                'SYNC_PUSH_CONFLICT_RESOLVED',
-                'SyncEngine',
-                'warning',
-                { collection: colName, docId, tenantId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt },
-              );
+              await AuditLogger.log(activeSecCtx.uid || 'system', 'SYNC_PUSH_CONFLICT_RESOLVED', 'SyncEngine', 'warning', {
+                collection: colName, docId, tenantId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt,
+              });
             }
           }
         } catch (fetchErr) {
@@ -110,13 +102,8 @@ export class SyncEngine {
         }
 
         if (overwriteRemote) {
-          const firestoreData = {
-            ...payload,
-            tenantId,
-            updatedAt: dbGateway.serverTimestamp(),
-            syncStatus: SyncStatus.SYNCED,
-          };
-          delete (firestoreData as any).isOffline;
+          const firestoreData = { ...payload, tenantId, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
+          delete firestoreData.isOffline;
           await dbGateway.writeBatch(db).set(docRef, firestoreData, { merge: true }).commit();
           await AuditLogger.log(activeSecCtx.uid || 'system', `SYNC_${operation.toUpperCase()}`, 'SyncEngine', 'success', { collection: colName, docId, tenantId });
         }
@@ -131,20 +118,11 @@ export class SyncEngine {
       await syncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
-      await AuditLogger.log(
-        activeSecCtx.uid || 'system',
-        `SYNC_${item.operation.toUpperCase()}_ERROR`,
-        'SyncEngine',
-        'error',
-        { collection: item.collection, docId: item.recordId, tenantId: item.tenantId, error: error.message, attempts },
-      );
-
+      await AuditLogger.log(activeSecCtx.uid || 'system', `SYNC_${item.operation.toUpperCase()}_ERROR`, 'SyncEngine', 'error', {
+        collection: item.collection, docId: item.recordId, tenantId: item.tenantId, error: error.message, attempts,
+      });
       if (attempts >= MAX_SYNC_ATTEMPTS) {
-        await syncRepository.moveToDeadLetterQueue(
-          item.id,
-          error.message || 'Exceeded retry limit',
-          error.code || 'SYNC_MAX_RETRIES_EXCEEDED',
-        );
+        await syncRepository.moveToDeadLetterQueue(item.id, error.message || 'Exceeded retry limit', error.code || 'SYNC_MAX_RETRIES_EXCEEDED');
       } else {
         const retryDelayMs = BASE_RETRY_DELAY_MS * (2 ** (attempts - 1));
         await syncRepository.incrementRetry(item.id);
