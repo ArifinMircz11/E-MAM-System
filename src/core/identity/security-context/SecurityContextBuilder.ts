@@ -1,31 +1,25 @@
-import type { EnterpriseContext, AuthenticationContext, IdentityContext } from './SecurityContext.types';
+import type { EnterpriseContext } from './SecurityContext.types';
 import { SecurityContextException } from './SecurityContext.types';
-import { PolicyResolver } from './PolicyResolver';
+import { securityContextService } from '../../security/SecurityContextService';
 
+/**
+ * Compatibility facade only.
+ *
+ * Authorization state MUST NOT be constructed in this legacy module.
+ * SecurityContextService is the sole runtime authority.
+ */
 export class SecurityContextBuilder {
-  static build(
-    authentication: AuthenticationContext,
-    identity: IdentityContext
-  ): EnterpriseContext {
-    if (!identity.user || !identity.user.uid) {
-      throw new SecurityContextException('Invalid canonical user: missing uid');
+  static build(): EnterpriseContext {
+    const context = securityContextService.getContext();
+    if (!context) {
+      throw new SecurityContextException('Canonical SecurityContext is not READY');
     }
-
-    return {
-      authentication,
-      identity,
-      security: PolicyResolver.resolve(identity),
-    };
+    return context as EnterpriseContext;
   }
 
   static buildGuest(): EnterpriseContext {
-      return {
-          authentication: { uid: '', email: '', provider: '', isAuthenticated: false },
-          identity: {
-              user: { uid: '', id: '', email: '', displayName: '', accountType: 'madrasah', createdAt: Date.now(), updatedAt: Date.now() } as any,
-              assignment: { tenantId: '', portal: 'public', status: 'inactive' }
-          },
-          security: { uid: '', tenantId: '', role: 'guest', roles: ['guest'], permissions: [], modules: [], features: [], license: { isActive: false }, scope: { level: 'guest' } }
-      }
+    throw new SecurityContextException(
+      'Guest SecurityContext construction is disabled; canonical context is required',
+    );
   }
 }
