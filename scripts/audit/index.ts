@@ -3,11 +3,14 @@ import { runFeaturesAudit } from './features.js';
 import { runUnusedAudit } from './unused.js';
 import { runGovernanceAudit } from './governance.js';
 import { runFoundationAudit } from './foundation.js';
+import { runScriptIntegrityAudit } from './script-integrity.js';
 
 function runMainAuditSuite() {
   console.log('=== 🛡️ E-MAM SYSTEM FOUNDATION & ENTERPRISE AUDIT SUITE ===\n');
 
   const governanceIssues = runGovernanceAudit();
+  console.log('--------------------------------------------------');
+  const scriptIntegrityIssues = runScriptIntegrityAudit();
   console.log('--------------------------------------------------');
   const foundationIssues = runFoundationAudit();
   console.log('--------------------------------------------------');
@@ -18,7 +21,7 @@ function runMainAuditSuite() {
   const unusedIssues = runUnusedAudit();
 
   console.log('\n==================================================');
-  const total = governanceIssues + foundationIssues + structIssues + featureIssues + unusedIssues;
+  const total = governanceIssues + scriptIntegrityIssues + foundationIssues + structIssues + featureIssues + unusedIssues;
   if (total === 0) {
     console.log('🎉 ALL REGISTERED AUDITS PASSED.');
   } else {
