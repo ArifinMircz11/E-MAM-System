@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { loginWithIdentifier, loginWithGoogle } from '@/services/authService';
-import { UserRole } from '@/types';
+import { loginWithIdentifier } from '@/services/authService';
 
 export const useLogin = () => {
   const [loading, setLoading] = useState(false);
@@ -23,31 +22,10 @@ export const useLogin = () => {
     }
   }, []);
 
-  const googleLogin = useCallback(async () => {
-    setLoading(true);
-    setErrorStr(null);
-    try {
-      const result = await loginWithGoogle();
-      if (!result.success) {
-        setErrorStr(result.error || 'Login Google gagal');
-      }
-      return result;
-    } catch (e: any) {
-      setErrorStr(e.message || 'Login Google gagal');
-      return { success: false, error: e.message };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const error = useMemo(
+    () => (errorStr ? { message: errorStr, type: 'error' as const } : null),
+    [errorStr],
+  );
 
-  const error = useMemo(() => 
-    errorStr ? { message: errorStr, type: 'error' as const } : null
-  , [errorStr]);
-
-  return useMemo(() => ({ 
-    login, 
-    googleLogin, 
-    loading, 
-    error 
-  }), [login, googleLogin, loading, error]);
+  return useMemo(() => ({ login, loading, error }), [login, loading, error]);
 };
