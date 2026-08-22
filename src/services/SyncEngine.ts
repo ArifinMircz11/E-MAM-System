@@ -12,7 +12,7 @@ import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
-import { AuditLogger } from '@/core/audit/AuditLogger';
+import { auditLogger } from '@/core/audit/AuditLogger';
 
 const MAX_SYNC_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1_000;
@@ -92,9 +92,22 @@ export class SyncEngine {
             const localUpdatedAt = payload?.updatedAt || 0;
             if (remoteVersion > localVersion || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
               overwriteRemote = false;
-              await AuditLogger.log(activeSecCtx.uid || 'system', 'SYNC_PUSH_CONFLICT_RESOLVED', 'SyncEngine', 'warning', {
-                collection: colName, docId, tenantId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt,
-              });
+              auditLogger.log(
+                'SyncEnabled',
+                tenantId,
+                undefined,
+                JSON.stringify({
+                  event: 'SYNC_PUSH_CONFLICT_RESOLVED',
+                  actorId: activeSecCtx.uid || 'system',
+                  collection: colName,
+                  docId,
+                  resolution: 'KEEP_REMOTE',
+                  localVersion,
+                  remoteVersion,
+                  localUpdatedAt,
+                  remoteUpdatedAt,
+                }),
+              );
             }
           }
         } catch (fetchErr) {
@@ -105,11 +118,31 @@ export class SyncEngine {
           const firestoreData = { ...payload, tenantId, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
           delete firestoreData.isOffline;
           await dbGateway.writeBatch(db).set(docRef, firestoreData, { merge: true }).commit();
-          await AuditLogger.log(activeSecCtx.uid || 'system', `SYNC_${operation.toUpperCase()}`, 'SyncEngine', 'success', { collection: colName, docId, tenantId });
+          auditLogger.log(
+            'SyncEnabled',
+            tenantId,
+            undefined,
+            JSON.stringify({
+              event: `SYNC_${operation.toUpperCase()}`,
+              actorId: activeSecCtx.uid || 'system',
+              collection: colName,
+              docId,
+            }),
+          );
         }
       } else if (operation === 'delete') {
         await dbGateway.writeBatch(db).delete(docRef).commit();
-        await AuditLogger.log(activeSecCtx.uid || 'system', 'SYNC_DELETE', 'SyncEngine', 'success', { collection: colName, docId, tenantId });
+        auditLogger.log(
+          'SyncEnabled',
+          tenantId,
+          undefined,
+          JSON.stringify({
+            event: 'SYNC_DELETE',
+            actorId: activeSecCtx.uid || 'system',
+            collection: colName,
+            docId,
+          }),
+        );
       } else {
         throw new Error(`Unsupported sync operation: ${item.operation}`);
       }
@@ -118,9 +151,19 @@ export class SyncEngine {
       await syncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
-      await AuditLogger.log(activeSecCtx.uid || 'system', `SYNC_${item.operation.toUpperCase()}_ERROR`, 'SyncEngine', 'error', {
-        collection: item.collection, docId: item.recordId, tenantId: item.tenantId, error: error.message, attempts,
-      });
+      auditLogger.log(
+        'SyncBlocked',
+        tenantId,
+        undefined,
+        JSON.stringify({
+          event: `SYNC_${item.operation.toUpperCase()}_ERROR`,
+          actorId: activeSecCtx.uid || 'system',
+          collection: item.collection,
+          docId: item.recordId,
+          error: error?.message || String(error),
+          attempts,
+        }),
+      );
       if (attempts >= MAX_SYNC_ATTEMPTS) {
         await syncRepository.moveToDeadLetterQueue(item.id, error.message || 'Exceeded retry limit', error.code || 'SYNC_MAX_RETRIES_EXCEEDED');
       } else {
