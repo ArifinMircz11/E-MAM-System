@@ -7,6 +7,11 @@ import type { SecurityContext } from '@/core/security/types';
 
 const PROCESSING_RECOVERY_TIMEOUT_MS = 60_000;
 
+type EnqueueItem = Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'attempts' | 'operation'> & {
+  operation?: SyncOperation;
+  metadata?: SyncQueueItem['metadata'];
+};
+
 /**
  * SyncRepository
  *
@@ -18,14 +23,103 @@ export class SyncRepository {
     return DatabaseResolver.getDatabase();
   }
 
+  /**
+   * Collapse mutations that have not started remote processing yet.
+   *
+   * Important: processing items are never coalesced. Once SyncEngine owns an
+   * item, changing it underneath the worker would create an ordering race.
+   */
+  private async coalesceUnsentMutation(
+    dbInstance: EMamDatabase,
+    candidate: SyncQueueItem,
+  ): Promise<{ id: string } | null> {
+    if (!candidate.recordId) return null;
+
+    const candidates = await dbInstance.sync_queue
+      .where('tenantId')
+      .equals(candidate.tenantId)
+      .filter(
+        (item) =>
+          item.collection === candidate.collection &&
+          item.recordId === candidate.recordId &&
+          (item.status === 'pending' || item.status === 'waiting' || item.status === 'failed'),
+      )
+      .sortBy('createdAt');
+
+    const existing = candidates[0];
+    if (!existing) return null;
+
+    // A create followed by local updates can be represented by one create
+    // carrying the newest state. This prevents stale intermediate versions.
+    if (existing.operation === 'create' && candidate.operation !== 'delete') {
+      await dbInstance.sync_queue.update(existing.id, {
+        operation: 'create',
+        payload: candidate.payload,
+        recordId: candidate.recordId,
+        metadata: candidate.metadata,
+        status: 'pending',
+        lastError: undefined,
+        nextRetryAt: undefined,
+        updatedAt: Date.now(),
+      });
+      return { id: existing.id };
+    }
+
+    // If a record was created locally and deleted before it ever reached the
+    // cloud, there is nothing to synchronize. Remove the unsent create.
+    if (existing.operation === 'create' && candidate.operation === 'delete') {
+      await dbInstance.sync_queue.delete(existing.id);
+      return { id: existing.id };
+    }
+
+    // Multiple updates/patches before synchronization only need the newest
+    // representation. Preserve the newest operation because PATCH and UPDATE
+    // may have different gateway semantics.
+    if (
+      (existing.operation === 'update' || existing.operation === 'patch') &&
+      (candidate.operation === 'update' || candidate.operation === 'patch')
+    ) {
+      await dbInstance.sync_queue.update(existing.id, {
+        operation: candidate.operation,
+        payload: candidate.payload,
+        recordId: candidate.recordId,
+        metadata: candidate.metadata,
+        status: 'pending',
+        lastError: undefined,
+        nextRetryAt: undefined,
+        updatedAt: Date.now(),
+      });
+      return { id: existing.id };
+    }
+
+    // A pending update followed by delete should synchronize only the final
+    // delete. Do not coalesce a delete followed by create/update: remote state
+    // may already exist and those operations require strict ordering.
+    if (
+      (existing.operation === 'update' || existing.operation === 'patch') &&
+      candidate.operation === 'delete'
+    ) {
+      await dbInstance.sync_queue.update(existing.id, {
+        operation: 'delete',
+        payload: candidate.payload,
+        recordId: candidate.recordId,
+        metadata: candidate.metadata,
+        status: 'pending',
+        lastError: undefined,
+        nextRetryAt: undefined,
+        updatedAt: Date.now(),
+      });
+      return { id: existing.id };
+    }
+
+    return null;
+  }
+
   async enqueue(
-    item: Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'attempts' | 'operation'> & {
-      operation?: SyncOperation;
-      metadata?: SyncQueueItem['metadata'];
-    },
+    item: EnqueueItem,
     context?: SecurityContext,
     options: { triggerSync?: boolean; db?: EMamDatabase } = { triggerSync: true },
-  ) {
+  ): Promise<string> {
     const activeSecCtx = context || getSecurityContext(false);
     if (!activeSecCtx?.uid || !activeSecCtx.tenantId) {
       throw new Error('SYNC_QUEUE_SECURITY_CONTEXT_INVALID: SecurityContext wajib tersedia saat enqueue.');
@@ -76,6 +170,7 @@ export class SyncRepository {
 
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const operation = item.operation ?? 'update';
+    const now = Date.now();
 
     const candidateItem: SyncQueueItem = {
       id,
@@ -86,8 +181,8 @@ export class SyncRepository {
       payload: sanitizedPayload,
       status: 'pending',
       attempts: 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       metadata: {
         ...(item.metadata ?? {}),
         actorId: item.metadata?.actorId ?? actorUid,
@@ -98,7 +193,8 @@ export class SyncRepository {
     ArchitectureBoundaryEnforcer.enforceSyncQueue(candidateItem, activeSecCtx);
 
     const dbInstance = options.db || this.db;
-    const res = await dbInstance.sync_queue.add(candidateItem);
+    const coalesced = await this.coalesceUnsentMutation(dbInstance, candidateItem);
+    const res = coalesced?.id ?? await dbInstance.sync_queue.add(candidateItem);
 
     if (options.triggerSync && typeof navigator !== 'undefined' && navigator.onLine) {
       setTimeout(() => {
@@ -115,23 +211,15 @@ export class SyncRepository {
 
   async recoverStaleProcessingItems(tenantId: string): Promise<number> {
     if (!tenantId) return 0;
-
     const cutoff = Date.now() - PROCESSING_RECOVERY_TIMEOUT_MS;
-    const staleItems = (await this.db.sync_queue
-      .where('tenantId')
-      .equals(tenantId)
-      .toArray())
+    const staleItems = (await this.db.sync_queue.where('tenantId').equals(tenantId).toArray())
       .filter((item) => item.status === 'processing' && (item.updatedAt ?? item.createdAt) <= cutoff);
 
     let recovered = 0;
     for (const item of staleItems) {
       const attempts = item.attempts || 0;
       if (attempts >= 5) {
-        await this.moveToDeadLetterQueue(
-          item.id,
-          'Queue item remained processing beyond recovery timeout',
-          'SYNC_PROCESSING_STALE',
-        );
+        await this.moveToDeadLetterQueue(item.id, 'Queue item remained processing beyond recovery timeout', 'SYNC_PROCESSING_STALE');
       } else {
         const updated = await this.db.sync_queue.update(item.id, {
           status: 'waiting',
@@ -142,67 +230,47 @@ export class SyncRepository {
         recovered += updated;
       }
     }
-
     return recovered;
   }
 
   async getPendingItems(context?: SecurityContext): Promise<SyncQueueItem[]> {
     const activeSecCtx = context || getSecurityContext(false);
     if (!activeSecCtx?.tenantId) return [];
-
-    const items = await this.db.sync_queue
-      .where('tenantId')
-      .equals(activeSecCtx.tenantId)
-      .toArray();
-
+    const items = await this.db.sync_queue.where('tenantId').equals(activeSecCtx.tenantId).toArray();
     const now = Date.now();
-    return items
-      .filter((i) => {
-        if (i.status === 'pending' || i.status === 'failed') return true;
-        if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
-        return false;
-      })
-      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    return items.filter((i) => {
+      if (i.status === 'pending' || i.status === 'failed') return true;
+      if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
+      return false;
+    }).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
   async findPendingItems(tenantId: string): Promise<SyncQueueItem[]> {
     if (!tenantId) return [];
     const items = await this.db.sync_queue.where('tenantId').equals(tenantId).toArray();
     const now = Date.now();
-    return items
-      .filter((i) => {
-        if (i.status === 'pending' || i.status === 'failed') return true;
-        if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
-        return false;
-      })
-      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    return items.filter((i) => {
+      if (i.status === 'pending' || i.status === 'failed') return true;
+      if (i.status === 'waiting') return !i.nextRetryAt || Date.parse(i.nextRetryAt) <= now;
+      return false;
+    }).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   }
 
   async updateStatus(id: string, status: SyncQueueStatus, error?: string) {
-    return await this.db.sync_queue.update(id, {
-      status,
-      lastError: error,
-      updatedAt: Date.now(),
-    });
+    return await this.db.sync_queue.update(id, { status, lastError: error, updatedAt: Date.now() });
   }
 
   async incrementRetry(id: string) {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
-
     const newAttempts = (item.attempts || 0) + 1;
-    return await this.db.sync_queue.update(id, {
-      attempts: newAttempts,
-      updatedAt: Date.now(),
-    });
+    return await this.db.sync_queue.update(id, { attempts: newAttempts, updatedAt: Date.now() });
   }
 
   async scheduleRetry(id: string, delayMs: number) {
     if (!Number.isFinite(delayMs) || delayMs < 0) throw new Error('SYNC_RETRY_DELAY_INVALID');
     return await this.db.sync_queue.update(id, {
-      status: 'waiting',
-      nextRetryAt: new Date(Date.now() + delayMs).toISOString(),
-      updatedAt: Date.now(),
+      status: 'waiting', nextRetryAt: new Date(Date.now() + delayMs).toISOString(), updatedAt: Date.now(),
     });
   }
 
@@ -216,31 +284,18 @@ export class SyncRepository {
   async moveToDeadLetterQueue(id: string, reason: string, errorCode = 'SYNC_MAX_RETRIES_EXCEEDED'): Promise<DeadLetterQueueItem | null> {
     const item = await this.db.sync_queue.get(id);
     if (!item) return null;
-
     const dlqItem: DeadLetterQueueItem = {
-      id: item.id,
-      tenantId: item.tenantId,
-      tenantsId: item.tenantId,
-      collection: item.collection,
-      entityId: item.recordId,
-      operation: item.operation,
-      payload: item.payload,
-      version: item.metadata?.version || 1,
-      errorCode,
-      errorReason: reason,
-      createdBy: item.metadata?.actorId || 'system',
-      updatedBy: item.metadata?.actorId || 'system',
-      status: 'dead_letter',
-      retryCount: item.attempts,
-      createdAt: item.createdAt || Date.now(),
-      failedAt: Date.now(),
+      id: item.id, tenantId: item.tenantId, tenantsId: item.tenantId,
+      collection: item.collection, entityId: item.recordId, operation: item.operation,
+      payload: item.payload, version: item.metadata?.version || 1, errorCode,
+      errorReason: reason, createdBy: item.metadata?.actorId || 'system',
+      updatedBy: item.metadata?.actorId || 'system', status: 'dead_letter',
+      retryCount: item.attempts, createdAt: item.createdAt || Date.now(), failedAt: Date.now(),
     };
-
     await this.db.transaction('rw', [this.db.sync_queue, this.db.dead_letter_queue], async () => {
       await this.db.dead_letter_queue.put(dlqItem);
       await this.db.sync_queue.delete(id);
     });
-
     return dlqItem;
   }
 
