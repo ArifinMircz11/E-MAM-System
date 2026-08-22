@@ -62,6 +62,9 @@ export class SyncEngine {
 
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
+    const context = SecurityContextService.getNullableContext();
+    if (!context?.tenantId) return 0;
+    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
     const records = await new FirestoreSyncDataSource().pullDelta(collectionName, tenantId);
     let synced = 0;
     for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
@@ -90,21 +93,25 @@ export class SyncEngine {
           const docSnap = await dbGateway.getDoc(docRef);
           if (docSnap.exists()) {
             const remoteData = docSnap.data();
-            const remoteVersion = remoteData.version || 0;
+            const remoteVersion = Number(remoteData.version || 0);
             const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
-            const localVersion = payload?.version || item.metadata?.version || 0;
+            const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
             const localUpdatedAt = Number(payload?.updatedAt || 0);
             if (remoteVersion > localVersion || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
               overwriteRemote = false;
+              await localSyncRepository.upsertSyncedRecord(colName, remoteData as Record<string, unknown>, 'id', tenantId);
               auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
             }
           }
-        } catch (fetchErr) { console.warn('[SyncEngine] Pre-write read failed:', fetchErr); }
+        } catch (fetchErr) {
+          throw Object.assign(new Error(`SYNC_CONFLICT_CHECK_FAILED: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`), { code: 'SYNC_CONFLICT_CHECK_FAILED' });
+        }
         if (overwriteRemote) {
-          const firestoreData = { ...payload, tenantId, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
+          const nextVersion = Math.max(Number(payload?.version ?? item.metadata?.version ?? 0), 0) + 1;
+          const firestoreData = { ...payload, tenantId, version: nextVersion, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
           delete firestoreData.isOffline;
           await dbGateway.writeBatch(dbGateway.db).set(docRef, firestoreData, { merge: true }).commit();
-          auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
+          auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId, version: nextVersion }));
         }
       } else if (operation === 'delete') {
         await dbGateway.writeBatch(dbGateway.db).delete(docRef).commit();
@@ -112,7 +119,7 @@ export class SyncEngine {
       } else throw new Error(`Unsupported sync operation: ${item.operation}`);
 
       await syncRepository.updateStatus(item.id, 'completed');
-      await localSyncRepository.markRecordSynced(colName, String(docId));
+      if (operation !== 'delete') await localSyncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
       const attempts = (item.attempts || 0) + 1;
       auditLogger.log('SyncBlocked', tenantId, undefined, JSON.stringify({ event: `SYNC_${item.operation.toUpperCase()}_ERROR`, actorId: activeSecCtx.uid || 'system', collection: item.collection, docId: item.recordId, error: error?.message || String(error), attempts }));
@@ -124,17 +131,19 @@ export class SyncEngine {
 
   static async syncAll() { await this.processQueue(); }
   static async executeAutoSweepSync(_context: any, _tenantId: string) { await this.processQueue(); }
-  static async executeClearPointsSync(_context: any, tenantId: string) {
+  static async executeClearPointsSync(context: SecurityContext, tenantId: string) {
     if (!tenantId) return;
+    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context?.tenantId, context?.isDeveloper);
     const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
     const snap = await dbGateway.getDocs(q);
     const batch = dbGateway.writeBatch(dbGateway.db);
     snap.docs.forEach((d: any) => batch.delete(d.ref));
     await batch.commit();
   }
-  static async executeBatchDeleteSync(context: any, collName: string, filter: any) {
+  static async executeBatchDeleteSync(context: SecurityContext, collName: string, filter: any) {
     const tenantId = context?.tenantId;
-    if (!tenantId) return;
+    if (!tenantId || !collName) return;
+    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
     let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
     if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
     if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
