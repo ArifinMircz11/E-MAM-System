@@ -1,1 +1,2 @@
-export { localDb, db, EMamDatabase, getTableByName, DatabaseResolver } from '@/core/database/db';
+export { localDb, db, EMamDatabase, getTableByName } from '@/core/database/db';
+export { DatabaseResolver } from '@/core/database/DatabaseResolver';
