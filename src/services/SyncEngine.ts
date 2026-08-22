@@ -6,7 +6,7 @@
 
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { db } from './firebase';
-import { SyncStatus } from '@/database/dexie';
+import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
