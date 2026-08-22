@@ -4,8 +4,17 @@ import path from 'node:path';
 const root = process.cwd();
 const files = [
   'src/features/auth/Login.tsx',
+  'src/features/auth/hooks/useLogin.ts',
   'src/app/App.tsx',
+  'src/hooks/useAuthInitialization.ts',
   'src/services/authService.ts',
+  'src/services/auth/AuthGateway.ts',
+  'src/core/security/SecurityContextService.ts',
+  'src/core/security/SecurityContext.ts',
+  'src/core/security/contextHelper.ts',
+  'src/core/identity/security-context/SecurityContext.ts',
+  'src/core/identity/security-context/SecurityContextBuilder.ts',
+  'src/core/identity/security-context/SecurityContextProvider.tsx',
   'api/auth/routes.ts',
   'api/admin/routes.ts',
   'firestore.rules',
@@ -18,14 +27,18 @@ const rules = [
   { name: 'five-click bypass', re: /handleSecretClick|Developer Bypass diaktifkan/gi },
   { name: 'disabled login lock', re: /isLoginLocked\s*=\s*false/g },
   { name: 'legacy hardcoded tenant', re: /30315537/g },
-  { name: 'client requester identity', re: /x-requester-uid/g },
+  { name: 'client requester identity', re: /x-requester-uid/gi },
   { name: 'email admin bypass', re: /bypassEmails|isBypassed|Admin bypass granted/gi },
   { name: 'default production password', re: /Madrasah2026!/g },
   { name: 'hardcoded Google provider', re: /provider\s*:\s*['"]google['"]/g },
+  { name: 'GoogleAuthProvider', re: /\bGoogleAuthProvider\b/g },
+  { name: 'interactive Google gateway', re: /signInWithPopup\s*\(/g },
+  { name: 'direct legacy SecurityContext construction', re: /new\s+SecurityContext\s*\(/g },
   { name: 'direct impersonation role mutation', re: /setUserData\([^\n]*roles:\s*\[role\]/g },
 ];
 
 let failures = 0;
+
 for (const relative of files) {
   const file = path.join(root, relative);
   if (!fs.existsSync(file)) continue;
@@ -39,7 +52,6 @@ for (const relative of files) {
   }
 }
 
-// Firestore authentication-only grants are forbidden on protected collections.
 const rulesFile = path.join(root, 'firestore.rules');
 if (fs.existsSync(rulesFile)) {
   const rulesText = fs.readFileSync(rulesFile, 'utf8');
