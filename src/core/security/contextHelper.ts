@@ -7,96 +7,68 @@ import { ArchitectureBoundaryEnforcer } from '../boundary/ArchitectureBoundaryEn
 import { ArchitectureBoundaryError } from '../boundary/ArchitectureBoundaryError';
 
 /**
- * Helper to generate SecurityContext from current user state
+ * Runtime SecurityContext projection.
+ *
+ * This helper is intentionally fail-closed. It must never manufacture a
+ * tenant, role, developer identity, or global scope from UI state/email.
  */
 export function getSecurityContext(strict?: true): SecurityContext;
 export function getSecurityContext(strict: false): SecurityContext | null;
 export function getSecurityContext(strict: boolean = true): SecurityContext | null {
   const userState = useUserStore.getState();
   const authState = useAuthStore.getState();
+  const user = authState.user || userState.user;
+  const uid = authState.user?.uid || userState.uid || user?.uid;
 
-  const user = userState.user || authState.user;
-  const uid = userState.uid || authState.user?.uid || user?.uid;
-
-  if (!uid) {
-    if (strict) {
-      throw new ArchitectureBoundaryError(
-        'identity',
-        'IDENTITY_UID_MISSING',
-        'Security Context incomplete: Pengguna belum masuk (tidak ada identitas uid).'
-      );
-    }
+  const fail = (code: string, message: string): null => {
+    if (strict) throw new ArchitectureBoundaryError('security_context', code, message);
     return null;
+  };
+
+  if (!uid) return fail('IDENTITY_UID_MISSING', 'Security Context incomplete: uid tidak tersedia.');
+
+  const roles = Array.from(new Set(
+    (Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : user?.role ? [user.role] : [])
+      .map((r: any) => String(r).toLowerCase().trim())
+      .filter(Boolean),
+  ));
+
+  if (roles.length === 0) return fail('SECURITY_CONTEXT_ROLE_MISSING', 'Security Context incomplete: role canonical tidak tersedia.');
+
+  const isDeveloper = user?.accountType === 'developer' || roles.includes('developer');
+  const tenantId = String(user?.tenantId || userState.tenantId || '').trim();
+  const referenceId = String(user?.referenceId || userState.user?.referenceId || '').trim();
+
+  if (!tenantId || ['global', 'default', 'unknown'].includes(tenantId.toLowerCase())) {
+    return fail('TENANT_ACCESS_DENIED', 'Security Context incomplete: canonical tenantId tidak valid.');
   }
 
-  const rawRoles = userState.roles && userState.roles.length > 0
-    ? userState.roles
-    : authState.user?.roles || (authState.user?.role ? [authState.user.role] : []);
+  if (!referenceId) return fail('REFERENCE_ID_MISSING', 'Security Context incomplete: referenceId canonical tidak tersedia.');
 
-  const email = (userState.user?.email || authState.user?.email || '').toLowerCase().trim();
-  const isDeveloper =
-    rawRoles.some((r: any) => String(r).toLowerCase() === 'developer') ||
-    email === 'developer@example.com' ||
-    email === 'admin@example.com';
-
-  const roles = isDeveloper
-    ? ['developer']
-    : (rawRoles.length > 0 ? Array.from(new Set(rawRoles.map((r: any) => String(r).toLowerCase().trim()))) : []);
-
-  if (roles.length === 0) {
-    if (strict) {
-      throw new ArchitectureBoundaryError(
-        'security_context',
-        'SECURITY_CONTEXT_INVALID',
-        'Security Context incomplete: Pengguna tidak memiliki role yang terdaftar.'
-      );
-    }
-    return null;
-  }
-
-  let tenantId = userState.tenantId || authState.user?.tenantId || user?.tenantId;
-  if (isDeveloper && (!tenantId || tenantId === 'global')) {
-    tenantId = 'global';
-  }
-
-  if (!tenantId) {
-    if (strict) {
-      throw new ArchitectureBoundaryError(
-        'tenant',
-        'TENANT_ACCESS_DENIED',
-        'Security Context incomplete: tenantId tidak terdefinisi.'
-      );
-    }
-    return null;
-  }
-
-  const primaryRole = roles[0] as any;
-
-  // Collect all permissions from all roles
   const permissionsSet = new Set<Permission>();
-  roles.forEach((role) => {
+  for (const role of roles) {
     const perms = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
-    perms.forEach((p) => permissionsSet.add(p));
-  });
+    perms.forEach((permission) => permissionsSet.add(permission));
+  }
 
+  const primaryRole = String(user?.role || roles[0]).toLowerCase().trim();
   const ctx = {
     uid,
-    userId: userState.user?.id || authState.user?.id || uid,
-    referenceId: userState.user?.referenceId || authState.user?.referenceId || undefined,
+    userId: user?.id || uid,
+    referenceId,
     tenantId,
     role: primaryRole,
     effectiveRole: primaryRole,
-    roles: roles,
-    permissions: permissionsSet as any,
+    roles,
+    permissions: isDeveloper ? (new Set(['*']) as any) : (permissionsSet as any),
     scopes: [],
-    scope: { level: isDeveloper ? 'global' : 'tenant' },
+    scope: { level: isDeveloper ? 'system' : 'tenant' },
     isDeveloper,
-    accountType: userState.user?.accountType || (isDeveloper ? 'developer' : 'madrasah'),
+    accountType: user?.accountType || 'madrasah',
     featureFlags: {},
-    sessionId: `sess_${uid}_${Date.now()}`,
+    sessionId: `sess_${uid}`,
   } as any;
 
   ArchitectureBoundaryEnforcer.enforceSecurityContext(ctx);
   return ctx;
 }
-
