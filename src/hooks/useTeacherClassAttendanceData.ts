@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAutoFix } from '@/hooks/useAutoFix';
-import { getCurrentUser, isMockMode } from '@/services/authService';
+import { getCurrentUser } from '@/services/authService';
 import { getSecurityContext } from '@/core/security/contextHelper';
 import { teacherRepository } from '@/repositories/teacherRepository';
 import { userRepository } from '@/repositories/userRepository';
