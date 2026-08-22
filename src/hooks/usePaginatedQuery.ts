@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type {
-  QueryConstraint,
-  DocumentData,
-  QueryDocumentSnapshot} from '@/services/dbGateway';
+import type { QueryConstraint, DocumentData, QueryDocumentSnapshot } from '@/services/gateways/FirestoreGateway';
 import {
   collection,
   query,
@@ -11,8 +8,8 @@ import {
   limit,
   startAfter,
   getDocs,
-  db as firestoreDb,
-} from '@/services/dbGateway';
+  firestoreGateway,
+} from '@/services/gateways/FirestoreGateway';
 import { useUserStore } from '../stores/userStore';
 
 export function usePaginatedQuery<T = DocumentData>(
@@ -29,14 +26,13 @@ export function usePaginatedQuery<T = DocumentData>(
 
   const fetchPage = useCallback(
     async (isInitial = false) => {
-      if (loading || (!hasMore && !isInitial)) return;
+      if (!tenantId || loading || (!hasMore && !isInitial)) return;
 
       setLoading(true);
 
       try {
-        const colRef = collection(firestoreDb, collectionName);
-
-        const qConstraints = [
+        const colRef = collection(firestoreGateway.db, collectionName);
+        const qConstraints: QueryConstraint[] = [
           ...constraints,
           where('tenantId', '==', tenantId),
           orderBy(orderByField, 'desc'),
@@ -49,15 +45,11 @@ export function usePaginatedQuery<T = DocumentData>(
 
         const q = query(colRef, ...qConstraints);
         const snapshot = await getDocs(q);
-
         const newLastVisible = snapshot.docs[snapshot.docs.length - 1];
         const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
 
-        if (isInitial) {
-          setData(items);
-        } else {
-          setData((prev) => [...prev, ...items]);
-        }
+        if (isInitial) setData(items);
+        else setData((prev) => [...prev, ...items]);
 
         setLastVisible(newLastVisible || null);
         setHasMore(snapshot.docs.length === pageSize);
@@ -67,12 +59,12 @@ export function usePaginatedQuery<T = DocumentData>(
         setLoading(false);
       }
     },
-    [collectionName, pageSize, constraints, lastVisible, hasMore, tenantId, orderByField],
+    [collectionName, pageSize, constraints, lastVisible, hasMore, tenantId, orderByField, loading],
   );
 
   useEffect(() => {
     fetchPage(true);
-  }, [collectionName, tenantId]); // Simple trigger, refine as needed
+  }, [collectionName, tenantId]);
 
   return { data, loading, hasMore, loadMore: () => fetchPage() };
 }
