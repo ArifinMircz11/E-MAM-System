@@ -10,13 +10,17 @@ const STU_COL = 'students';
  * Attendance sync is deliberately cloud-bound only through the SyncEngine
  * adapter. It must never depend on an HTTP API for correctness: the queue
  * may execute after a long offline period and must remain retry-safe.
+ *
+ * All generated document IDs are tenant-scoped. This is mandatory because
+ * the same student ID can legitimately exist in different tenants.
  */
 export async function handleAttendanceSync(payload: any, student: Student = {} as Student) {
   if (!payload?.tenantId || !payload?.studentId || !payload?.date || !payload?.fieldName) {
     throw new Error('ATTENDANCE_SYNC_PAYLOAD_INVALID');
   }
 
-  const attId = `${payload.studentId}_${payload.date}`;
+  const scope = `${payload.tenantId}_${payload.studentId}`;
+  const attId = `${scope}_${payload.date}`;
   const attRef = db.doc(ATT_COL, attId);
 
   await db.runTransaction(async (transaction: any) => {
@@ -109,7 +113,7 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
     transaction.set(attRef, deepClean(updateData), { merge: true });
 
     if (finalPointsPenalty > 0) {
-      const pointId = `${payload.studentId}_${payload.date}_${payload.fieldName}`;
+      const pointId = `${scope}_${payload.date}_${payload.fieldName}`;
       const pointRef = db.doc('poin', pointId);
       transaction.set(
         pointRef,
@@ -123,14 +127,17 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
           tanggal: payload.date,
           jenis: 'Otomatis Sesi',
           idPetugas: 'SYSTEM_BOT',
+          tenantId: payload.tenantId,
           serverTime: db.serverTimestamp(),
         }),
       );
 
-      const summaryRef = db.doc('student_point_summaries', payload.studentId);
+      const summaryRef = db.doc('student_point_summaries', scope);
       transaction.set(
         summaryRef,
         deepClean({
+          studentId: payload.studentId,
+          tenantId: payload.tenantId,
           totalPoints: db.increment(finalPointsPenalty),
           lastUpdate: db.serverTimestamp(),
         }),
@@ -141,6 +148,7 @@ export async function handleAttendanceSync(payload: any, student: Student = {} a
       transaction.update(
         studentRef,
         deepClean({
+          tenantId: payload.tenantId,
           point: db.increment(finalPointsPenalty),
           lastModified: db.serverTimestamp(),
         }),
