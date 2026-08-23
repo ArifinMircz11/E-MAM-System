@@ -64,11 +64,10 @@ export type {
 
 /**
  * FirestoreGateway
- * 
+ *
  * Central gateway for all Firestore operations.
  * This is the ONLY place allowed to import from 'firebase/firestore'.
  */
-
 export const firestoreGateway = {
   db: db as Firestore,
   collection,
@@ -90,4 +89,5 @@ export const firestoreGateway = {
   increment,
   serverTimestamp,
   Timestamp,
+  startAfter,
 };
