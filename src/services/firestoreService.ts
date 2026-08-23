@@ -1,5 +1,4 @@
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
-import { db } from './firebase';
 
 export async function deleteFirestoreField(
   collectionPath: string,
@@ -7,7 +6,7 @@ export async function deleteFirestoreField(
   fieldPath: string,
 ) {
   try {
-    const docRef = dbGateway.doc(db, collectionPath, documentId);
+    const docRef = dbGateway.doc(collectionPath, documentId);
     await dbGateway.updateDoc(docRef, {
       [fieldPath]: dbGateway.deleteField(),
     });
