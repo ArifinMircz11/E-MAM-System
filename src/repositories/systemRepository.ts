@@ -1,5 +1,6 @@
 import { localDb } from '@/database/dexie';
 import type { AboutContent } from '@/types';
+import { syncRepository } from './SyncRepository';
 
 export const systemRepository = {
   async getAboutContent(): Promise<AboutContent | null> {
@@ -30,15 +31,11 @@ export const systemRepository = {
     };
     await localDb.systemSettings.put(payload);
 
-    await localDb.sync_queue.add({
-      id: crypto.randomUUID(),
+    await syncRepository.enqueue({
       collection: 'about_content',
-      documentId: 'main',
-      action: 'UPDATE',
+      recordId: 'main',
+      operation: 'update',
       payload: content,
-      status: 'PENDING',
-      createdAt: Date.now(),
-      retryCount: 0,
     });
   },
 };
