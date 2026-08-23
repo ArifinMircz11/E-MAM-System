@@ -49,6 +49,7 @@ export class SyncEngine {
     } finally { this.isProcessing = false; }
   }
 
+  /** Pull remote changes and persist a stable (updatedAt, documentId) checkpoint only after local materialization succeeds. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const context = SecurityContextService.getNullableContext();
@@ -121,12 +122,23 @@ export class SyncEngine {
       throw error;
     }
   }
+
   static async syncAll() { await this.processQueue(); }
   static async executeAutoSweepSync(_context: any, _tenantId: string) { await this.processQueue(); }
+
   static async executeClearPointsSync(context: SecurityContext, tenantId: string) {
     if (!tenantId) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context?.tenantId, context?.isDeveloper);
     const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
-    void q;
+    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
+  }
+
+  static async executeBatchDeleteSync(context: SecurityContext, collName: string, filter: any) {
+    const tenantId = context?.tenantId; if (!tenantId || !collName) return;
+    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
+    let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
+    if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
+    if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
+    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
   }
 }
