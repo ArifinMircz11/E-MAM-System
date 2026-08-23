@@ -1,3 +1,4 @@
+import { liveQuery } from 'dexie';
 import { BaseRepository } from './BaseRepository';
 import type { SecurityContext } from '@/core/security/types';
 
@@ -27,6 +28,18 @@ export class ClassChatRepository extends BaseRepository<ClassChatMessage> {
       .filter((row: ClassChatMessage) => row.classId === classId)
       .toArray();
     return rows.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  observeByClass(
+    context: SecurityContext,
+    classId: string,
+    onChange: (rows: ClassChatMessage[]) => void,
+    onError?: (error: unknown) => void,
+  ): () => void {
+    this.validateContext(context, 'observeByClass');
+    const observable = liveQuery(() => this.listByClass(context, classId));
+    const subscription = observable.subscribe({ next: onChange, error: onError });
+    return () => subscription.unsubscribe();
   }
 }
 
