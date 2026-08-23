@@ -1,0 +1,127 @@
+#!/usr/bin/env node
+/**
+ * P0 security hardening audit.
+ *
+ * Enforces:
+ *   P0-B Firestore/Storage authority: no email bypass, no signed-in-only
+ *        tenant data, deny-by-default catch-all.
+ *   P0-C Tenant authority: no production tenant fallbacks.
+ *   P0-D SecurityContext: client stores/helpers may not invent developer authority.
+ *   P0-E Persistence boundary: Firebase SDK/Dexie access stays in the approved corridor.
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.resolve(__dirname, '../..');
+const SRC = path.join(ROOT, 'src');
+const IGNORE = new Set(['node_modules', 'dist', 'coverage', '.git']);
+const EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.cjs']);
+const findings = [];
+
+function walk(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (IGNORE.has(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, out);
+    else if (EXT.has(path.extname(entry.name))) out.push(full);
+  }
+  return out;
+}
+
+function rel(file) {
+  return path.relative(ROOT, file).replaceAll(path.sep, '/');
+}
+
+function add(file, rule, message) {
+  findings.push({ file: rel(file), rule, message });
+}
+
+function source(file) {
+  return fs.readFileSync(file, 'utf8');
+}
+
+// P0-C / P0-D: production code must never synthesize tenant authority.
+for (const file of walk(SRC)) {
+  const text = source(file);
+  if (/tenantId\s*\|\|\s*['"](?:default|global|unknown)['"]/.test(text)) {
+    add(file, 'P0-C', 'Tenant fallback (default/global/unknown) is forbidden.');
+  }
+  if (/developer@example\.com|admin@example\.com/.test(text)) {
+    add(file, 'P0-D', 'Hard-coded developer/admin email is forbidden as runtime authority.');
+  }
+}
+
+const firestore = path.join(ROOT, 'firestore.rules');
+if (fs.existsSync(firestore)) {
+  const text = source(firestore);
+  if (/request\.auth\.token\.email/.test(text)) {
+    add(firestore, 'P0-B', 'Firestore authorization must not use email claims.');
+  }
+  if (/!hasUserDoc\(\)/.test(text)) {
+    add(firestore, 'P0-B', 'Firestore tenant validation must not fail open when users/{uid} is missing.');
+  }
+  if (/allow\s+(?:read|write|read,\s*write)\s*:\s*if\s+isSignedIn\(\)/.test(text)) {
+    add(firestore, 'P0-B', 'Tenant data must not be authorized by authentication alone.');
+  }
+  if (!/match\s+\/\{document=\*\*\}\s*\{\s*allow\s+read,\s*write:\s*if\s+false;/.test(text)) {
+    add(firestore, 'P0-B', 'Firestore rules require an explicit deny-by-default catch-all.');
+  }
+}
+
+const storage = path.join(ROOT, 'storage.rules');
+if (fs.existsSync(storage)) {
+  const text = source(storage);
+  if (/request\.auth\.token\.email/.test(text)) {
+    add(storage, 'P0-B', 'Storage authorization must not use email claims.');
+  }
+  if (/allow\s+write\s*:\s*if\s+true/.test(text)) {
+    add(storage, 'P0-B', 'Public Storage writes are forbidden.');
+  }
+  if (/match\s+\/\{allPaths=\*\*\}\s*\{\s*allow\s+read\s*,\s*write\s*:\s*if\s+isSignedIn\(\)/.test(text)) {
+    add(storage, 'P0-B', 'Storage catch-all must not authorize all authenticated users.');
+  }
+}
+
+// P0-E: direct cloud/database access is restricted to infrastructure corridors.
+const approvedFirebase = new Set([
+  'src/services/firebase.ts',
+  'src/services/gateways/',
+  'src/services/sync/',
+  'src/infrastructure/',
+  'src/core/database/',
+]);
+const approvedDexie = new Set(['src/database/', 'src/core/database/', 'src/services/sync/']);
+
+function allowed(file, prefixes) {
+  const r = rel(file);
+  return [...prefixes].some(prefix => r === prefix || r.startsWith(prefix));
+}
+
+for (const file of walk(SRC)) {
+  const text = source(file);
+  if (/from\s+['"](?:firebase|@firebase)\//.test(text) && !allowed(file, approvedFirebase)) {
+    add(file, 'P0-E', 'Firebase SDK import is outside the approved infrastructure corridor.');
+  }
+  if (/from\s+['"]dexie['"]|from\s+['"][^'"]*\/core\/database/.test(text) && !allowed(file, approvedDexie)) {
+    add(file, 'P0-E', 'Dexie/database access is outside the approved persistence corridor.');
+  }
+  if (/services\/dbGateway|@\/services\/dbGateway/.test(text)) {
+    add(file, 'P0-E', 'Deprecated dbGateway is forbidden.');
+  }
+}
+
+if (findings.length) {
+  console.error(`P0 SECURITY AUDIT FAILED: ${findings.length} finding(s)`);
+  for (const finding of findings) {
+    console.error(`[${finding.rule}] ${finding.file} — ${finding.message}`);
+  }
+  process.exit(1);
+}
+
+console.log('P0 SECURITY AUDIT PASS');
+console.log('P0-B Firestore/Storage authority: PASS');
+console.log('P0-C Tenant authority: PASS');
+console.log('P0-D Canonical SecurityContext enforcement: PASS');
+console.log('P0-E Repository/Firebase boundary: PASS');
