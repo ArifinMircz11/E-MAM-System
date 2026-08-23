@@ -5,7 +5,7 @@ Baseline: `4ed82e06b2a3bce4c554c9b444008623b50106ad`
 
 ## Executive decision
 
-The repository is **not yet architecture-clean**. Two P1 persistence/boundary problems have now been remediated in runtime: the obsolete domain-level IdentityEngine cloud path and the onboarding service's direct Firestore path.
+The repository is **not yet architecture-clean**. Three P1 persistence/boundary problems have now been remediated in runtime: the obsolete domain-level IdentityEngine cloud path, the onboarding service's direct Firestore path, and UserSyncService's direct Firestore relation synchronization.
 
 The remaining codebase still contains a large legacy persistence surface. Final Offline-First certification remains blocked until the global cloud boundary and critical offline workflows are migrated and verified.
 
@@ -23,15 +23,17 @@ The remaining codebase still contains a large legacy persistence surface. Final 
 
 **Finding:** `src/services/onboardingService.ts` imported Firebase/dbGateway and performed Firestore transactions, reads, writes and realtime listeners.
 
-**Action:**
-- Added `src/repositories/OnboardingRepository.ts`.
-- Gate 1 submission now commits request + user status to Dexie first and queues synchronization.
-- Gate 2 submission now commits request + user status to Dexie first and queues synchronization.
-- Approval/rejection now updates request + user + master record in a local Dexie transaction, then queues the corresponding cloud mutations.
-- Pending onboarding subscriptions now use Dexie `liveQuery`; Firestore `onSnapshot` was removed from the onboarding service.
-- `onboardingService.ts` is now an orchestration/audit layer and contains no Firebase/dbGateway imports.
+**Action:** added `OnboardingRepository`; Gate 1, Gate 2 and approval/rejection are now local Dexie transactions followed by SyncQueue mutations. Pending requests use Dexie `liveQuery`.
 
 **Status:** FIXED for the onboarding runtime path.
+
+### P1 — UserSyncService direct Firestore relation synchronization
+
+**Finding:** `src/services/UserSyncService.ts` queried `students` and updated `users/{uid}` directly through `FirestoreGateway`, then mutated runtime stores.
+
+**Action:** added `UserRelationRepository`. Student relation reconciliation now reads the local `students`/`users` tables, updates Dexie, and enqueues the canonical `users` mutation through `SyncRepository`. `UserSyncService` is now orchestration-only and has no Firebase/Firestore imports.
+
+**Status:** FIXED for the UserSync relation path.
 
 ### P1 — Legacy dbGateway surface
 
@@ -41,7 +43,7 @@ The remaining codebase still contains a large legacy persistence surface. Final 
 
 ### P1 — Service-level direct Firestore persistence
 
-The existing boundary report records substantial direct Firestore usage in services, including user synchronization, attendance synchronization, realtime listeners and legacy services.
+The existing boundary report records substantial direct Firestore usage in services, including attendance synchronization, realtime listeners and legacy services.
 
 **Status:** BLOCKED / MIGRATION REQUIRED.
 
@@ -69,14 +71,15 @@ Because direct cloud paths remain elsewhere in the codebase, the application can
 
 1. Authentication / canonical user identity — substantially stabilized.
 2. Onboarding and approval workflow — migrated to Dexie + SyncQueue.
-3. User and teacher/student synchronization.
-4. Attendance + QR Scanner.
-5. Points ledger.
-6. Letters / permissions.
-7. Realtime listeners into local/reactive sync infrastructure.
-8. Remaining legacy services and UI hooks.
-9. Remove `dbGateway` compatibility facade.
-10. Run full audit + typecheck + lint + build + unit/e2e verification.
+3. User relation synchronization — migrated to Dexie + SyncQueue.
+4. Teacher/student master synchronization and remaining user sync paths.
+5. Attendance + QR Scanner.
+6. Points ledger.
+7. Letters / permissions.
+8. Realtime listeners into local/reactive sync infrastructure.
+9. Remaining legacy services and UI hooks.
+10. Remove `dbGateway` compatibility facade.
+11. Run full audit + typecheck + lint + build + unit/e2e verification.
 
 ## Architectural invariant
 
