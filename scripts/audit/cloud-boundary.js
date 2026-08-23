@@ -5,8 +5,9 @@
  * Target architecture:
  *   UI -> Store -> Service -> Repository -> Dexie -> SyncQueue -> SyncEngine -> Firestore
  *
- * This audit intentionally fails on application-layer bypasses. It is kept
- * dependency-free so it can run in CI, locally, or from the governance engine.
+ * Application/business layers may not access Firebase, FirestoreGateway,
+ * dbGateway, or Dexie directly. Cloud access is restricted to the
+ * infrastructure/sync corridor.
  */
 
 const fs = require('node:fs');
@@ -20,11 +21,8 @@ const rules = [
   {
     id: 'CB-001',
     name: 'deprecated dbGateway',
-    patterns: [
-      /@\/services\/dbGateway/, 
-      /services\/dbGateway/, 
-    ],
-    applies: () => true,
+    patterns: [/@\/services\/dbGateway/, /services\/dbGateway/],
+    applies: (file) => isApplicationLayer(file),
     message: 'Deprecated dbGateway is forbidden in application code.',
   },
   {
@@ -35,29 +33,38 @@ const rules = [
       /from\s+['"]@firebase\//,
       /require\(\s*['"]firebase\//,
     ],
-    applies: (file) => !isInfrastructureCorridor(file),
+    applies: (file) => isApplicationLayer(file),
     message: 'Firebase SDK access must remain inside the approved infrastructure/sync corridor.',
   },
   {
     id: 'CB-003',
-    name: 'Dexie in UI/hooks/services',
+    name: 'Dexie in application layer',
     patterns: [
       /from\s+['"]dexie['"]/, 
       /from\s+['"][^'"]*\/database\/dexie/, 
       /from\s+['"][^'"]*\/core\/database/, 
     ],
-    applies: (file) => isUiOrServiceLayer(file),
-    message: 'UI/hooks/services must use repositories, not Dexie directly.',
+    applies: (file) => isApplicationLayer(file),
+    message: 'Application layers must use repositories, not Dexie directly.',
   },
   {
     id: 'CB-004',
-    name: 'FirestoreGateway in UI/hooks',
+    name: 'FirestoreGateway in application layer',
     patterns: [
-      /FirestoreGateway/, 
+      /FirestoreGateway/,
       /from\s+['"][^'"]*FirestoreGateway['"]/, 
     ],
-    applies: (file) => /\/(features|modules|hooks)\//.test(file),
-    message: 'UI/features/hooks must not access the cloud gateway directly.',
+    applies: (file) => isApplicationLayer(file),
+    message: 'Application code must not access the cloud gateway directly.',
+  },
+  {
+    id: 'CB-005',
+    name: 'Firestore operations in application layer',
+    patterns: [
+      /\b(onSnapshot|getDoc|getDocs|addDoc|setDoc|updateDoc|deleteDoc|runTransaction|writeBatch)\s*\(/,
+    ],
+    applies: (file) => isApplicationLayer(file),
+    message: 'Direct Firestore operations are forbidden in application/business layers.',
   },
 ];
 
@@ -75,7 +82,18 @@ function relative(file) {
   return path.relative(path.resolve(__dirname, '../..'), file).replaceAll(path.sep, '/');
 }
 
-function isInfrastructureCorridor(file) {
+function isApplicationLayer(file) {
+  const rel = relative(file);
+  return [
+    'src/hooks/',
+    'src/features/',
+    'src/modules/',
+    'src/services/',
+    'src/domain/',
+  ].some(prefix => rel.startsWith(prefix)) && !isApprovedCorridor(file);
+}
+
+function isApprovedCorridor(file) {
   const rel = relative(file);
   return [
     'src/services/firebase.ts',
@@ -83,17 +101,8 @@ function isInfrastructureCorridor(file) {
     'src/services/sync/',
     'src/infrastructure/',
     'src/core/database/',
+    'src/repositories/',
   ].some(prefix => rel === prefix || rel.startsWith(prefix));
-}
-
-function isUiOrServiceLayer(file) {
-  const rel = relative(file);
-  return [
-    'src/hooks/',
-    'src/features/',
-    'src/modules/',
-    'src/services/',
-  ].some(prefix => rel.startsWith(prefix));
 }
 
 const findings = [];
@@ -101,7 +110,7 @@ for (const file of walk(ROOT)) {
   const source = fs.readFileSync(file, 'utf8');
   for (const rule of rules) {
     if (!rule.applies(file)) continue;
-    if (rule.patterns.some(pattern => pattern.test(source))) {
+    if (rule.patterns.some((pattern) => pattern.test(source))) {
       findings.push({ id: rule.id, file: relative(file), message: rule.message });
     }
   }
