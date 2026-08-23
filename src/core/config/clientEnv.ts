@@ -90,12 +90,21 @@ export function buildClientEnvironment(): ClientEnvironmentConfig {
   const firebaseMeasurementId = getClientRaw('VITE_FIREBASE_MEASUREMENT_ID');
   const firebaseDatabaseId = getClientRaw('VITE_FIREBASE_DATABASE_ID') || '(default)';
 
-  // Fail-closed validation for Production environment
+  // Fail-closed validation for Production environment.
+  // All Firebase client bootstrap fields are required; only analytics/database IDs are optional.
   if (isProd) {
-    const invalidFields: string[] = [];
-    if (!firebaseApiKey || isPlaceholder(firebaseApiKey)) invalidFields.push('VITE_FIREBASE_API_KEY');
-    if (!firebaseProjectId || isPlaceholder(firebaseProjectId)) invalidFields.push('VITE_FIREBASE_PROJECT_ID');
-    if (!firebaseAppId || isPlaceholder(firebaseAppId)) invalidFields.push('VITE_FIREBASE_APP_ID');
+    const requiredFirebaseFields: Array<[string, string]> = [
+      ['VITE_FIREBASE_API_KEY', firebaseApiKey],
+      ['VITE_FIREBASE_AUTH_DOMAIN', firebaseAuthDomain],
+      ['VITE_FIREBASE_PROJECT_ID', firebaseProjectId],
+      ['VITE_FIREBASE_STORAGE_BUCKET', firebaseStorageBucket],
+      ['VITE_FIREBASE_MESSAGING_SENDER_ID', firebaseMessagingSenderId],
+      ['VITE_FIREBASE_APP_ID', firebaseAppId],
+    ];
+
+    const invalidFields = requiredFirebaseFields
+      .filter(([, value]) => !value || isPlaceholder(value))
+      .map(([name]) => name);
 
     if (invalidFields.length > 0) {
       throw new Error(
@@ -106,13 +115,20 @@ export function buildClientEnvironment(): ClientEnvironmentConfig {
     }
   }
 
-  // Mock mode: NEVER allowed in production. Only explicitly active in dev/test if requested.
   const rawMock = getClientRaw('VITE_MOCK_MODE') === 'true';
-  const mockMode = isProd ? false : rawMock;
-
-  const useEmulator =
+  const rawUseEmulator =
     getClientRaw('USE_FIREBASE_EMULATOR') === 'true' ||
     getClientRaw('VITE_USE_FIREBASE_EMULATOR') === 'true';
+
+  // Mock mode and Firebase emulators are development/test capabilities only.
+  const mockMode = isProd ? false : rawMock;
+  const useEmulator = isProd ? false : rawUseEmulator;
+
+  if (isProd && rawUseEmulator) {
+    throw new Error(
+      '[ConfigEngine] FAIL-CLOSED: Firebase emulator configuration is not allowed in production. Production boot halted.'
+    );
+  }
 
   const firebaseConfig = {
     API_KEY: firebaseApiKey,
