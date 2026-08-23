@@ -27,8 +27,9 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
 
     setIsSubmitting(true);
     try {
+      const now = Date.now();
       const requestPayload = {
-        id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: `req_${now}_${Math.random().toString(36).substring(2, 7)}`,
         tenantId: 'kanwil_kalsel',
         userId: user?.uid || 'guest_user',
         userName: user?.displayName || user?.email || 'Pengguna',
@@ -39,8 +40,9 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
         madrasahId: madrasahName.toLowerCase().replace(/\s+/g, '_'),
         madrasahName,
         status: 'pending',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        requestedAt: now,
+        createdAt: now,
+        updatedAt: now,
         version: 1,
         syncStatus: 'pending'
       };
@@ -99,9 +101,9 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
                 className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="Kankemenag Kota Banjarmasin">Kankemenag Kota Banjarmasin</option>
-                <option value="Kankemenag Kota Banjarbaru">Kankemenag Kota Banjarbaru</option>
                 <option value="Kankemenag Kab. Banjar">Kankemenag Kab. Banjar</option>
                 <option value="Kankemenag Kab. Barito Kuala">Kankemenag Kab. Barito Kuala</option>
+                <option value="Kankemenag Kab. Balangan">Kankemenag Kab. Balangan</option>
                 <option value="Kankemenag Kab. Tapin">Kankemenag Kab. Tapin</option>
                 <option value="Kankemenag Kab. Hulu Sungai Selatan">Kankemenag Kab. Hulu Sungai Selatan</option>
                 <option value="Kankemenag Kab. Hulu Sungai Tengah">Kankemenag Kab. Hulu Sungai Tengah</option>
@@ -110,27 +112,18 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
                 <option value="Kankemenag Kab. Tanah Laut">Kankemenag Kab. Tanah Laut</option>
                 <option value="Kankemenag Kab. Tanah Bumbu">Kankemenag Kab. Tanah Bumbu</option>
                 <option value="Kankemenag Kab. Kotabaru">Kankemenag Kab. Kotabaru</option>
-                <option value="Kankemenag Kab. Balangan">Kankemenag Kab. Balangan</option>
+                <option value="Kankemenag Kab. Barito Timur">Kankemenag Kab. Barito Timur</option>
               </select>
             </div>
 
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-                Jenjang Pendidikan
+                Jenjang Madrasah
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['MA', 'MTs', 'MI'] as const).map((lvl) => (
-                  <button
-                    key={lvl}
-                    type="button"
-                    onClick={() => setJenjang(lvl)}
-                    className={`py-3 rounded-2xl text-xs font-bold tracking-wider transition-all border ${
-                      jenjang === lvl
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    {lvl}
+              <div className="grid grid-cols-3 gap-2">
+                {(['MI', 'MTs', 'MA'] as const).map((level) => (
+                  <button key={level} type="button" onClick={() => setJenjang(level)} className={`py-3 rounded-xl text-xs font-bold border ${jenjang === level ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>
+                    {level}
                   </button>
                 ))}
               </div>
@@ -138,39 +131,24 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
 
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-                Nama Madrasah / Satuan Kerja Tujuan
+                Nama Madrasah Tujuan
               </label>
               <input
                 type="text"
                 value={madrasahName}
                 onChange={(e) => setMadrasahName(e.target.value)}
-                placeholder="Contoh: MAN 1 Model Banjarmasin"
+                placeholder="Contoh: MAN 1 Hulu Sungai Tengah"
                 className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                required
               />
             </div>
 
-            <div className="pt-4 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-3 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Mengirim Ajuan...' : 'Kirim Ajuan Penugasan'}
-              </button>
-            </div>
+            <button type="submit" disabled={isSubmitting} className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+              <CheckCircleIcon className="w-4 h-4" />
+              {isSubmitting ? 'Mengirim...' : 'Kirim Ajuan Penugasan'}
+            </button>
           </form>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 };
-
-export default AssignmentRequestModal;
