@@ -16,11 +16,35 @@ export interface ClassMessage {
   syncStatus?: string;
 }
 
+const toClassMessage = (row: {
+  id: string;
+  senderId: string;
+  senderName?: string;
+  text: string;
+  createdAt: number;
+  updatedAt?: number;
+  syncStatus?: string;
+  classId: string;
+  tenantId: string;
+}): ClassMessage => ({
+  id: row.id,
+  senderId: row.senderId,
+  senderName: row.senderName || '',
+  senderRole: '',
+  messageText: row.text,
+  timestamp: new Date(row.createdAt).toISOString(),
+  classID: row.classId,
+  tenantId: row.tenantId,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+  syncStatus: row.syncStatus,
+});
+
 export const sendMessageToClass = async (
   context: SecurityContext,
   classId: string,
   message: Omit<ClassMessage, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'syncStatus'>,
-  dateStr: string,
+  _dateStr?: string,
 ): Promise<void> => {
   if (!context?.tenantId) throw new Error('tenantId required');
   if (context.tenantId === 'default' || context.tenantId === 'unknown') {
@@ -47,20 +71,20 @@ export const sendMessageToClass = async (
 export const getClassMessages = async (
   context: SecurityContext,
   classId: string,
-  _dateStr?: string,
 ): Promise<ClassMessage[]> => {
   const rows = await classChatRepository.listByClass(context, classId);
-  return rows.map((row) => ({
-    id: row.id,
-    senderId: row.senderId,
-    senderName: row.senderName || '',
-    senderRole: '',
-    messageText: row.text,
-    timestamp: new Date(row.createdAt).toISOString(),
-    classID: row.classId,
-    tenantId: row.tenantId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    syncStatus: row.syncStatus,
-  }));
+  return rows.map(toClassMessage);
 };
+
+export const observeClassMessages = (
+  context: SecurityContext,
+  classId: string,
+  onChange: (messages: ClassMessage[]) => void,
+  onError?: (error: unknown) => void,
+): (() => void) =>
+  classChatRepository.observeByClass(
+    context,
+    classId,
+    (rows) => onChange(rows.map(toClassMessage)),
+    onError,
+  );
