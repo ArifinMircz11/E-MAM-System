@@ -18,6 +18,11 @@ import { auditLogger } from '@/core/audit/AuditLogger';
 const MAX_SYNC_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1_000;
 
+/** Version contract for a single record: only a strictly newer mutation may apply. */
+export const shouldApplyMutationVersion = (remoteVersion: number, mutationVersion: number): boolean => {
+  return Number(mutationVersion) > Number(remoteVersion);
+};
+
 export class SyncEngine {
   private static isProcessing = false;
   private static isStopped = false;
@@ -97,7 +102,7 @@ export class SyncEngine {
             const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
             const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
             const localUpdatedAt = Number(payload?.updatedAt || 0);
-            if (remoteVersion > localVersion || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
+            if (!shouldApplyMutationVersion(remoteVersion, localVersion) || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
               overwriteRemote = false;
               await localSyncRepository.upsertSyncedRecord(colName, remoteData as Record<string, unknown>, 'id', tenantId);
               auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
