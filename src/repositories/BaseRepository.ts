@@ -86,6 +86,11 @@ export abstract class BaseRepository<T extends BaseEntity> {
         updatedAt: now,
         ...(isCreate ? { createdAt: Number((entity as any).createdAt ?? now) } : {}),
       } as T & Record<string, any>;
+
+      if (dataToSave.tenantId !== context.tenantId && !context.isDeveloper) {
+        throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', `Tenant mismatch pada batch repository: '${dataToSave.tenantId}' !== '${context.tenantId}'.`);
+      }
+
       prepared.push(dataToSave as T);
       queueItems.push({
         id: this.generateQueueId(id, nextVersion),
@@ -109,12 +114,119 @@ export abstract class BaseRepository<T extends BaseEntity> {
     }
 
     await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => {
-      await table.bulkPut(prepared);
-      if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').bulkPut(queueItems as any[]);
+      await table.bulkPut(prepared as any);
+      if (queueItems.length) await dbInstance.table('sync_queue').bulkPut(queueItems as any);
     });
+
     return prepared;
   }
 
+  protected getTable(): Table<T, any> { return this.table; }
+
+  protected validateContext(context: SecurityContext, operation: string): void {
+    if (!context || !context.tenantId || typeof context.tenantId !== 'string' || context.tenantId.trim() === '' || context.tenantId === 'default' || context.tenantId === 'unknown') {
+      throw new ArchitectureBoundaryError('repository', 'REPOSITORY_TENANT_MISSING', `Operasi repository '${operation}' ditolak: SecurityContext bernilai null, undefined, atau memiliki tenantId yang tidak valid/fallback.`);
+    }
+    ArchitectureBoundaryEnforcer.enforceRepositoryTenant(context.tenantId, operation, context.isDeveloper);
+  }
+
+  async findById(id: string, tenantId?: string): Promise<T | null> {
+    const entity = await this.getTable().get(id);
+    if (!entity) return null;
+    if (tenantId && tenantId !== 'global' && (entity as any).tenantId !== tenantId) return null;
+    return entity;
+  }
+
+  async findAll(tenantId: string): Promise<T[]> {
+    ArchitectureBoundaryEnforcer.enforceRepositoryTenant(tenantId, 'findAll', tenantId === 'global');
+    if (tenantId === 'global') return await this.getTable().toArray();
+    return await this.getTable().where('tenantId').equals(tenantId).toArray();
+  }
+
+  async getById(context: SecurityContext, id: string): Promise<T | null> {
+    this.validateContext(context, 'getById');
+    const entity = await this.getTable().get(id);
+    if (entity && !context.isDeveloper && (entity as any).tenantId !== context.tenantId) return null;
+    return entity || null;
+  }
+
+  async getAll(context: SecurityContext): Promise<T[]> {
+    this.validateContext(context, 'getAll');
+    if (context.isDeveloper || context.tenantId === 'global') return await this.getTable().toArray();
+    return await this.getTable().where('tenantId').equals(context.tenantId).toArray();
+  }
+
+  async save(context: SecurityContext, entity: Partial<T>): Promise<T>;
+  async save(entity: T): Promise<void>;
+  async save(arg1: SecurityContext | T, arg2?: Partial<T>): Promise<T | void> {
+    const table = this.getTable();
+    const dbInstance = this.db;
+    const tName = this.tableName || table.name || 'students';
+
+    if (arg2 === undefined) {
+      await table.put(arg1 as T);
+      return;
+    }
+
+    const context = arg1 as SecurityContext;
+    this.validateContext(context, 'save');
+    const input = { ...(arg2 as Partial<T>) } as T & Record<string, any>;
+    const existing = input.id ? await table.get(input.id) : undefined;
+    const isCreate = !existing;
+    const id = input.id || this.generateId();
+    const currentVersion = Number((existing as any)?.version ?? 0);
+    const requestedVersion = Number(input.version ?? 0);
+    const nextVersion = isCreate ? Math.max(1, requestedVersion) : Math.max(currentVersion + 1, requestedVersion);
+
+    if (input.tenantId && input.tenantId !== context.tenantId && !context.isDeveloper) {
+      throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', `Tenant mismatch pada penyimpanan repository: '${input.tenantId}' !== '${context.tenantId}'.`, { entityTenant: input.tenantId, contextTenant: context.tenantId });
+    }
+
+    const now = Date.now();
+    const dataToSave = {
+      ...existing,
+      ...input,
+      id,
+      tenantId: context.tenantId,
+      syncStatus: SyncStatus.PENDING,
+      version: nextVersion,
+      updatedAt: now,
+      ...(isCreate ? { createdAt: Number(input.createdAt ?? now) } : {}),
+    } as T & Record<string, any>;
+
+    const queueItem = {
+      id: this.generateQueueId(id, nextVersion),
+      tenantId: context.tenantId,
+      collection: tName,
+      operation: isCreate ? 'create' : 'update',
+      recordId: id,
+      payload: dataToSave,
+      status: 'pending',
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      priority: 'high',
+      metadata: {
+        actorId: context.uid,
+        version: nextVersion,
+        idempotencyKey: `${context.tenantId}:${tName}:${id}:${nextVersion}`,
+        action: isCreate ? 'CREATE' : 'UPDATE',
+      },
+    };
+
+    await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => {
+      await table.put(dataToSave as T);
+      if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any);
+    });
+
+    return dataToSave as T;
+  }
+
+  /**
+   * Canonical create contract plus a one-argument compatibility form.
+   * The one-argument form resolves the authoritative runtime SecurityContext;
+   * it does not accept tenant/actor identity from the entity as authority.
+   */
   async create(...args: [SecurityContext, Partial<T>] | [T]): Promise<T | void> {
     const context = args.length === 2 ? args[0] : getSecurityContext(true);
     const entity = (args.length === 2 ? args[1] : args[0]) as Partial<T>;
