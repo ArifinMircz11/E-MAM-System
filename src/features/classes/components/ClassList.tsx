@@ -351,7 +351,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
     }
 
     try {
-      await sendMessageToClass(selectedClass.id!, messageDoc, todayDateStr);
+      await sendMessageToClass(getSecurityContext(true), selectedClass.id!, messageDoc, todayDateStr);
     } catch (err: any) {
       toast.error('Gagal mengirim obrolan: ' + err.message);
       setNewMsgText(textToClear);

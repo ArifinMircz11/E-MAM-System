@@ -1,5 +1,5 @@
 import { BaseRepository } from './BaseRepository';
-import { localDb } from '@/database/dexie';
+import { syncRepository } from './SyncRepository';
 
 export interface StudentParentRelation {
   id: string;
@@ -31,18 +31,11 @@ export class StudentParentRepository extends BaseRepository<StudentParentRelatio
 
   async create(entity: StudentParentRelation): Promise<void> {
     await this.table.add(entity);
-    // Relationship is synchronized to Firestore
-    await localDb.sync_queue.add({
-      id: `sq_${Date.now()}_${entity.id}`,
+    await syncRepository.enqueue({
       tenantId: entity.tenantId,
       collection: 'studentParents',
-      documentId: entity.id,
-      operation: 'create',
+      action: 'CREATE',
       payload: entity,
-      createdAt: Date.now(),
-      status: 'pending',
-      retryCount: 0,
-      priority: 1
     });
   }
 }

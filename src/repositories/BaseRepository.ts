@@ -228,7 +228,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * it does not accept tenant/actor identity from the entity as authority.
    */
   async create(...args: [SecurityContext, Partial<T>] | [T]): Promise<T | void> {
-    const context = args.length === 2 ? args[0] : getSecurityContext(false);
+    const context = args.length === 2 ? args[0] : getSecurityContext(true);
     const entity = (args.length === 2 ? args[1] : args[0]) as Partial<T>;
     this.validateContext(context, 'create');
     if ((entity as any).id && await this.getTable().get((entity as any).id)) {

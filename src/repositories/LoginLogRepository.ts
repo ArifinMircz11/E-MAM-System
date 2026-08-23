@@ -1,6 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import type { LoginHistoryEntry } from '@/types';
-import { localDb } from '@/database/dexie';
+import { syncRepository } from './SyncRepository';
 
 export class LoginLogRepository extends BaseRepository<LoginHistoryEntry> {
   constructor() {
@@ -17,18 +17,12 @@ export class LoginLogRepository extends BaseRepository<LoginHistoryEntry> {
 
   async create(entity: LoginHistoryEntry): Promise<void> {
     await this.table.add(entity);
-    // Login logs are synchronized to Firestore for security audit
-    await localDb.sync_queue.add({
-      id: `sq_${Date.now()}_${entity.id}`,
+    // Login logs are synchronized to Firestore for security audit.
+    await syncRepository.enqueue({
       tenantId: entity.tenantId,
       collection: 'login_logs',
-      documentId: entity.id,
-      operation: 'create',
+      action: 'CREATE',
       payload: entity,
-      createdAt: Date.now(),
-      status: 'pending',
-      retryCount: 0,
-      priority: 0 // Lower priority for logs
     });
   }
 }
