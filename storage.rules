@@ -1,15 +1,37 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Helper to check if user is admin
-    function isAdmin() {
-      return request.auth != null && 
-        (request.auth.token.email in ["developer@example.com", "admin@example.com"]);
+
+    // Storage authority is UID-backed through the canonical users document.
+    // Email claims are never used as authorization.
+    function hasUserDoc() {
+      return request.auth != null &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
     }
 
-    function isSignedIn() {
-       return request.auth != null;
+    function currentUser() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasCanonicalTenant() {
+      return hasUserDoc() &&
+        currentUser().get('tenantId', '') != '' &&
+        currentUser().get('tenantId', '') != 'default' &&
+        currentUser().get('tenantId', '') != 'unknown' &&
+        currentUser().get('tenantId', '') != 'global';
+    }
+
+    function isAdmin() {
+      return hasCanonicalTenant() && (
+        currentUser().get('role', '') == 'admin' ||
+        currentUser().get('role', '') == 'developer' ||
+        'admin' in currentUser().get('roles', []) ||
+        'developer' in currentUser().get('roles', [])
+      );
+    }
+
+    function isSignedInCanonical() {
+      return hasCanonicalTenant();
     }
 
     match /news/{newsId}/{fileName} {
@@ -23,33 +45,33 @@ service firebase.storage {
     }
 
     match /students/{studentId}/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isSignedInCanonical();
       allow write: if isAdmin();
     }
 
     match /letters/{requestId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isSignedInCanonical();
+      allow write: if isAdmin();
     }
 
     match /letter_attachments/{path}/{fileName} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isSignedInCanonical();
+      allow write: if isAdmin();
     }
 
     match /profiles/{userId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedInCanonical();
+      allow write: if hasCanonicalTenant() && request.auth.uid == userId;
     }
 
     match /archives/{teacherId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isSignedInCanonical();
+      allow write: if isAdmin();
     }
 
+    // Deny-by-default. New storage paths must receive an explicit rule.
     match /{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if false;
     }
   }
 }
