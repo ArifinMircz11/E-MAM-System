@@ -36,8 +36,6 @@ import GlobalSidebar from '@/navigation/components/GlobalSidebar';
 import { ChatProvider } from '@/lib/context/ChatContext';
 import EmergencyAlert from '@/features/emergency/components/EmergencyAlert';
 import { ProfileCompletionModal } from '@/features/profile/components/ProfileCompletionModal';
-import { eventBus } from '@/events/eventBus';
-import { IdentityEngine } from '@/domain/identityEngine';
 import { initPointAuditListeners, initUserAuditListeners } from '@/services/auditLogService';
 import { initNotificationEventListeners } from '@/services/notificationService';
 import { useAppInitialization } from '@/hooks/useAppInitialization';
@@ -92,9 +90,6 @@ const App: React.FC = () => {
     if (!authLoading && !user && !isLoginPage) { setCurrentView(ViewState.LOGIN); setNavigationHistory([]); }
   }, [authLoading, user, isLoginPage, setCurrentView, setNavigationHistory]);
 
-  useEffect(() => {
-    eventBus.subscribe('PROFILE_COMPLETED', async (event) => { await IdentityEngine.provisionAccess(event.data.uid, event.data.userData); });
-  }, []);
   useEffect(() => { const root = window.document.documentElement; if (isDarkMode) { root.classList.add('dark'); root.style.colorScheme = 'dark'; } else { root.classList.remove('dark'); root.style.colorScheme = 'light'; } }, [isDarkMode]);
   useEffect(() => { initPointAuditListeners(); initUserAuditListeners(); initNotificationEventListeners(); }, []);
 
