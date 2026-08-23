@@ -1,59 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    /**
-     * e-Mam System - Security Rules v8.2 (Developer RBAC)
-     * 
-     * TTL POLICIES (Configured in GCP Console):
-     * - audit_logs: 90 Days
-     * - login_logs: 30 Days
-     * - error_logs: 30 Days
-     */
 
-    // --- OPTIMIZED HELPERS (e-Mam v8.2) ---
-    function isSignedIn() { 
-      return request.auth != null; 
+    function isSignedIn() {
+      return request.auth != null;
     }
-    
+
     function hasUserDoc() {
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
-    
-    // Core User Data Helper - ONLY call when hasUserDoc() is true to avoid rule evaluation errors
+
     function currentUser() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isDeveloper() { 
-      return isSignedIn() && (
-        request.auth.token.email in ["developer@example.com", "admin@example.com"] || 
-        (hasUserDoc() && (
-          currentUser().get('role', '') == "developer" || 
-          "developer" in currentUser().get('roles', [])
-        ))
-      ); 
+    // Developer authority is UID-backed only. Email is never an authorization source.
+    function isDeveloper() {
+      return hasUserDoc() && (
+        currentUser().get('role', '') == 'developer' ||
+        'developer' in currentUser().get('roles', [])
+      ) && currentUser().get('tenantId', '') != '';
     }
 
     function hasRole(role) {
-      return isSignedIn() && hasUserDoc() && (
-        currentUser().get('role', '') == role || 
+      return hasUserDoc() && (
+        currentUser().get('role', '') == role ||
         role in currentUser().get('roles', [])
       );
     }
 
     function hasAnyRole(roles) {
-      return isSignedIn() && hasUserDoc() && (
-        currentUser().get('role', '') in roles || 
+      return hasUserDoc() && (
+        currentUser().get('role', '') in roles ||
         currentUser().get('roles', []).hasAny(roles)
-      );
-    }
-
-    function isValidTenant(tenantId) {
-      return isSignedIn() && (
-        !hasUserDoc() ||
-        currentUser().get('tenantId', 'default') == tenantId || 
-        isDeveloper()
       );
     }
 
@@ -61,333 +40,239 @@ service cloud.firestore {
       return hasAnyRole(['admin', 'developer']);
     }
 
-    // Tenant Matching Helpers
-    function isTenantMatch() {
-       return resource == null || isValidTenant(resource.data.get('tenantId', resource.data.get('schoolId', 'default')));
+    function canonicalTenant() {
+      return currentUser().get('tenantId', '');
     }
-    
+
+    function hasCanonicalTenant() {
+      return hasUserDoc() && canonicalTenant() != '' &&
+        canonicalTenant() != 'default' &&
+        canonicalTenant() != 'unknown' &&
+        canonicalTenant() != 'global';
+    }
+
+    // Authenticated is not authorized. Every tenant-scoped operation requires
+    // an existing canonical user and a concrete tenant.
+    function isValidTenant(tenantId) {
+      return hasCanonicalTenant() && tenantId != '' && tenantId == canonicalTenant();
+    }
+
+    function resourceTenantId() {
+      return resource.data.get('tenantId', resource.data.get('schoolId', ''));
+    }
+
+    function requestTenantId() {
+      return request.resource.data.get('tenantId', request.resource.data.get('schoolId', ''));
+    }
+
+    function isTenantMatch() {
+      return hasCanonicalTenant() && resource != null && isValidTenant(resourceTenantId());
+    }
+
     function isNewDocTenantMatch() {
-       return request.resource == null || isValidTenant(request.resource.data.get('tenantId', request.resource.data.get('schoolId', 'default')));
+      return hasCanonicalTenant() && request.resource != null && isValidTenant(requestTenantId());
     }
 
     function isManajemen() {
-       return hasAnyRole(['kepala_madrasah', 'kepala_tu', 'wakamad', 'kesiswaan', 'kurikulum']) || isAdmin();
+      return hasAnyRole(['kepala_madrasah', 'kepala_tu', 'wakamad', 'kesiswaan', 'kurikulum']) || isAdmin();
     }
 
-    match /announcements/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow write: if isDeveloper() || isAdmin() || isManajemen();
-    }
-    
-    // --- 1. SEKTOR PUBLIK (READ-ONLY) ---
+    // --- PUBLIC / NON-TENANT READ-ONLY ---
     match /system_config/app_version { allow read: if true; }
     match /system_config/master_version { allow read: if true; }
     match /system_config/maintenance { allow read: if true; }
     match /system_settings/maintenance_config { allow read: if true; }
-    
-    match /system/role_permissions { allow read: if isSignedIn(); }
-    match /system/feature_locks { allow read: if isSignedIn(); }
-    match /system_config/feature_locks { allow read: if isSignedIn(); }
-    
     match /news/{id} { allow read: if true; allow write: if isDeveloper() || isAdmin() || isManajemen(); }
     match /ticker/{id} { allow read: if true; allow write: if isDeveloper() || isAdmin() || isManajemen(); }
-    match /documentation/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin(); }
-    
-    // --- 2. MASTER DATA ---
-    match /tenants/{tenantId} { 
-      allow read: if isValidTenant(tenantId); 
-      allow write: if isDeveloper() || isAdmin(); 
+    match /events/{id} { allow read: if true; allow write: if isDeveloper() || (isNewDocTenantMatch() && isManajemen()); }
+
+    // --- SYSTEM ---
+    match /system/role_permissions { allow read: if hasCanonicalTenant(); }
+    match /system/feature_locks { allow read: if hasCanonicalTenant(); }
+    match /system_config/feature_locks { allow read: if hasCanonicalTenant(); }
+    match /documentation/{id} { allow read: if hasCanonicalTenant(); allow write: if isDeveloper() || isAdmin(); }
+    match /system_config/{docId} { allow read, write: if isDeveloper(); }
+    match /system_configs/{path=**} { allow read, write: if isDeveloper(); }
+
+    // --- TENANT / MASTER DATA ---
+    match /tenants/{tenantId} {
+      allow read: if isValidTenant(tenantId) || (isDeveloper() && tenantId == canonicalTenant());
+      allow write: if isDeveloper() || isAdmin();
     }
-    match /subjects/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin() || isManajemen(); }
-    match /classes/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin() || isManajemen(); }
-    match /schedules/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin() || isManajemen() || hasAnyRole(['guru', 'kurikulum']); }
-    match /teachers/{teacherId} { 
-      allow read: if isSignedIn();
-      allow update, create: if isDeveloper() || isAdmin() || (
-        isSignedIn() && 
-        (resource == null || resource.data.get('userId', '') == '' || resource.data.userId == request.auth.uid || teacherId == currentUser().get('referenceId', '')) &&
+
+    match /subjects/{id} {
+      allow read: if isTenantMatch();
+      allow write: if isDeveloper() || isAdmin() || (isNewDocTenantMatch() && isManajemen());
+    }
+
+    match /classes/{id} {
+      allow read: if isTenantMatch();
+      allow write: if isDeveloper() || isAdmin() || (isNewDocTenantMatch() && isManajemen());
+    }
+
+    match /schedules/{id} {
+      allow read: if isTenantMatch();
+      allow write: if isDeveloper() || isAdmin() || (isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'kurikulum'])));
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isTenantMatch();
+      allow create: if isDeveloper() || isAdmin() || isNewDocTenantMatch();
+      allow update: if isDeveloper() || isAdmin() || (
+        isTenantMatch() && isNewDocTenantMatch() &&
+        request.resource.data.get('tenantId', '') == resource.data.get('tenantId', '') &&
         request.resource.data.get('idUnik', '') == resource.data.get('idUnik', '')
       );
-      allow write, delete: if isDeveloper() || isAdmin(); 
+      allow delete: if isDeveloper() || isAdmin();
     }
-    match /academic_years/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin() || isManajemen(); }
-    match /point_categories/{id} { allow read: if isSignedIn(); allow write: if isDeveloper() || isAdmin() || isManajemen(); }
-    
+
+    match /academic_years/{id} {
+      allow read: if isTenantMatch();
+      allow write: if isDeveloper() || isAdmin() || (isNewDocTenantMatch() && isManajemen());
+    }
+
+    match /point_categories/{id} {
+      allow read: if isTenantMatch();
+      allow write: if isDeveloper() || isAdmin() || (isNewDocTenantMatch() && isManajemen());
+    }
+
     match /students/{studentId} {
-      allow read: if isSignedIn();
+      allow read: if isTenantMatch();
+      allow create: if isDeveloper() || isAdmin() || isNewDocTenantMatch();
       allow update: if isDeveloper() || isAdmin() || (
-        isSignedIn() && 
-        (resource.data.get('userId', '') == '' || resource.data.userId == request.auth.uid || studentId == currentUser().get('referenceId', '')) &&
+        isTenantMatch() && isNewDocTenantMatch() &&
+        request.resource.data.get('tenantId', '') == resource.data.get('tenantId', '') &&
         request.resource.data.get('idUnik', '') == resource.data.get('idUnik', '') &&
         request.resource.data.get('studentId', '') == resource.data.get('studentId', '')
       );
-      allow create, delete: if isDeveloper() || isAdmin();
+      allow delete: if isDeveloper() || isAdmin();
     }
 
-    match /studentParents/{id} {
-      allow read, write: if isTenantMatch() || isDeveloper();
-    }
+    match /studentParents/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /summaries/{id} { allow read: if isTenantMatch(); }
+    match /daily_stats/{id} { allow read: if isTenantMatch(); }
 
-    match /summaries/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-    match /daily_stats/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-    
-    // --- 3. TRANSACTIONAL & FEATURES ---
-    match /attendance/{id} { 
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        (isTenantMatch() && resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '')) ||
-        (isTenantMatch() && hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk']))
-      ); 
-      allow create: if isDeveloper() || (isNewDocTenantMatch() && request.resource.data.version == 1);
-      allow update: if isDeveloper() || (isTenantMatch() && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
-      allow delete: if false; 
-    }
-    
-    match /points/{id} { 
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        (isTenantMatch() && resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '')) ||
-        (isTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])))
-      ); 
-      allow create: if isDeveloper() || (isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])) && request.resource.data.version == 1);
-      allow update: if isDeveloper() || (
-        isTenantMatch() && 
-        (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])) && 
-        request.resource.data.tenantId == resource.data.tenantId && 
-        request.resource.data.version > resource.data.version
+    // --- TRANSACTIONAL ---
+    match /attendance/{id} {
+      allow read: if isTenantMatch() && (
+        isDeveloper() || isManajemen() ||
+        resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '') ||
+        hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])
       );
+      allow create: if isDeveloper() || (isNewDocTenantMatch() && request.resource.data.version == 1);
+      allow update: if isDeveloper() || (isTenantMatch() && isNewDocTenantMatch() && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
+      allow delete: if false;
+    }
+
+    match /points/{id} {
+      allow read: if isTenantMatch() && (isDeveloper() || isManajemen() || resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '') || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk']));
+      allow create: if isDeveloper() || (isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])) && request.resource.data.version == 1);
+      allow update: if isDeveloper() || (isTenantMatch() && isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])) && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
       allow delete: if isDeveloper() || (isTenantMatch() && isManajemen());
     }
-    
-    match /grades/{id} { 
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        (isTenantMatch() && resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '')) ||
-        (isTenantMatch() && hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk']))
-      ); 
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && (request.method == 'delete' || isNewDocTenantMatch())); 
+
+    match /grades/{id} {
+      allow read: if isTenantMatch() && (isDeveloper() || isManajemen() || resource.data.get('studentsId', resource.data.get('studentId', '')) == currentUser().get('referenceId', '') || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk']));
+      allow write: if isDeveloper() || (isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'wali_kelas', 'staf', 'guru_bk'])));
     }
 
     match /letters/{id} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        (isTenantMatch() && isManajemen()) || 
-        isDeveloper()
-      );
+      allow read: if isTenantMatch() && (resource.data.userId == request.auth.uid || isManajemen() || isDeveloper());
       allow create: if isDeveloper() || (isNewDocTenantMatch() && request.resource.data.version == 1);
-      allow update: if isDeveloper() || (
-        isTenantMatch() && 
-        (resource.data.userId == request.auth.uid || isManajemen()) &&
-        request.resource.data.tenantId == resource.data.tenantId &&
-        request.resource.data.version > resource.data.version
-      );
+      allow update: if isDeveloper() || (isTenantMatch() && isNewDocTenantMatch() && (resource.data.userId == request.auth.uid || isManajemen()) && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
       allow delete: if isDeveloper() || (isTenantMatch() && isManajemen());
     }
 
     match /notifications/{id} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        (isTenantMatch() && (resource.data.targetRole != null || isManajemen())) ||
-        isDeveloper()
-      );
+      allow read: if isTenantMatch() && (resource.data.userId == request.auth.uid || isManajemen() || resource.data.get('targetRole', '') != '');
       allow write: if isDeveloper() || isNewDocTenantMatch();
     }
 
     match /profile_update_requests/{id} {
-      allow read: if isSignedIn() && (
-        resource.data.get('userId', '') == request.auth.uid || 
-        isManajemen() || 
-        isDeveloper()
-      );
-      allow create: if isSignedIn() && (
-        request.resource.data.get('userId', '') == request.auth.uid || 
-        isDeveloper()
-      );
-      allow update: if isSignedIn() && (
-        resource.data.get('userId', '') == request.auth.uid || 
-        isManajemen() || 
-        isDeveloper()
-      );
+      allow read, update: if isTenantMatch() && (resource.data.get('userId', '') == request.auth.uid || isManajemen() || isDeveloper());
+      allow create: if isDeveloper() || (isNewDocTenantMatch() && request.resource.data.get('userId', '') == request.auth.uid);
       allow delete: if isDeveloper();
     }
 
     match /approval_requests/{id} {
-      allow read: if isSignedIn() && (
-        resource.data.get('userId', '') == request.auth.uid || 
-        isManajemen() || 
-        isDeveloper()
-      );
-      allow create: if isSignedIn() && (
-        request.resource.data.get('userId', '') == request.auth.uid || 
-        isDeveloper()
-      );
-      allow update: if isSignedIn() && (
-        resource.data.get('userId', '') == request.auth.uid || 
-        isManajemen() || 
-        isDeveloper()
-      );
+      allow read, update: if isTenantMatch() && (resource.data.get('userId', '') == request.auth.uid || isManajemen() || isDeveloper());
+      allow create: if isDeveloper() || (isNewDocTenantMatch() && request.resource.data.get('userId', '') == request.auth.uid);
       allow delete: if isDeveloper();
     }
 
     match /teacher_attendance/{id} {
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        (resource.data.get('teachersId', '') == currentUser().get('referenceId', ''))
-      );
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && (request.method == 'delete' || isNewDocTenantMatch()));
+      allow read: if isTenantMatch() && (isDeveloper() || isManajemen() || resource.data.get('teachersId', '') == currentUser().get('referenceId', ''));
+      allow write: if isDeveloper() || (isNewDocTenantMatch() && (isManajemen() || hasAnyRole(['guru', 'staf'])));
     }
 
     match /journals/{id} {
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        isTenantMatch()
-      );
+      allow read: if isTenantMatch() && (isDeveloper() || isManajemen() || hasAnyRole(['guru', 'wali_kelas']));
       allow create: if isDeveloper() || (isNewDocTenantMatch() && hasAnyRole(['guru', 'wali_kelas']) && request.resource.data.version == 1);
-      allow update: if isDeveloper() || (isTenantMatch() && hasAnyRole(['guru', 'wali_kelas']) && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
+      allow update: if isDeveloper() || (isTenantMatch() && isNewDocTenantMatch() && hasAnyRole(['guru', 'wali_kelas']) && request.resource.data.tenantId == resource.data.tenantId && request.resource.data.version > resource.data.version);
       allow delete: if isDeveloper() || (isTenantMatch() && hasAnyRole(['guru', 'wali_kelas']));
     }
 
-    match /assignments/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && hasAnyRole(['guru', 'wali_kelas']));
-    }
+    match /assignments/{id} { allow read: if isTenantMatch(); allow write: if isDeveloper() || (isNewDocTenantMatch() && hasAnyRole(['guru', 'wali_kelas'])); }
 
     match /submissions/{id} {
-      allow read: if isSignedIn() && (
-        isDeveloper() || 
-        isManajemen() || 
-        (isTenantMatch() && resource.data.get('studentId', '') == currentUser().get('referenceId', '')) ||
-        (isTenantMatch() && hasAnyRole(['guru', 'wali_kelas']))
-      );
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && (
-        hasAnyRole(['guru', 'wali_kelas']) || 
-        request.resource.data.get('studentId', '') == currentUser().get('referenceId', '')
-      ));
+      allow read: if isTenantMatch() && (isDeveloper() || isManajemen() || resource.data.get('studentId', '') == currentUser().get('referenceId', '') || hasAnyRole(['guru', 'wali_kelas']));
+      allow write: if isDeveloper() || (isNewDocTenantMatch() && (hasAnyRole(['guru', 'wali_kelas']) || request.resource.data.get('studentId', '') == currentUser().get('referenceId', '')));
     }
 
-    match /events/{id} {
-      allow read: if true;
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && isManajemen());
-    }
+    match /chat_rooms/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /chat_messages/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /academic_configs/{id} { allow read: if isTenantMatch(); allow write: if isDeveloper() || (isNewDocTenantMatch() && isManajemen()); }
+    match /qr_sessions/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /activity_logs/{id} { allow read, create: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); allow update, delete: if isDeveloper(); }
+    match /backups/{id} { allow read, write: if isDeveloper() || (isTenantMatch() && isManajemen()); }
 
-    match /chat_rooms/{id} {
-      allow read, write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
+    // Client-side sync metadata is tenant-bound. It is not an authorization bypass.
+    match /sync_queue/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch(); }
+    match /sync_metadata/{deviceId} { allow read, write: if isTenantMatch() || isNewDocTenantMatch(); }
+    match /deleted_records/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch(); }
+    match /sync_conflicts/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch(); }
+    match /devices/{deviceId} { allow read, write: if isTenantMatch() || isNewDocTenantMatch(); }
 
-    match /chat_messages/{id} {
-      allow read, write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
+    match /summary/{id} { allow read: if isTenantMatch(); allow write: if isDeveloper() || (isNewDocTenantMatch() && isManajemen()); }
+    match /student_point_summaries/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /complaints/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /conversations/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
+    match /messages/{id} { allow read, write: if isTenantMatch() || isNewDocTenantMatch() || isDeveloper(); }
 
-    match /academic_configs/{id} {
-      allow read: if isTenantMatch() || isDeveloper();
-      allow write: if isDeveloper() || (isNewDocTenantMatch() && isManajemen());
-    }
-
-    match /qr_sessions/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-
-    match /activity_logs/{id} {
-      allow read, create: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow update, delete: if isDeveloper();
-    }
-
-    match /backups/{id} {
-      allow read, write: if isDeveloper() || (isSignedIn() && isManajemen());
-    }
-
-    match /sync_queue/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /sync_metadata/{deviceId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /deleted_records/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /sync_conflicts/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /summary/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow write: if isDeveloper() || isManajemen();
-    }
-
-    match /devices/{deviceId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /student_point_summaries/{id} {
-      allow read: if isSignedIn() && (isTenantMatch() || isDeveloper());
-      allow write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-
-    match /complaints/{id} {
-      allow read, write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-
-    match /conversations/{id} {
-      allow read, write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-
-    match /messages/{id} {
-      allow read, write: if isSignedIn() && (isTenantMatch() || isDeveloper());
-    }
-
-    // --- 4. DATA PENGGUNA & CONFIG PRIVAT ---
+    // --- USER / SECURITY DATA ---
     match /users/{userId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == userId || 
-        isManajemen() || 
-        isDeveloper()
-      );
-      allow create: if isDeveloper() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if hasCanonicalTenant() && (request.auth.uid == userId || isManajemen() || isDeveloper());
+      allow create: if isDeveloper() || (hasCanonicalTenant() && request.auth.uid == userId && isNewDocTenantMatch());
       allow update: if isDeveloper() || (
-        isSignedIn() && request.auth.uid == userId &&
+        hasCanonicalTenant() && request.auth.uid == userId && isTenantMatch() && isNewDocTenantMatch() &&
         request.resource.data.get('role', '') == resource.data.get('role', '') &&
         request.resource.data.get('roles', []) == resource.data.get('roles', []) &&
-        request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false)
+        request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false) &&
+        request.resource.data.get('tenantId', '') == resource.data.get('tenantId', '')
       );
       allow delete: if isDeveloper();
     }
 
-    match /system_config/{docId} { allow read, write: if isDeveloper(); }
-    match /system_configs/{path=**} { allow read, write: if isDeveloper(); }
-    
-    match /audit_logs/{path=**} { 
-      allow read: if isDeveloper(); 
-      allow create: if isSignedIn(); 
-      allow update, delete: if false; 
-    }
-    
-    match /login_logs/{id} {
-      allow read: if isDeveloper() || (isSignedIn() && request.auth.uid == resource.data.userId);
-      allow create: if isSignedIn();
+    match /audit_logs/{path=**} {
+      allow read: if isDeveloper();
+      allow create: if hasCanonicalTenant() && isNewDocTenantMatch();
       allow update, delete: if false;
     }
-    
-    match /system_settings/{path=**} { 
-      allow read: if isSignedIn(); 
-      allow write: if isDeveloper(); 
+
+    match /login_logs/{id} {
+      allow read: if isDeveloper() || (isTenantMatch() && request.auth.uid == resource.data.userId);
+      allow create: if hasCanonicalTenant() && isNewDocTenantMatch();
+      allow update, delete: if false;
     }
 
-    // Final catch-all (safety)
+    match /system_settings/{path=**} {
+      allow read: if hasCanonicalTenant();
+      allow write: if isDeveloper();
+    }
+
+    // Final deny-by-default. No implicit authentication-based access.
     match /{document=**} {
-      allow read, write: if isDeveloper();
+      allow read, write: if false;
     }
   }
 }
