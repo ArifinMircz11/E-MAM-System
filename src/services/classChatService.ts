@@ -1,6 +1,7 @@
 import { classChatRepository } from '@/repositories/ClassChatRepository';
 import type { SecurityContext } from '@/core/security/types';
 import { generateManualId } from '../utils/firestoreHelpers';
+import { SyncStatus } from '@/domain/entities/base';
 
 export interface ClassMessage {
   id?: string;
@@ -13,7 +14,7 @@ export interface ClassMessage {
   tenantId: string;
   createdAt?: number;
   updatedAt?: number;
-  syncStatus?: string;
+  syncStatus?: SyncStatus;
 }
 
 const toClassMessage = (row: {
@@ -23,7 +24,7 @@ const toClassMessage = (row: {
   text: string;
   createdAt: number;
   updatedAt?: number;
-  syncStatus?: string;
+  syncStatus?: SyncStatus;
   classId: string;
   tenantId: string;
 }): ClassMessage => ({
@@ -64,7 +65,7 @@ export const sendMessageToClass = async (
     text: message.messageText,
     createdAt,
     updatedAt: createdAt,
-    syncStatus: 'pending',
+    syncStatus: SyncStatus.PENDING,
   });
 };
 
