@@ -2,6 +2,7 @@ import { BaseEntity } from "../entities/BaseEntity";
 import { localDb, DatabaseResolver, type EMamDatabase } from "@/database/dexie";
 import type { Table } from "dexie";
 import type { SecurityContext } from "@/core/security/types";
+import { getSecurityContext } from "@/core/security/contextHelper";
 import { syncRepository } from "./SyncRepository";
 import { SyncStatus } from "@/domain/entities/base";
 import { ArchitectureBoundaryEnforcer } from "@/core/boundary/ArchitectureBoundaryEnforcer";
@@ -221,7 +222,14 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return dataToSave as T;
   }
 
-  async create(context: SecurityContext, entity: Partial<T>): Promise<T> {
+  /**
+   * Canonical create contract plus a one-argument compatibility form.
+   * The one-argument form resolves the authoritative runtime SecurityContext;
+   * it does not accept tenant/actor identity from the entity as authority.
+   */
+  async create(...args: [SecurityContext, Partial<T>] | [T]): Promise<T | void> {
+    const context = args.length === 2 ? args[0] : getSecurityContext(false);
+    const entity = (args.length === 2 ? args[1] : args[0]) as Partial<T>;
     this.validateContext(context, 'create');
     if ((entity as any).id && await this.getTable().get((entity as any).id)) {
       throw new ArchitectureBoundaryError('repository', 'REPOSITORY_CREATE_CONFLICT', `Create ditolak: entity '${(entity as any).id}' sudah ada.`);
