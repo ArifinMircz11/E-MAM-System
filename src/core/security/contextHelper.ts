@@ -1,93 +1,92 @@
-import { useUserStore } from '@/stores/userStore';
 import { useAuthStore } from '@/stores/authStore';
-import type { SecurityContext } from './types';
-import type { Permission } from '@/types/permissions';
-import { ROLE_PERMISSIONS } from '@/types/permissions';
+import type { SecurityContext, AppPermission } from './types';
 import { ArchitectureBoundaryEnforcer } from '../boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '../boundary/ArchitectureBoundaryError';
 
 /**
- * Helper to generate SecurityContext from current user state.
- * Developer authority is derived only from the authoritative role claim;
- * email addresses are never treated as privilege grants.
+ * Generate the runtime SecurityContext from the authoritative CanonicalUser.
+ *
+ * AuthStore is the sole identity authority at this boundary. userStore is a
+ * compatibility/runtime projection and must not participate in authorization
+ * decisions here. Developer authority comes only from the canonical role
+ * claim; email addresses are never treated as privilege grants.
  */
 export function getSecurityContext(strict?: true): SecurityContext;
 export function getSecurityContext(strict: false): SecurityContext | null;
 export function getSecurityContext(strict: boolean = true): SecurityContext | null {
-  const userState = useUserStore.getState();
-  const authState = useAuthStore.getState();
+  const canonicalUser = useAuthStore.getState().user;
 
-  const user = userState.user || authState.user;
-  const uid = userState.uid || authState.user?.uid || user?.uid;
-
-  if (!uid) {
+  if (!canonicalUser?.uid) {
     if (strict) {
       throw new ArchitectureBoundaryError(
         'identity',
         'IDENTITY_UID_MISSING',
-        'Security Context incomplete: Pengguna belum masuk (tidak ada identitas uid).'
+        'Security Context incomplete: pengguna belum memiliki CanonicalUser yang terautentikasi.'
       );
     }
     return null;
   }
 
-  const rawRoles = userState.roles && userState.roles.length > 0
-    ? userState.roles
-    : authState.user?.roles || (authState.user?.role ? [authState.user.role] : []);
+  if (!canonicalUser.tenantId) {
+    if (strict) {
+      throw new ArchitectureBoundaryError(
+        'tenant',
+        'TENANT_ACCESS_DENIED',
+        'Security Context incomplete: tenantId tidak terdefinisi pada CanonicalUser.'
+      );
+    }
+    return null;
+  }
 
-  const roles = Array.from(new Set(
-    rawRoles.map((r: any) => String(r).toLowerCase().trim()).filter(Boolean),
-  ));
-  const isDeveloper = roles.includes('developer');
+  const roles = Array.from(
+    new Set(
+      (canonicalUser.roles?.length ? canonicalUser.roles : [canonicalUser.role])
+        .map((role) => String(role).toLowerCase().trim())
+        .filter(Boolean),
+    ),
+  );
 
   if (roles.length === 0) {
     if (strict) {
       throw new ArchitectureBoundaryError(
         'security_context',
         'SECURITY_CONTEXT_INVALID',
-        'Security Context incomplete: Pengguna tidak memiliki role yang terdaftar.'
+        'Security Context incomplete: CanonicalUser tidak memiliki role yang terdaftar.'
       );
     }
     return null;
   }
 
-  const tenantId = userState.tenantId || authState.user?.tenantId || user?.tenantId;
+  // Developer privilege is a canonical role claim, never an email heuristic.
+  const isDeveloper = roles.includes('developer');
+  const primaryRole = String(canonicalUser.role || roles[0]).toLowerCase().trim();
 
-  if (!tenantId) {
-    if (strict) {
-      throw new ArchitectureBoundaryError(
-        'tenant',
-        'TENANT_ACCESS_DENIED',
-        'Security Context incomplete: tenantId tidak terdefinisi.'
-      );
-    }
-    return null;
-  }
+  const permissions = new Set<AppPermission>(
+    (canonicalUser.permissions || [])
+      .map((permission) => String(permission).trim())
+      .filter(Boolean) as AppPermission[],
+  );
 
-  const primaryRole = roles[0] as any;
-
-  const permissionsSet = new Set<Permission>();
-  roles.forEach((role) => {
-    const perms = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
-    perms.forEach((p) => permissionsSet.add(p));
-  });
+  const scope = canonicalUser.scope
+    ? { ...canonicalUser.scope }
+    : { level: isDeveloper ? 'global' : 'tenant' };
 
   const ctx = {
-    uid,
-    userId: userState.user?.id || authState.user?.id || uid,
-    referenceId: userState.user?.referenceId || authState.user?.referenceId || undefined,
-    tenantId,
+    uid: canonicalUser.uid,
+    userId: canonicalUser.id,
+    referenceId: canonicalUser.referenceId,
+    tenantId: canonicalUser.tenantId,
     role: primaryRole,
     effectiveRole: primaryRole,
     roles,
-    permissions: permissionsSet as any,
+    permissions,
     scopes: [],
-    scope: { level: isDeveloper ? 'global' : 'tenant' },
+    scope,
     isDeveloper,
-    accountType: userState.user?.accountType || (isDeveloper ? 'developer' : 'madrasah'),
+    accountType: canonicalUser.accountType,
     featureFlags: {},
-    sessionId: `sess_${uid}_${Date.now()}`,
-  } as any;
+    sessionId: `sess_${canonicalUser.uid}_${Date.now()}`,
+  } as SecurityContext;
 
   ArchitectureBoundaryEnforcer.enforceSecurityContext(ctx);
   return ctx;
