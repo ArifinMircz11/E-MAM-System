@@ -20,9 +20,7 @@ type EnqueueItem = Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedA
 export class SyncRepository {
   private get db(): EMamDatabase { return DatabaseResolver.getDatabase(); }
 
-  private checkpointId(tenantId: string, collection: string): string {
-    return `${tenantId}::${collection}`;
-  }
+  private checkpointId(tenantId: string, collection: string): string { return `${tenantId}::${collection}`; }
 
   async getDeltaCheckpoint(tenantId: string, collection: string): Promise<string | undefined> {
     if (!tenantId || !collection) return undefined;
@@ -37,10 +35,7 @@ export class SyncRepository {
 
   async clearDeltaCheckpoint(tenantId: string, collection?: string): Promise<void> {
     if (!tenantId) return;
-    if (collection) {
-      await this.db.syncMetadata.delete(this.checkpointId(tenantId, collection));
-      return;
-    }
+    if (collection) { await this.db.syncMetadata.delete(this.checkpointId(tenantId, collection)); return; }
     const rows = await this.db.syncMetadata.where('tenantId').equals(tenantId).toArray();
     if (rows.length) await this.db.syncMetadata.bulkDelete(rows.map((row: any) => row.id));
   }
@@ -77,7 +72,8 @@ export class SyncRepository {
       }
       if (!docId) for (const key of Object.keys(candidate)) if (key.toLowerCase().endsWith('id') && candidate[key] && typeof candidate[key] !== 'object') { docId = String(candidate[key]); break; }
     }
-    if (sanitizedPayload && typeof sanitizedPayload === 'object' && docId && !sanitizedPayload.id) (sanitizedPayload as Record<string, unknown>).id = String(docId);
+    const payloadObject = sanitizedPayload && typeof sanitizedPayload === 'object' ? sanitizedPayload as Record<string, unknown> : undefined;
+    if (payloadObject && docId && !payloadObject.id) payloadObject.id = String(docId);
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const operation = item.operation ?? (item.action ? normalizeSyncOperation(item.action) : 'update');
     const now = Date.now();
