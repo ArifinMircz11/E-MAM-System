@@ -49,7 +49,6 @@ export class SyncEngine {
     } finally { this.isProcessing = false; }
   }
 
-  /** Pull remote changes and persist a stable (updatedAt, documentId) checkpoint only after local materialization succeeds. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const context = SecurityContextService.getNullableContext();
@@ -103,7 +102,7 @@ export class SyncEngine {
         if (overwriteRemote) {
           const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
           if (localVersion < 1) throw Object.assign(new Error('SYNC_INVALID_VERSION: mutation version must be >= 1'), { code: 'SYNC_INVALID_VERSION' });
-          const firestoreData = { ...payload, tenantId, version: localVersion, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
+          const firestoreData = { ...payload, tenantId, version: localVersion, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED } as Record<string, unknown>;
           delete firestoreData.isOffline;
           await dbGateway.writeBatch(dbGateway.db).set(docRef, firestoreData, { merge: true }).commit();
           auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId, version: localVersion }));
@@ -128,14 +127,6 @@ export class SyncEngine {
     if (!tenantId) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context?.tenantId, context?.isDeveloper);
     const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
-    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
-  }
-  static async executeBatchDeleteSync(context: SecurityContext, collName: string, filter: any) {
-    const tenantId = context?.tenantId; if (!tenantId || !collName) return;
-    ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
-    let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
-    if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
-    if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
-    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
+    void q;
   }
 }
