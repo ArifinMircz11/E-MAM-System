@@ -2,7 +2,7 @@ import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
 import { localSyncRepository } from '@/repositories/LocalSyncRepository';
-import { FirestoreSyncDataSource, encodeDeltaCursor } from '@/infrastructure/datasource/SyncDataSource';
+import { FirestoreSyncDataSource, getNextDeltaCursor } from '@/infrastructure/datasource/SyncDataSource';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -13,16 +13,6 @@ const MAX_SYNC_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1_000;
 
 export const shouldApplyMutationVersion = (remoteVersion: number, mutationVersion: number): boolean => Number(mutationVersion) > Number(remoteVersion);
-
-const getRecordCursor = (record: Record<string, unknown>): { updatedAt: string; id: string } | undefined => {
-  const raw = record.updatedAt;
-  let updatedAt: string | undefined;
-  if (raw instanceof Date) updatedAt = raw.toISOString();
-  else if (typeof raw === 'string') { const parsed = new Date(raw); if (!Number.isNaN(parsed.getTime())) updatedAt = parsed.toISOString(); }
-  else if (typeof raw === 'number') { const parsed = new Date(raw); if (!Number.isNaN(parsed.getTime())) updatedAt = parsed.toISOString(); }
-  const id = typeof record.id === 'string' ? record.id : undefined;
-  return updatedAt && id ? { updatedAt, id } : undefined;
-};
 
 export class SyncEngine {
   private static isProcessing = false;
@@ -59,6 +49,7 @@ export class SyncEngine {
     } finally { this.isProcessing = false; }
   }
 
+  /** Pull remote changes and persist a stable (updatedAt, documentId) checkpoint only after local materialization succeeds. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const context = SecurityContextService.getNullableContext();
@@ -71,11 +62,8 @@ export class SyncEngine {
       const records = await source.pullDelta(collectionName, tenantId, cursor);
       if (!records.length) break;
       for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
-      const recordCursors = records.map((record) => getRecordCursor(record as Record<string, unknown>)).filter((value): value is { updatedAt: string; id: string } => Boolean(value));
-      if (!recordCursors.length) break;
-      const next = recordCursors.reduce((max, value) => value.updatedAt > max.updatedAt || (value.updatedAt === max.updatedAt && value.id > max.id) ? value : max, recordCursors[0]);
-      const nextCursor = encodeDeltaCursor(next);
-      if (cursor && nextCursor === cursor) break;
+      const nextCursor = getNextDeltaCursor(records as Array<Record<string, unknown>>, cursor);
+      if (!nextCursor) break;
       await syncRepository.saveDeltaCheckpoint(tenantId, collectionName, nextCursor);
       cursor = nextCursor;
       if (records.length < 100) break;
@@ -146,8 +134,8 @@ export class SyncEngine {
     const tenantId = context?.tenantId; if (!tenantId || !collName) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
     let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
+    if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
     if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
-    if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
     const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
   }
 }
