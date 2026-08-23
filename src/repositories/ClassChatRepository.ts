@@ -1,6 +1,7 @@
 import { liveQuery } from 'dexie';
 import { BaseRepository } from './BaseRepository';
 import type { SecurityContext } from '@/core/security/types';
+import type { SyncStatus } from '@/domain/entities/base';
 
 export interface ClassChatMessage {
   id: string;
@@ -11,7 +12,7 @@ export interface ClassChatMessage {
   text: string;
   createdAt: number;
   updatedAt?: number;
-  syncStatus?: string;
+  syncStatus?: SyncStatus;
 }
 
 /** Local-first repository for class chat messages. Cloud transport belongs to SyncEngine. */
