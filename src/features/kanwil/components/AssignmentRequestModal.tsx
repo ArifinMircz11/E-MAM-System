@@ -82,35 +82,97 @@ export const AssignmentRequestModal: React.FC<Props> = ({ isOpen, onClose, user 
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white" aria-label="Tutup">
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Satuan Kerja</label>
-              <input value={satuanKerja} onChange={(e) => setSatuanKerja(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Jenjang</label>
-              <select value={jenjang} onChange={(e) => setJenjang(e.target.value as typeof jenjang)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
-                <option value="MA">MA</option>
-                <option value="MTs">MTs</option>
-                <option value="MI">MI</option>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                Satuan Kerja Kabupaten / Kota
+              </label>
+              <select
+                value={satuanKerja}
+                onChange={(e) => setSatuanKerja(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="Kankemenag Kota Banjarmasin">Kankemenag Kota Banjarmasin</option>
+                <option value="Kankemenag Kota Banjarbaru">Kankemenag Kota Banjarbaru</option>
+                <option value="Kankemenag Kab. Banjar">Kankemenag Kab. Banjar</option>
+                <option value="Kankemenag Kab. Barito Kuala">Kankemenag Kab. Barito Kuala</option>
+                <option value="Kankemenag Kab. Tapin">Kankemenag Kab. Tapin</option>
+                <option value="Kankemenag Kab. Hulu Sungai Selatan">Kankemenag Kab. Hulu Sungai Selatan</option>
+                <option value="Kankemenag Kab. Hulu Sungai Tengah">Kankemenag Kab. Hulu Sungai Tengah</option>
+                <option value="Kankemenag Kab. Hulu Sungai Utara">Kankemenag Kab. Hulu Sungai Utara</option>
+                <option value="Kankemenag Kab. Tabalong">Kankemenag Kab. Tabalong</option>
+                <option value="Kankemenag Kab. Tanah Laut">Kankemenag Kab. Tanah Laut</option>
+                <option value="Kankemenag Kab. Tanah Bumbu">Kankemenag Kab. Tanah Bumbu</option>
+                <option value="Kankemenag Kab. Kotabaru">Kankemenag Kab. Kotabaru</option>
+                <option value="Kankemenag Kab. Balangan">Kankemenag Kab. Balangan</option>
               </select>
             </div>
+
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Madrasah Tujuan</label>
-              <input value={madrasahName} onChange={(e) => setMadrasahName(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm" placeholder="Nama madrasah" />
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                Jenjang Pendidikan
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                {(['MA', 'MTs', 'MI'] as const).map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setJenjang(lvl)}
+                    className={`py-3 rounded-2xl text-xs font-bold tracking-wider transition-all border ${
+                      jenjang === lvl
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
             </div>
-            <button type="submit" disabled={isSubmitting} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold uppercase">
-              <CheckCircleIcon className="w-4 h-4" />
-              {isSubmitting ? 'Mengirim...' : 'Kirim Ajuan'}
-            </button>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                Nama Madrasah / Satuan Kerja Tujuan
+              </label>
+              <input
+                type="text"
+                value={madrasahName}
+                onChange={(e) => setMadrasahName(e.target.value)}
+                placeholder="Contoh: MAN 1 Model Banjarmasin"
+                className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+            </div>
+
+            <div className="pt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-3 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Mengirim Ajuan...' : 'Kirim Ajuan Penugasan'}
+              </button>
+            </div>
           </form>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 };
+
+export default AssignmentRequestModal;
