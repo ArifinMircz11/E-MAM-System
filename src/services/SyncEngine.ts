@@ -134,8 +134,8 @@ export class SyncEngine {
     const tenantId = context?.tenantId; if (!tenantId || !collName) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
     let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
-    if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
     if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
+    if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
     const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
   }
 }
