@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/services/authService';
-import { useUserStore } from '@/stores/userStore';
+import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import type { MadrasahData } from '@/types';
 import { UserRole } from '@/types';
@@ -7,9 +7,8 @@ import { ensureStringIds } from '@/utils/schemaHelpers';
 
 /**
  * Seed utility. All Firestore access is routed through FirestoreGateway.
- * Seed operations require an authoritative tenant and never synthesize one.
+ * Seed operations require an authoritative SecurityContext tenant.
  */
-
 const defaultMadrasahInfo: MadrasahData = {
   nama: 'MAN 1 HULU SUNGAI TENGAH', nsm: '131163070001', npsn: '30315354',
   alamat: 'Jl. H. Damanhuri No. 12 Barabai', telepon: '0517-41234',
@@ -31,14 +30,14 @@ const defaultRolePermissions: Record<string, string[]> = {
 };
 
 function requireTenantId(): string {
-  const tenantId = useUserStore.getState().tenantId?.trim();
-  if (!tenantId || ['default', 'global', 'unknown'].includes(tenantId.toLowerCase())) throw new Error('Seed operation requires an authoritative tenantId.');
+  if (!SecurityContextService.isReady()) throw new Error('SEED_SECURITY_CONTEXT_NOT_READY');
+  const tenantId = SecurityContextService.getContext().tenantId?.trim();
+  if (!tenantId || ['default', 'global', 'unknown'].includes(tenantId.toLowerCase())) throw new Error('SEED_TENANT_INVALID');
   return tenantId;
 }
 
 export const seedInitialData = async () => {
-  const currentUser = getCurrentUser();
-  if (!currentUser) return;
+  if (!getCurrentUser()) return;
   try {
     const db = dbGateway.db;
     const tenantId = requireTenantId();
@@ -47,11 +46,7 @@ export const seedInitialData = async () => {
       const ref = dbGateway.doc(db, 'system_settings', key);
       const snap = await dbGateway.getDoc(ref);
       if (snap.exists()) continue;
-      const data = key === 'madrasah_info' ? { ...defaultMadrasahInfo, tenantId } :
-        key === 'role_permissions' ? { tenantId, permissions: defaultRolePermissions } :
-        key === 'features' ? { tenantId, scheduleReminder: true } :
-        key === 'maintenance_config' ? { tenantId, isMaintenance: false, allowedRoles: ['Developer', 'Admin'], message: 'Update rutin, silakan kembali nanti.' } :
-        { tenantId, locked: ['reports', 'teacher_attendance', 'advisor'] };
+      const data = key === 'madrasah_info' ? { ...defaultMadrasahInfo, tenantId } : key === 'role_permissions' ? { tenantId, permissions: defaultRolePermissions } : key === 'features' ? { tenantId, scheduleReminder: true } : key === 'maintenance_config' ? { tenantId, isMaintenance: false, allowedRoles: ['Developer', 'Admin'], message: 'Update rutin, silakan kembali nanti.' } : { tenantId, locked: ['reports', 'teacher_attendance', 'advisor'] };
       await dbGateway.setDoc(ref, data);
     }
     const unified = dbGateway.doc(db, 'system', 'config');
