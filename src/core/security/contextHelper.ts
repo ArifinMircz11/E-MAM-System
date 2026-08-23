@@ -7,7 +7,9 @@ import { ArchitectureBoundaryEnforcer } from '../boundary/ArchitectureBoundaryEn
 import { ArchitectureBoundaryError } from '../boundary/ArchitectureBoundaryError';
 
 /**
- * Helper to generate SecurityContext from current user state
+ * Helper to generate SecurityContext from current user state.
+ * Developer authority is derived only from the authoritative role claim;
+ * email addresses are never treated as privilege grants.
  */
 export function getSecurityContext(strict?: true): SecurityContext;
 export function getSecurityContext(strict: false): SecurityContext | null;
@@ -33,15 +35,10 @@ export function getSecurityContext(strict: boolean = true): SecurityContext | nu
     ? userState.roles
     : authState.user?.roles || (authState.user?.role ? [authState.user.role] : []);
 
-  const email = (userState.user?.email || authState.user?.email || '').toLowerCase().trim();
-  const isDeveloper =
-    rawRoles.some((r: any) => String(r).toLowerCase() === 'developer') ||
-    email === 'developer@example.com' ||
-    email === 'admin@example.com';
-
-  const roles = isDeveloper
-    ? ['developer']
-    : (rawRoles.length > 0 ? Array.from(new Set(rawRoles.map((r: any) => String(r).toLowerCase().trim()))) : []);
+  const roles = Array.from(new Set(
+    rawRoles.map((r: any) => String(r).toLowerCase().trim()).filter(Boolean),
+  ));
+  const isDeveloper = roles.includes('developer');
 
   if (roles.length === 0) {
     if (strict) {
@@ -54,10 +51,7 @@ export function getSecurityContext(strict: boolean = true): SecurityContext | nu
     return null;
   }
 
-  let tenantId = userState.tenantId || authState.user?.tenantId || user?.tenantId;
-  if (isDeveloper && (!tenantId || tenantId === 'global')) {
-    tenantId = 'global';
-  }
+  const tenantId = userState.tenantId || authState.user?.tenantId || user?.tenantId;
 
   if (!tenantId) {
     if (strict) {
@@ -72,7 +66,6 @@ export function getSecurityContext(strict: boolean = true): SecurityContext | nu
 
   const primaryRole = roles[0] as any;
 
-  // Collect all permissions from all roles
   const permissionsSet = new Set<Permission>();
   roles.forEach((role) => {
     const perms = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
@@ -86,7 +79,7 @@ export function getSecurityContext(strict: boolean = true): SecurityContext | nu
     tenantId,
     role: primaryRole,
     effectiveRole: primaryRole,
-    roles: roles,
+    roles,
     permissions: permissionsSet as any,
     scopes: [],
     scope: { level: isDeveloper ? 'global' : 'tenant' },
@@ -99,4 +92,3 @@ export function getSecurityContext(strict: boolean = true): SecurityContext | nu
   ArchitectureBoundaryEnforcer.enforceSecurityContext(ctx);
   return ctx;
 }
-
