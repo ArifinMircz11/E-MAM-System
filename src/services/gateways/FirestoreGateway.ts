@@ -27,6 +27,7 @@ import {
   QueryConstraint,
   DocumentData,
   startAfter,
+  documentId,
 } from 'firebase/firestore';
 
 export {
@@ -50,6 +51,7 @@ export {
   deleteField,
   Timestamp,
   startAfter,
+  documentId,
 };
 
 export type {
@@ -64,7 +66,7 @@ export type {
 
 /**
  * FirestoreGateway
- * 
+ *
  * Central gateway for all Firestore operations.
  * This is the ONLY place allowed to import from 'firebase/firestore'.
  */
@@ -90,4 +92,6 @@ export const firestoreGateway = {
   increment,
   serverTimestamp,
   Timestamp,
+  startAfter,
+  documentId,
 };
