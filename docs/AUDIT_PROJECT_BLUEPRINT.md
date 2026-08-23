@@ -202,7 +202,6 @@ Config
 Migration
 
 Seeder
-
 ```
 
 Output
@@ -291,7 +290,6 @@ users
 audit_logs
 
 login_logs
-
 ```
 
 Periksa
@@ -338,7 +336,6 @@ Letter
 ↓
 
 Notification
-
 ```
 
 Cari
@@ -377,7 +374,6 @@ Index
 Uniqueness
 
 Naming
-
 ```
 
 Output
@@ -388,7 +384,6 @@ Quality Score
 Coverage %
 
 Missing %
-
 ```
 
 ---
@@ -413,7 +408,6 @@ Delta Sync
 Version
 
 Checkpoint
-
 ```
 
 Cari
@@ -448,7 +442,6 @@ Migration
 Version
 
 Cache
-
 ```
 
 Cari
@@ -549,7 +542,6 @@ Pulang Cepat
 Prestasi
 
 Pelanggaran
-
 ```
 
 Cari
@@ -578,7 +570,6 @@ Role
 Tenant
 
 Class
-
 ```
 
 Cari
@@ -833,3 +824,56 @@ Audit harus selalu mengikuti prinsip yang telah disepakati untuk proyek ini:
 * **SecurityService** menjadi pusat validasi izin dan hak akses.
 * **Relationship & Data Repair Engine** menjadi pusat governance relasi data, validasi PK/FK, analisis perubahan skema, serta migrasi/backfill agar integritas data antar koleksi tetap terjaga.
 * Setiap temuan audit harus ditindaklanjuti melalui **Work Order (WO)** yang kecil, terukur, dapat diuji, dan tidak mengubah arsitektur dasar tanpa persetujuan.
+
+---
+
+# 27. Runtime Verification Checkpoint
+
+Sebelum **Sync Foundation** dinyatakan GREEN atau sebelum release production, jalankan seluruh pemeriksaan berikut pada checkout repository yang sama dan pada commit yang akan dirilis.
+
+```bash
+npm run typecheck
+npm run test:unit
+npm run audit:sync
+npm run audit:dexie
+npm run audit:repository
+npm run audit:architecture
+npm run audit
+npm run verify
+```
+
+Semua command wajib dicatat hasil aktualnya.
+
+| Command | Required Result | Evidence |
+| --- | --- | --- |
+| `npm run typecheck` | PASS | Output command |
+| `npm run test:unit` | PASS | Test summary |
+| `npm run audit:sync` | PASS | Sync audit report |
+| `npm run audit:dexie` | PASS | Dexie audit report |
+| `npm run audit:repository` | PASS | Repository audit report |
+| `npm run audit:architecture` | PASS | Architecture audit report |
+| `npm run audit` | PASS | Full audit report |
+| `npm run verify` | PASS | Complete verification output |
+
+### Gate Rule
+
+* **P0/P1 failure:** release dan status GREEN diblokir.
+* **P2 finding:** harus dicatat sebagai Work Order sebelum release.
+* **Warning:** tidak boleh dianggap PASS tanpa penilaian dan bukti.
+* Hasil code review saja **tidak menggantikan runtime verification**.
+* Jika command tidak dapat dijalankan, status harus **NOT VERIFIED**, bukan PASS.
+
+### Required Evidence
+
+Setiap verification harus menyimpan:
+
+1. Commit SHA yang diuji.
+2. Waktu eksekusi.
+3. Command yang dijalankan.
+4. Exit code.
+5. Ringkasan PASS/FAIL/WARNING.
+6. Error lengkap untuk command yang gagal.
+7. File/line yang terdampak.
+8. Work Order untuk setiap blocker.
+
+**Checkpoint ini wajib diselesaikan sebelum menyatakan Sync Foundation GREEN.**
