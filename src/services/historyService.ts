@@ -1,7 +1,6 @@
-import { useUserStore } from '@/stores/userStore';
 import { loginLogRepository } from '@/repositories/LoginLogRepository';
 import type { LoginHistoryEntry } from '@/types';
-import { isMockMode } from './firebase';
+import { SecurityContextService } from '@/core/security/SecurityContextService';
 
 const getDeviceName = (): string => {
   if (typeof navigator === 'undefined') return 'Server Side';
@@ -19,21 +18,18 @@ export const logLoginEvent = async (
   userId: string,
   status: 'Success' | 'Failed' = 'Success',
 ): Promise<void> => {
-  let tenantId = 'global';
-  try {
-    tenantId = useUserStore.getState().tenantId || 'global';
-  } catch (e) {
-    // Fallback or ignore if store not ready
-  }
+  const context = SecurityContextService.getContext();
+  if (!SecurityContextService.isReady()) throw new Error('LOGIN_HISTORY_SECURITY_CONTEXT_NOT_READY');
+  if (context.uid !== userId) throw new Error('LOGIN_HISTORY_USER_MISMATCH');
 
   const entry: LoginHistoryEntry = {
     id: `log_${Date.now()}_${userId}`,
     userId,
     timestamp: new Date().toISOString(),
     device: getDeviceName(),
-    ip: '127.0.0.1', // Placeholder
+    ip: '127.0.0.1',
     status,
-    tenantId: tenantId,
+    tenantId: context.tenantId,
   };
 
   try {
@@ -45,6 +41,9 @@ export const logLoginEvent = async (
 
 export const getLoginHistory = async (userId: string): Promise<LoginHistoryEntry[]> => {
   if (!userId) return [];
+  const context = SecurityContextService.getContext();
+  if (!SecurityContextService.isReady()) throw new Error('LOGIN_HISTORY_SECURITY_CONTEXT_NOT_READY');
+  if (context.uid !== userId) throw new Error('LOGIN_HISTORY_USER_MISMATCH');
 
   try {
     return await loginLogRepository.getByUserId(userId);
