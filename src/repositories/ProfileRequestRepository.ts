@@ -18,13 +18,12 @@ export class ProfileRequestRepository extends BaseRepository<ProfileUpdateReques
       id: `sq_${Date.now()}_${entity.id}`,
       tenantId: entity.tenantId,
       collection: 'profile_update_requests',
-      documentId: entity.id,
+      recordId: entity.id,
       operation: 'create',
       payload: entity,
       createdAt: Date.now(),
       status: 'pending',
-      retryCount: 0,
-      priority: 1
+      attempts: 0,
     });
   }
 
@@ -34,13 +33,12 @@ export class ProfileRequestRepository extends BaseRepository<ProfileUpdateReques
       id: `sq_${Date.now()}_${entity.id}`,
       tenantId: entity.tenantId,
       collection: 'profile_update_requests',
-      documentId: entity.id,
+      recordId: entity.id,
       operation: 'update',
       payload: entity,
       createdAt: Date.now(),
       status: 'pending',
-      retryCount: 0,
-      priority: 1
+      attempts: 0,
     });
   }
 
@@ -48,15 +46,14 @@ export class ProfileRequestRepository extends BaseRepository<ProfileUpdateReques
     await this.table.where('id').equals(id).filter(r => r.tenantId === tenantId).delete();
     await localDb.sync_queue.add({
       id: `sq_${Date.now()}_${id}`,
-      tenantId: tenantId,
+      tenantId,
       collection: 'profile_update_requests',
-      documentId: id,
+      recordId: id,
       operation: 'delete',
       payload: { id, deleted: true },
       createdAt: Date.now(),
       status: 'pending',
-      retryCount: 0,
-      priority: 1
+      attempts: 0,
     });
   }
 
