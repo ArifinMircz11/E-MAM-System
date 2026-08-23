@@ -4,13 +4,17 @@ import { ensureStringIds } from '@/utils/schemaHelpers';
 import { getSecurityContext } from '@/core/security/contextHelper';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import type { SecurityContext } from '@/core/security/types';
+import { normalizeSyncOperation } from '@/types/syncQueue';
 
 const PROCESSING_RECOVERY_TIMEOUT_MS = 60_000;
 const MAX_SYNC_ATTEMPTS = 5;
 
-type EnqueueItem = Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'attempts' | 'operation'> & {
+type EnqueueItem = Omit<SyncQueueItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'attempts' | 'operation' | 'tenantId' | 'recordId'> & {
+  tenantId?: string;
+  recordId?: string;
+  documentId?: string;
+  action?: string;
   operation?: SyncOperation;
-  metadata?: SyncQueueItem['metadata'];
 };
 
 export class SyncRepository {
@@ -28,13 +32,7 @@ export class SyncRepository {
 
   async saveDeltaCheckpoint(tenantId: string, collection: string, cursor: string): Promise<void> {
     if (!tenantId || !collection || !cursor) return;
-    await this.db.syncMetadata.put({
-      id: this.checkpointId(tenantId, collection),
-      tenantId,
-      collection,
-      cursor,
-      updatedAt: Date.now(),
-    });
+    await this.db.syncMetadata.put({ id: this.checkpointId(tenantId, collection), tenantId, collection, cursor, updatedAt: Date.now() });
   }
 
   async clearDeltaCheckpoint(tenantId: string, collection?: string): Promise<void> {
@@ -50,8 +48,7 @@ export class SyncRepository {
   private async coalesceUnsentMutation(dbInstance: EMamDatabase, candidate: SyncQueueItem): Promise<{ id: string } | null> {
     if (!candidate.recordId) return null;
     const candidates = await dbInstance.sync_queue.where('tenantId').equals(candidate.tenantId)
-      .filter((item) => item.collection === candidate.collection && item.recordId === candidate.recordId &&
-        (item.status === 'pending' || item.status === 'waiting' || item.status === 'failed')).sortBy('createdAt');
+      .filter((item) => item.collection === candidate.collection && item.recordId === candidate.recordId && (item.status === 'pending' || item.status === 'waiting' || item.status === 'failed')).sortBy('createdAt');
     const existing = candidates[0];
     if (!existing) return null;
     const changes: Partial<SyncQueueItem> = { payload: candidate.payload, recordId: candidate.recordId, status: 'pending', updatedAt: Date.now() };
@@ -72,7 +69,7 @@ export class SyncRepository {
     if (!isExplicitGlobalScope && requestedTenantId && requestedTenantId !== tenantId) ArchitectureBoundaryEnforcer.enforceTenantAccess(tenantId, requestedTenantId, 'sync_queue', activeSecCtx.isDeveloper);
     const actorUid = activeSecCtx.uid;
     const sanitizedPayload = ensureStringIds(item.payload);
-    let docId = item.recordId;
+    let docId = item.recordId ?? item.documentId;
     if (!docId && sanitizedPayload && typeof sanitizedPayload === 'object') {
       const candidate = sanitizedPayload as Record<string, unknown>;
       for (const key of ['id', 'idUnik', 'uid', 'userId', 'studentId', 'studentsId', 'teacherId', 'teachersId', 'classId', 'classesId']) {
@@ -82,7 +79,7 @@ export class SyncRepository {
     }
     if (sanitizedPayload && typeof sanitizedPayload === 'object' && docId && !sanitizedPayload.id) (sanitizedPayload as Record<string, unknown>).id = String(docId);
     const id = `SYNC_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const operation = item.operation ?? 'update';
+    const operation = item.operation ?? (item.action ? normalizeSyncOperation(item.action) : 'update');
     const now = Date.now();
     const candidateItem: SyncQueueItem = { id, tenantId, operation, collection: item.collection, payload: sanitizedPayload, status: 'pending', attempts: 0, createdAt: now, updatedAt: now, ...(docId ? { recordId: String(docId) } : {}), metadata: { ...(item.metadata ?? {}), actorId: item.metadata?.actorId ?? actorUid, idempotencyKey: item.metadata?.idempotencyKey ?? id } };
     ArchitectureBoundaryEnforcer.enforceSyncQueue(candidateItem, activeSecCtx);
