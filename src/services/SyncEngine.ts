@@ -3,7 +3,6 @@
  * e-Mam System - Sync Engine Core
  * LAYER: SERVICE (transport/orchestration; operational writes stay in repositories)
  */
-
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
@@ -18,22 +17,22 @@ import { auditLogger } from '@/core/audit/AuditLogger';
 const MAX_SYNC_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1_000;
 
-/** Version contract for a single record: only a strictly newer mutation may apply. */
-export const shouldApplyMutationVersion = (remoteVersion: number, mutationVersion: number): boolean => {
-  return Number(mutationVersion) > Number(remoteVersion);
+export const shouldApplyMutationVersion = (remoteVersion: number, mutationVersion: number): boolean => Number(mutationVersion) > Number(remoteVersion);
+
+const getRecordCursor = (record: Record<string, unknown>): string | undefined => {
+  const raw = record.updatedAt;
+  if (!raw) return undefined;
+  if (raw instanceof Date) return raw.toISOString();
+  if (typeof raw === 'string') { const parsed = new Date(raw); return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString(); }
+  if (typeof raw === 'number') { const parsed = new Date(raw); return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString(); }
+  return undefined;
 };
 
 export class SyncEngine {
   private static isProcessing = false;
   private static isStopped = false;
   private static intervalHandle: ReturnType<typeof setInterval> | null = null;
-
-  static start(intervalMs = 10_000): void {
-    this.isStopped = false;
-    if (this.intervalHandle) return;
-    void this.processQueue();
-    this.intervalHandle = setInterval(() => { void this.processQueue(); }, Math.max(1_000, intervalMs));
-  }
+  static start(intervalMs = 10_000): void { this.isStopped = false; if (this.intervalHandle) return; void this.processQueue(); this.intervalHandle = setInterval(() => { void this.processQueue(); }, Math.max(1_000, intervalMs)); }
   static stop(): void { this.isStopped = true; if (this.intervalHandle) { clearInterval(this.intervalHandle); this.intervalHandle = null; } }
   static resume(): void { this.start(); }
   static isStoppedState(): boolean { return this.isStopped; }
@@ -58,21 +57,33 @@ export class SyncEngine {
         if (this.isStopped) break;
         const claimed = await syncRepository.claimItem(snapshot.id, activeSecCtx.tenantId);
         if (!claimed) continue;
-        try { await this.processItem(claimed, activeSecCtx); }
-        catch (err) { console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err); }
+        try { await this.processItem(claimed, activeSecCtx); } catch (err) { console.error(`[SyncEngine] Failed to process queue item ${claimed.id}:`, err); }
       }
       await syncRepository.clearCompleted(activeSecCtx.tenantId);
     } finally { this.isProcessing = false; }
   }
 
+  /** Pull remote changes and persist a checkpoint only after local materialization succeeds. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const context = SecurityContextService.getNullableContext();
     if (!context?.tenantId) return 0;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
-    const records = await new FirestoreSyncDataSource().pullDelta(collectionName, tenantId);
+    const source = new FirestoreSyncDataSource();
+    let cursor = await syncRepository.getDeltaCheckpoint(tenantId, collectionName);
     let synced = 0;
-    for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
+    for (;;) {
+      const records = await source.pullDelta(collectionName, tenantId, cursor);
+      if (!records.length) break;
+      for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
+      const cursors = records.map((record) => getRecordCursor(record as Record<string, unknown>)).filter((value): value is string => Boolean(value));
+      if (!cursors.length) break;
+      const nextCursor = cursors.reduce((max, value) => value > max ? value : max, cursors[0]);
+      if (cursor && nextCursor <= cursor) break;
+      await syncRepository.saveDeltaCheckpoint(tenantId, collectionName, nextCursor);
+      cursor = nextCursor;
+      if (records.length < 100) break;
+    }
     return synced;
   }
 
@@ -88,7 +99,6 @@ export class SyncEngine {
       if (!docId) { await syncRepository.moveToDeadLetterQueue(item.id, 'Document ID missing in payload', 'SYNC_QUEUE_ENTITY_ID_MISSING'); return; }
       const docRef = dbGateway.doc(dbGateway.db, colName, String(docId));
       const customActions = ['SCAN_PRESENSI', 'ADD_POINT', 'ATTENDANCE_PROCESS', 'BATCH_SYNC'];
-
       if (customAction && customActions.includes(customAction)) {
         const { SyncDispatcher } = await import('@/sync/SyncDispatcher');
         await SyncDispatcher.dispatch(item as any, activeSecCtx);
@@ -108,9 +118,7 @@ export class SyncEngine {
               auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
             }
           }
-        } catch (fetchErr) {
-          throw Object.assign(new Error(`SYNC_CONFLICT_CHECK_FAILED: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`), { code: 'SYNC_CONFLICT_CHECK_FAILED' });
-        }
+        } catch (fetchErr) { throw Object.assign(new Error(`SYNC_CONFLICT_CHECK_FAILED: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`), { code: 'SYNC_CONFLICT_CHECK_FAILED' }); }
         if (overwriteRemote) {
           const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
           if (localVersion < 1) throw Object.assign(new Error('SYNC_INVALID_VERSION: mutation version must be >= 1'), { code: 'SYNC_INVALID_VERSION' });
@@ -123,7 +131,6 @@ export class SyncEngine {
         await dbGateway.writeBatch(dbGateway.db).delete(docRef).commit();
         auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_DELETE', actorId: activeSecCtx.uid || 'system', collection: colName, docId }));
       } else throw new Error(`Unsupported sync operation: ${item.operation}`);
-
       await syncRepository.updateStatus(item.id, 'completed');
       if (operation !== 'delete') await localSyncRepository.markRecordSynced(colName, String(docId));
     } catch (error: any) {
@@ -134,28 +141,20 @@ export class SyncEngine {
       throw error;
     }
   }
-
   static async syncAll() { await this.processQueue(); }
   static async executeAutoSweepSync(_context: any, _tenantId: string) { await this.processQueue(); }
   static async executeClearPointsSync(context: SecurityContext, tenantId: string) {
     if (!tenantId) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context?.tenantId, context?.isDeveloper);
     const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'poin'), dbGateway.where('tenantId', '==', tenantId));
-    const snap = await dbGateway.getDocs(q);
-    const batch = dbGateway.writeBatch(dbGateway.db);
-    snap.docs.forEach((d: any) => batch.delete(d.ref));
-    await batch.commit();
+    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
   }
   static async executeBatchDeleteSync(context: SecurityContext, collName: string, filter: any) {
-    const tenantId = context?.tenantId;
-    if (!tenantId || !collName) return;
+    const tenantId = context?.tenantId; if (!tenantId || !collName) return;
     ArchitectureBoundaryEnforcer.enforceSyncEngineTenant(tenantId, context.tenantId, context.isDeveloper);
     let q = dbGateway.query(dbGateway.collection(dbGateway.db, collName), dbGateway.where('tenantId', '==', tenantId));
     if (filter?.date) q = dbGateway.query(q, dbGateway.where('date', '==', filter.date));
     if (filter?.month) q = dbGateway.query(q, dbGateway.where('date', '>=', `${filter.month}-01`), dbGateway.where('date', '<=', `${filter.month}-31`));
-    const snap = await dbGateway.getDocs(q);
-    const batch = dbGateway.writeBatch(dbGateway.db);
-    snap.docs.forEach((d: any) => batch.delete(d.ref));
-    await batch.commit();
+    const snap = await dbGateway.getDocs(q); const batch = dbGateway.writeBatch(dbGateway.db); snap.docs.forEach((d: any) => batch.delete(d.ref)); await batch.commit();
   }
 }
