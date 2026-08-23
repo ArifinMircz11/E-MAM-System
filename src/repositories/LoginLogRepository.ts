@@ -22,13 +22,12 @@ export class LoginLogRepository extends BaseRepository<LoginHistoryEntry> {
       id: `sq_${Date.now()}_${entity.id}`,
       tenantId: entity.tenantId,
       collection: 'login_logs',
-      documentId: entity.id,
+      recordId: entity.id,
       operation: 'create',
       payload: entity,
       createdAt: Date.now(),
       status: 'pending',
-      retryCount: 0,
-      priority: 0 // Lower priority for logs
+      attempts: 0,
     });
   }
 }
