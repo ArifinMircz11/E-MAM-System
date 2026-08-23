@@ -36,13 +36,12 @@ export class StudentParentRepository extends BaseRepository<StudentParentRelatio
       id: `sq_${Date.now()}_${entity.id}`,
       tenantId: entity.tenantId,
       collection: 'studentParents',
-      documentId: entity.id,
+      recordId: entity.id,
       operation: 'create',
       payload: entity,
       createdAt: Date.now(),
       status: 'pending',
-      retryCount: 0,
-      priority: 1
+      attempts: 0,
     });
   }
 }
