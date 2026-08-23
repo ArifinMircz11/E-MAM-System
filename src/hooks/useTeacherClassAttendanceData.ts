@@ -29,11 +29,11 @@ export function useTeacherClassAttendanceInit(
 
       let tProfile: any = null;
       const localUser = await userRepository.findById(user.uid, tenantId);
-      const teacherId = localUser?.teacherId || localUser?.teachersId;
+      const teacherId = localUser?.teachersId;
 
       if (teacherId) {
         const teacher = await teacherRepository.findById(teacherId, tenantId);
-        if (teacher) tProfile = { id: teacherId, ...teacher };
+        if (teacher) tProfile = { ...teacher, id: teacherId };
       }
       setTeacherProfile(tProfile);
 
