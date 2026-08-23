@@ -1,9 +1,7 @@
-import { db } from './firebase';
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { getDocsOptimized } from '@/services/sync/firestoreHelpers';
 import { generateManualId } from '@/utils/dataHelpers';
 import { auditRepository } from '@/repositories/auditRepository';
-import { TenantContext } from '@/core/context/TenantContext';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 
 export type LogCategory = 'SECURITY' | 'ATTENDANCE' | 'USER' | 'SYSTEM' | 'GRADE' | 'SURAT' | 'AUTH' | 'POINTS';
@@ -71,21 +69,18 @@ export const logLogin = async (data: { userId: string; email: string; name: stri
 };
 
 export const getAuditLogs = async (maxCount: number = 50) => {
-  if (!db) return [];
   try {
     const context = requireAuditContext();
-    const tenantId = context.tenantId;
-    const q = dbGateway.query(dbGateway.collection(db, 'audit_logs'), dbGateway.where('tenantId', '==', tenantId), dbGateway.orderBy('timestamp', 'desc'), dbGateway.limit(maxCount));
+    const q = dbGateway.query(dbGateway.collection(dbGateway.db, 'audit_logs'), dbGateway.where('tenantId', '==', context.tenantId), dbGateway.orderBy('timestamp', 'desc'), dbGateway.limit(maxCount));
     return await getDocsOptimized<AuditLog>(q);
   } catch (error) { console.error('Failed to get audit logs:', error); return []; }
 };
 
 export const getAuditLogsPaginated = async (tenantId: string, lastDoc: any | null = null, pageSize: number = 25) => {
-  if (!db) return { data: [], lastDoc: null };
   try {
     const context = requireAuditContext();
     if (context.tenantId !== tenantId) throw new Error('AUDIT_TENANT_MISMATCH');
-    let q = dbGateway.query(dbGateway.collection(db, 'audit_logs'), dbGateway.where('tenantId', '==', tenantId), dbGateway.orderBy('timestamp', 'desc'), dbGateway.limit(pageSize));
+    let q = dbGateway.query(dbGateway.collection(dbGateway.db, 'audit_logs'), dbGateway.where('tenantId', '==', tenantId), dbGateway.orderBy('timestamp', 'desc'), dbGateway.limit(pageSize));
     if (lastDoc) q = dbGateway.query(q, (dbGateway as any).startAfter(lastDoc));
     const snap = await dbGateway.getDocs(q);
     const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as AuditLog);
