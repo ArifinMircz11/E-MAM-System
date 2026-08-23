@@ -1,6 +1,6 @@
 import { BaseRepository } from './base/BaseRepository';
 import type { ProfileUpdateRequest } from '@/domain/entities/profileRequest';
-import { localDb } from '@/database/dexie';
+import { syncRepository } from '@/repositories/SyncRepository';
 
 export class ProfileRequestRepository extends BaseRepository<ProfileUpdateRequest> {
 
@@ -14,54 +14,36 @@ export class ProfileRequestRepository extends BaseRepository<ProfileUpdateReques
 
   async create(entity: ProfileUpdateRequest): Promise<void> {
     await this.table.add(entity);
-    await localDb.sync_queue.add({
-      id: `sq_${Date.now()}_${entity.id}`,
+    await syncRepository.enqueue({
       tenantId: entity.tenantId,
       collection: 'profile_update_requests',
-      documentId: entity.id,
-      operation: 'create',
+      action: 'CREATE',
       payload: entity,
-      createdAt: Date.now(),
-      status: 'pending',
-      retryCount: 0,
-      priority: 1
     });
   }
 
   async update(entity: ProfileUpdateRequest): Promise<void> {
     await this.table.put(entity);
-    await localDb.sync_queue.add({
-      id: `sq_${Date.now()}_${entity.id}`,
+    await syncRepository.enqueue({
       tenantId: entity.tenantId,
       collection: 'profile_update_requests',
-      documentId: entity.id,
-      operation: 'update',
+      action: 'UPDATE',
       payload: entity,
-      createdAt: Date.now(),
-      status: 'pending',
-      retryCount: 0,
-      priority: 1
     });
   }
 
   async delete(id: string, tenantId: string): Promise<void> {
     await this.table.where('id').equals(id).filter(r => r.tenantId === tenantId).delete();
-    await localDb.sync_queue.add({
-      id: `sq_${Date.now()}_${id}`,
-      tenantId: tenantId,
+    await syncRepository.enqueue({
+      tenantId,
       collection: 'profile_update_requests',
-      documentId: id,
-      operation: 'delete',
+      action: 'DELETE',
       payload: { id, deleted: true },
-      createdAt: Date.now(),
-      status: 'pending',
-      retryCount: 0,
-      priority: 1
     });
   }
 
-  async refresh(tenantId: string): Promise<void> {
-    // Sync logic will be handled by SyncService in Phase 3
+  async refresh(_tenantId: string): Promise<void> {
+    // Sync logic is handled by SyncEngine.
   }
 
   async getPendingByTenant(tenantId: string): Promise<ProfileUpdateRequest[]> {
