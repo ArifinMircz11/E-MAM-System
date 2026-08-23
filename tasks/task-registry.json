@@ -13,6 +13,12 @@
       "module": "dev-governance"
     },
     {
+      "taskId": "WO-DEPLOY-001",
+      "title": "Production Deployment Boundary Audit (Vercel & Express)",
+      "priority": "P0",
+      "module": "deployment"
+    },
+    {
       "taskId": "WO-QR-001",
       "title": "QR Scanner Offline-First",
       "priority": "P1",
