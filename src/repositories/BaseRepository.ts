@@ -283,7 +283,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
     };
 
     await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => {
-      await table.put(tombstone as T);
+      await table.delete(id);
       if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any);
     });
   }
