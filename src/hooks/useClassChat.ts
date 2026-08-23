@@ -1,46 +1,47 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, limit, firestoreGateway } from '@/services/gateways/FirestoreGateway';
-import { type ClassMessage } from '../services/classChatService';
-import { realtimeHub } from '../services/realtime/realtimeHub';
+import { useUserStore } from '@/stores/userStore';
+import { observeClassMessages, type ClassMessage } from '../services/classChatService';
 
 export const useClassChat = (classId: string | undefined, activeTab: string) => {
   const [messages, setMessages] = useState<ClassMessage[]>([]);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const uid = useUserStore((state) => state.uid);
+  const tenantId = useUserStore((state) => state.tenantId);
+  const roles = useUserStore((state) => state.roles);
+  const role = useUserStore((state) => state.role);
+  const scope = useUserStore((state) => state.scope);
 
   useEffect(() => {
-    if (!classId || activeTab !== 'obrolan') {
+    if (!classId || activeTab !== 'obrolan' || !uid || !tenantId) {
       setMessages([]);
       return;
     }
 
-    const todayDateStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
-    const path = `class_chats/${classId}/messages_${todayDateStr}`;
-    const q = query(collection(firestoreGateway.db, path), orderBy('timestamp', 'asc'), limit(100));
+    const context = {
+      uid,
+      tenantId,
+      permissions: new Set<string>(),
+      scope: scope || {},
+      roles,
+      role: role || undefined,
+      isDeveloper: roles.includes('developer') || role === 'developer',
+    };
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const msgs = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            }) as ClassMessage,
-        );
-        setMessages(msgs);
+    const unsubscribe = observeClassMessages(
+      context,
+      classId,
+      (nextMessages) => {
+        setMessages(nextMessages);
         setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       },
-      (err) => {
-        console.warn('Realtime listener error class chat:', err.message);
+      (error) => {
+        console.warn('Local class chat observation error:', error);
+        setMessages([]);
       },
     );
 
-    realtimeHub.subscribe(`class-chat-${classId}`, unsubscribe);
-
-    return () => {
-      realtimeHub.unsubscribe(`class-chat-${classId}`);
-    };
-  }, [classId, activeTab]);
+    return unsubscribe;
+  }, [classId, activeTab, uid, tenantId, roles, role, scope]);
 
   return { messages, chatBottomRef };
 };
