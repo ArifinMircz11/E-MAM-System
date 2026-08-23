@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { UserAssignment, UserStatus, ApprovalStatus, CanonicalUser } from '@/types';
-import { UserRole, AccountType } from '@/types';
+import { AccountType } from '@/types';
 import { normalizeUserDataRoles } from '@/utils/roleNormalizer';
 
 interface UserState {
@@ -58,35 +58,16 @@ export const useUserStore = create<UserState>((set) => ({
       const mergedInput = { ...state, ...data };
       const normalized = normalizeUserDataRoles(mergedInput, mergedInput.uid || undefined);
 
-      const updated = {
+      return {
         ...state,
         ...data,
         roles: normalized.roles,
         role: normalized.primaryRole,
-        accountType: normalized.accountType as any,
+        accountType: normalized.accountType as AccountType,
         isLoaded: true,
       };
-
-      // Developer access override
-      const developerEmails = ['developer@example.com', 'admin@example.com'];
-      // Note: We'd typically check email here if we had it in state, 
-      // but the canonical user might not have it. Assuming email comes in data if available.
-      const email = (data as any).email;
-      const isDev =
-        updated.roles.includes(UserRole.DEVELOPER) ||
-        (email && developerEmails.includes(email));
-
-      if (isDev) {
-        if (!updated.roles.includes(UserRole.DEVELOPER)) {
-          updated.roles.push(UserRole.DEVELOPER);
-        }
-        updated.accountType = AccountType.DEVELOPER;
-        if (!updated.tenantId || updated.tenantId === 'default') {
-          updated.tenantId = 'global';
-        }
-      }
-      return updated;
     }),
+
   clearUserData: () =>
     set({
       uid: null,
