@@ -107,11 +107,12 @@ export class SyncEngine {
           throw Object.assign(new Error(`SYNC_CONFLICT_CHECK_FAILED: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`), { code: 'SYNC_CONFLICT_CHECK_FAILED' });
         }
         if (overwriteRemote) {
-          const nextVersion = Math.max(Number(payload?.version ?? item.metadata?.version ?? 0), 0) + 1;
-          const firestoreData = { ...payload, tenantId, version: nextVersion, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
+          const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
+          if (localVersion < 1) throw Object.assign(new Error('SYNC_INVALID_VERSION: mutation version must be >= 1'), { code: 'SYNC_INVALID_VERSION' });
+          const firestoreData = { ...payload, tenantId, version: localVersion, updatedAt: dbGateway.serverTimestamp(), syncStatus: SyncStatus.SYNCED };
           delete firestoreData.isOffline;
           await dbGateway.writeBatch(dbGateway.db).set(docRef, firestoreData, { merge: true }).commit();
-          auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId, version: nextVersion }));
+          auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: `SYNC_${operation.toUpperCase()}`, actorId: activeSecCtx.uid || 'system', collection: colName, docId, version: localVersion }));
         }
       } else if (operation === 'delete') {
         await dbGateway.writeBatch(dbGateway.db).delete(docRef).commit();
