@@ -36,7 +36,10 @@ export class OnboardingRepository {
 
   async getLatestByUserId(userId: string, tenantId: string): Promise<OnboardingRequest | null> {
     assertTenant(tenantId);
-    const rows = await this.db.approval_requests.where('tenantId').equals(tenantId).filter(r => r.userId === userId).toArray();
+    const rows = [
+      ...(await this.db.approval_requests.where('tenantId').equals(tenantId).filter(r => r.userId === userId).toArray()),
+      ...(await this.db.profile_update_requests.where('tenantId').equals(tenantId).filter(r => r.userId === userId).toArray()),
+    ];
     if (!rows.length) return null;
     return rows.sort((a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0))[0] as OnboardingRequest;
   }
@@ -50,7 +53,10 @@ export class OnboardingRepository {
 
   async listHistory(tenantId: string): Promise<OnboardingRequest[]> {
     assertTenant(tenantId);
-    const rows = await this.db.approval_requests.where('tenantId').equals(tenantId).toArray();
+    const rows = [
+      ...(await this.db.approval_requests.where('tenantId').equals(tenantId).toArray()),
+      ...(await this.db.profile_update_requests.where('tenantId').equals(tenantId).toArray()),
+    ];
     return rows.sort((a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0)) as OnboardingRequest[];
   }
 
@@ -59,13 +65,15 @@ export class OnboardingRepository {
     const timestamp = now();
     const id = `${request.userId}_${timestamp}`;
     const payload: OnboardingRequest = { ...request, id, tenantId, status: 'pending', gateType: 'gate1', createdAt: timestamp, updatedAt: timestamp };
+    const duplicates = await this.db.profile_update_requests.where('tenantId').equals(tenantId).filter(r => r.userId === request.userId && r.status === 'pending').toArray();
+
     await this.db.transaction('rw', [this.db.profile_update_requests, this.db.users, this.db.sync_queue], async () => {
-      const duplicates = await this.db.profile_update_requests.where('tenantId').equals(tenantId).filter(r => r.userId === request.userId && r.status === 'pending').toArray();
       for (const duplicate of duplicates) await this.db.profile_update_requests.delete(duplicate.id);
       await this.db.profile_update_requests.put(payload);
       await this.db.users.update(request.userId, { status: 'pending_profile_approval', accountStatus: 'pending_profile_approval', updatedAt: timestamp });
     });
-    for (const duplicate of await this.db.profile_update_requests.where('tenantId').equals(tenantId).filter(r => r.userId === request.userId && r.status === 'pending' && r.id !== id).toArray()) {
+
+    for (const duplicate of duplicates) {
       await syncRepository.enqueue({ tenantId, collection: 'profile_update_requests', recordId: duplicate.id, operation: 'delete', payload: { id: duplicate.id, tenantId, deleted: true, deletedAt: timestamp } }, context, { triggerSync: false });
     }
     await syncRepository.enqueue({ tenantId, collection: 'profile_update_requests', recordId: id, operation: 'create', payload }, context, { triggerSync: false });
@@ -102,26 +110,26 @@ export class OnboardingRepository {
       if (request.role === 'guru' || request.role === 'wali_kelas') { userPatch.teachersId = targetId; userPatch.teacherId = targetId; }
     }
     const requestPatch = { ...request, status, adminNote: adminNote || '', updatedAt: timestamp };
+    const masterPayload = status === 'approved'
+      ? request.gateType === 'gate2'
+        ? { id: targetId, tenantId, sistemJangkar: { userId: request.userId }, updatedAt: timestamp }
+        : { id: targetId, ...request.formData, idUnik: targetId, tenantId, statusAktif: true, sistemJangkar: { userId: request.userId }, createdAt: timestamp, updatedAt: timestamp, ...(request.role === 'siswa' ? { status: 'Aktif' } : {}) }
+      : null;
+
     await this.db.transaction('rw', [requestTable, this.db.users, this.db.table(collectionName)], async () => {
       await requestTable.put(requestPatch);
       await this.db.users.update(request.userId, userPatch);
-      if (status === 'approved') {
-        const masterPayload = request.gateType === 'gate2' ? { sistemJangkar: { userId: request.userId }, updatedAt: timestamp } : { ...request.formData, idUnik: targetId, tenantId, statusAktif: true, sistemJangkar: { userId: request.userId }, createdAt: timestamp, updatedAt: timestamp, ...(request.role === 'siswa' ? { status: 'Aktif' } : {}) };
-        await this.db.table(collectionName).put({ id: targetId, ...masterPayload });
-      }
+      if (masterPayload) await this.db.table(collectionName).put(masterPayload);
     });
+
     await syncRepository.enqueue({ tenantId, collection: gate2 ? 'approval_requests' : 'profile_update_requests', recordId: requestId, operation: 'update', payload: requestPatch }, context, { triggerSync: false });
     await syncRepository.enqueue({ tenantId, collection: 'users', recordId: request.userId, operation: 'update', payload: userPatch }, context, { triggerSync: false });
-    if (status === 'approved') {
-      const masterPayload = request.gateType === 'gate2' ? { id: targetId, tenantId, sistemJangkar: { userId: request.userId }, updatedAt: timestamp } : { id: targetId, ...request.formData, idUnik: targetId, tenantId, statusAktif: true, sistemJangkar: { userId: request.userId }, createdAt: timestamp, updatedAt: timestamp, ...(request.role === 'siswa' ? { status: 'Aktif' } : {}) };
-      await syncRepository.enqueue({ tenantId, collection: collectionName, recordId: targetId, operation: 'update', payload: masterPayload }, context, { triggerSync: false });
-    }
+    if (masterPayload) await syncRepository.enqueue({ tenantId, collection: collectionName, recordId: targetId, operation: 'update', payload: masterPayload }, context, { triggerSync: false });
   }
 
   subscribePending(tenantId: string, onUpdate: (requests: OnboardingRequest[]) => void, onError?: (error: unknown) => void): () => void {
-    const context = assertTenant(tenantId);
+    assertTenant(tenantId);
     const subscription = liveQuery(() => this.listPending(tenantId)).subscribe({ next: onUpdate, error: onError });
-    void context;
     return () => subscription.unsubscribe();
   }
 }
