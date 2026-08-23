@@ -13,7 +13,14 @@ export interface AuthBootstrapResult {
 }
 
 const normalizeStatus = (value: unknown): string => String(value || 'active').trim().toLowerCase();
+const isStudentRole = (role: string): boolean => role === UserRole.SISWA;
 const isStudentType = (value: unknown): boolean => ['student', 'siswa'].includes(String(value || '').trim().toLowerCase());
+const isTeacherRole = (role: string): boolean => [
+  UserRole.GURU,
+  UserRole.GURU_BK,
+  UserRole.GTK,
+  UserRole.KEPALA_MADRASAH,
+].includes(role as UserRole);
 const isTeacherType = (value: unknown): boolean => ['teacher', 'guru', 'pendidik'].includes(String(value || '').trim().toLowerCase());
 
 export class AuthBootstrapService {
@@ -54,11 +61,12 @@ export class AuthBootstrapService {
     if (!roles.includes(role)) throw new Error(`Canonical role '${role}' is not present in roles[]`);
 
     const isDev = DEVELOPER_EMAILS.includes(firebaseUser.email || '') || roles.includes(UserRole.DEVELOPER);
-    const studentType = isStudentType(accountType) || role === UserRole.SISWA;
-    const teacherType = isTeacherType(accountType) || [UserRole.GURU, UserRole.GURU_BK, UserRole.GTK].includes(role as UserRole);
+    const studentType = isStudentType(accountType) || isStudentRole(role);
+    const teacherType = isTeacherType(accountType) || isTeacherRole(role);
+    const requiresReference = studentType || teacherType;
 
     let linkedStudent = false;
-    if (role === UserRole.SISWA && !authoritativeUser.studentsId && firebaseUser.email) {
+    if (isStudentRole(role) && !authoritativeUser.studentsId && firebaseUser.email) {
       try {
         const tenantForLink = typeof authoritativeUser.tenantId === 'string' ? authoritativeUser.tenantId : '';
         linkedStudent = Boolean(await attemptAutoLinkStudent(firebaseUser.uid, firebaseUser.email, tenantForLink));
@@ -83,7 +91,9 @@ export class AuthBootstrapService {
     const referenceId = explicitReferenceId
       || (studentType && typeof authoritativeUser.studentsId === 'string' && authoritativeUser.studentsId.trim() ? authoritativeUser.studentsId.trim() : null)
       || (teacherType && typeof authoritativeUser.teachersId === 'string' && authoritativeUser.teachersId.trim() ? authoritativeUser.teachersId.trim() : null);
-    if (!referenceId) throw new Error(`Canonical user '${firebaseUser.uid}' has no valid referenceId for role '${role}'`);
+    if (requiresReference && !referenceId) {
+      throw new Error(`Canonical user '${firebaseUser.uid}' has no valid referenceId for role '${role}'`);
+    }
 
     const status = normalizeStatus(authoritativeUser.status);
     if (['suspended', 'inactive', 'disabled', 'blocked'].includes(status)) {
@@ -109,7 +119,7 @@ export class AuthBootstrapService {
     };
 
     let profile = profilePayload;
-    if (studentType || teacherType) profile = (await getMasterProfile(firebaseUser.uid, accountType, referenceId)) || profilePayload;
+    if (requiresReference) profile = (await getMasterProfile(firebaseUser.uid, accountType, referenceId!)) || profilePayload;
 
     return {
       user: profilePayload, userData, profile,
