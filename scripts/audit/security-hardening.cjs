@@ -7,7 +7,8 @@
  *        tenant data, deny-by-default catch-all.
  *   P0-C Tenant authority: no production tenant fallbacks in runtime code.
  *   P0-D SecurityContext: client stores/helpers may not invent developer authority.
- *   P0-E Persistence boundary: Firebase SDK/Dexie access stays in the approved corridor.
+ *   P0-E Persistence boundary: Firebase SDK/facade/Dexie access stays in the
+ *        approved infrastructure corridor.
  */
 
 const fs = require('node:fs');
@@ -42,7 +43,10 @@ function source(file) {
   return fs.readFileSync(file, 'utf8');
 }
 
-const runtimeFiles = walk(SRC).filter(file => !rel(file).startsWith('src/__tests__/') && !rel(file).startsWith('src/test/'));
+const runtimeFiles = walk(SRC).filter(file => {
+  const r = rel(file);
+  return !r.startsWith('src/__tests__/') && !r.startsWith('src/test/');
+});
 
 // P0-C / P0-D: production code must never synthesize tenant authority or privilege.
 for (const file of runtimeFiles) {
@@ -104,12 +108,20 @@ function allowed(file, prefixes) {
 
 for (const file of runtimeFiles) {
   const text = source(file);
+  const r = rel(file);
+
   if (/from\s+['"](?:firebase|@firebase)\//.test(text) && !allowed(file, approvedFirebase)) {
     add(file, 'P0-E', 'Firebase SDK import is outside the approved infrastructure corridor.');
   }
+
+  if (/from\s+['"](?:\.\.?\/)+firebase(?:\.ts)?['"]|from\s+['"]@\/services\/firebase['"]/.test(text) && r !== 'src/services/firebase.ts' && !r.startsWith('src/services/gateways/') && !r.startsWith('src/services/sync/')) {
+    add(file, 'P0-E', 'Direct firebase facade import is outside the approved infrastructure corridor; use the repository/gateway boundary.');
+  }
+
   if (/from\s+['"]dexie['"]/.test(text) && !allowed(file, approvedDexie)) {
     add(file, 'P0-E', 'Dexie access is outside the approved persistence corridor.');
   }
+
   if (/services\/dbGateway|@\/services\/dbGateway/.test(text)) {
     add(file, 'P0-E', 'Deprecated dbGateway is forbidden.');
   }
