@@ -1,13 +1,8 @@
-/**
- * @license
- * e-Mam System - Sync Engine Core
- * LAYER: SERVICE (transport/orchestration; operational writes stay in repositories)
- */
 import { firestoreGateway as dbGateway } from './gateways/FirestoreGateway';
 import { SyncStatus } from '@/domain/entities/base';
 import { syncRepository } from '@/repositories/SyncRepository';
 import { localSyncRepository } from '@/repositories/LocalSyncRepository';
-import { FirestoreSyncDataSource } from '@/infrastructure/datasource/SyncDataSource';
+import { FirestoreSyncDataSource, encodeDeltaCursor } from '@/infrastructure/datasource/SyncDataSource';
 import type { SyncQueueItem } from '@/types';
 import type { SecurityContext } from '@/core/security/types';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
@@ -19,13 +14,14 @@ const BASE_RETRY_DELAY_MS = 1_000;
 
 export const shouldApplyMutationVersion = (remoteVersion: number, mutationVersion: number): boolean => Number(mutationVersion) > Number(remoteVersion);
 
-const getRecordCursor = (record: Record<string, unknown>): string | undefined => {
+const getRecordCursor = (record: Record<string, unknown>): { updatedAt: string; id: string } | undefined => {
   const raw = record.updatedAt;
-  if (!raw) return undefined;
-  if (raw instanceof Date) return raw.toISOString();
-  if (typeof raw === 'string') { const parsed = new Date(raw); return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString(); }
-  if (typeof raw === 'number') { const parsed = new Date(raw); return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString(); }
-  return undefined;
+  let updatedAt: string | undefined;
+  if (raw instanceof Date) updatedAt = raw.toISOString();
+  else if (typeof raw === 'string') { const parsed = new Date(raw); if (!Number.isNaN(parsed.getTime())) updatedAt = parsed.toISOString(); }
+  else if (typeof raw === 'number') { const parsed = new Date(raw); if (!Number.isNaN(parsed.getTime())) updatedAt = parsed.toISOString(); }
+  const id = typeof record.id === 'string' ? record.id : undefined;
+  return updatedAt && id ? { updatedAt, id } : undefined;
 };
 
 export class SyncEngine {
@@ -63,7 +59,6 @@ export class SyncEngine {
     } finally { this.isProcessing = false; }
   }
 
-  /** Pull remote changes and persist a checkpoint only after local materialization succeeds. */
   static async pullCollection(collectionName: string, tenantId: string, idField = 'id'): Promise<number> {
     if (!collectionName || !tenantId || !SecurityContextService.isReady()) return 0;
     const context = SecurityContextService.getNullableContext();
@@ -76,10 +71,11 @@ export class SyncEngine {
       const records = await source.pullDelta(collectionName, tenantId, cursor);
       if (!records.length) break;
       for (const record of records) if (await localSyncRepository.upsertSyncedRecord(collectionName, record as Record<string, unknown>, idField, tenantId)) synced++;
-      const cursors = records.map((record) => getRecordCursor(record as Record<string, unknown>)).filter((value): value is string => Boolean(value));
-      if (!cursors.length) break;
-      const nextCursor = cursors.reduce((max, value) => value > max ? value : max, cursors[0]);
-      if (cursor && nextCursor <= cursor) break;
+      const recordCursors = records.map((record) => getRecordCursor(record as Record<string, unknown>)).filter((value): value is { updatedAt: string; id: string } => Boolean(value));
+      if (!recordCursors.length) break;
+      const next = recordCursors.reduce((max, value) => value.updatedAt > max.updatedAt || (value.updatedAt === max.updatedAt && value.id > max.id) ? value : max, recordCursors[0]);
+      const nextCursor = encodeDeltaCursor(next);
+      if (cursor && nextCursor === cursor) break;
       await syncRepository.saveDeltaCheckpoint(tenantId, collectionName, nextCursor);
       cursor = nextCursor;
       if (records.length < 100) break;
@@ -100,25 +96,22 @@ export class SyncEngine {
       const docRef = dbGateway.doc(dbGateway.db, colName, String(docId));
       const customActions = ['SCAN_PRESENSI', 'ADD_POINT', 'ATTENDANCE_PROCESS', 'BATCH_SYNC'];
       if (customAction && customActions.includes(customAction)) {
-        const { SyncDispatcher } = await import('@/sync/SyncDispatcher');
-        await SyncDispatcher.dispatch(item as any, activeSecCtx);
+        const { SyncDispatcher } = await import('@/sync/SyncDispatcher'); await SyncDispatcher.dispatch(item as any, activeSecCtx);
       } else if (['create', 'update', 'patch', 'bulk_create', 'bulk_update'].includes(operation)) {
         let overwriteRemote = true;
-        try {
-          const docSnap = await dbGateway.getDoc(docRef);
-          if (docSnap.exists()) {
-            const remoteData = docSnap.data();
-            const remoteVersion = Number(remoteData.version || 0);
-            const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
-            const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
-            const localUpdatedAt = Number(payload?.updatedAt || 0);
-            if (!shouldApplyMutationVersion(remoteVersion, localVersion) || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
-              overwriteRemote = false;
-              await localSyncRepository.upsertSyncedRecord(colName, remoteData as Record<string, unknown>, 'id', tenantId);
-              auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
-            }
+        const docSnap = await dbGateway.getDoc(docRef);
+        if (docSnap.exists()) {
+          const remoteData = docSnap.data();
+          const remoteVersion = Number(remoteData.version || 0);
+          const remoteUpdatedAt = remoteData.updatedAt instanceof dbGateway.Timestamp ? remoteData.updatedAt.toMillis() : Number(remoteData.updatedAt || 0);
+          const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
+          const localUpdatedAt = Number(payload?.updatedAt || 0);
+          if (!shouldApplyMutationVersion(remoteVersion, localVersion) || (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt)) {
+            overwriteRemote = false;
+            await localSyncRepository.upsertSyncedRecord(colName, remoteData as Record<string, unknown>, 'id', tenantId);
+            auditLogger.log('SyncEnabled', tenantId, undefined, JSON.stringify({ event: 'SYNC_PUSH_CONFLICT_RESOLVED', actorId: activeSecCtx.uid || 'system', collection: colName, docId, resolution: 'KEEP_REMOTE', localVersion, remoteVersion, localUpdatedAt, remoteUpdatedAt }));
           }
-        } catch (fetchErr) { throw Object.assign(new Error(`SYNC_CONFLICT_CHECK_FAILED: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`), { code: 'SYNC_CONFLICT_CHECK_FAILED' }); }
+        }
         if (overwriteRemote) {
           const localVersion = Number(payload?.version ?? item.metadata?.version ?? 0);
           if (localVersion < 1) throw Object.assign(new Error('SYNC_INVALID_VERSION: mutation version must be >= 1'), { code: 'SYNC_INVALID_VERSION' });
