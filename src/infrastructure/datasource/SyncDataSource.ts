@@ -13,7 +13,7 @@ export interface SyncDataSource {
   delete(collection: string, id: string): Promise<void>;
 }
 
-const parseCursor = (cursor?: string): DeltaCursor | undefined => {
+export const parseCursor = (cursor?: string): DeltaCursor | undefined => {
   if (!cursor) return undefined;
   try {
     const parsed = JSON.parse(cursor) as Partial<DeltaCursor>;
@@ -32,6 +32,29 @@ export const encodeDeltaCursor = (cursor: DeltaCursor): string => JSON.stringify
   updatedAt: new Date(cursor.updatedAt).toISOString(),
   id: cursor.id,
 });
+
+export const getNextDeltaCursor = (records: Array<Record<string, unknown>>, previousCursor?: string): string | undefined => {
+  const previous = parseCursor(previousCursor);
+  const candidates = records
+    .map((record) => {
+      const raw = record.updatedAt;
+      const id = typeof record.id === 'string' ? record.id : undefined;
+      if (!raw || !id) return undefined;
+      const date = raw instanceof Date ? raw : new Date(raw as string | number);
+      if (Number.isNaN(date.getTime())) return undefined;
+      return { updatedAt: date.toISOString(), id } satisfies DeltaCursor;
+    })
+    .filter((value): value is DeltaCursor => Boolean(value));
+
+  if (!candidates.length) return undefined;
+  const next = candidates.reduce((max, value) =>
+    value.updatedAt > max.updatedAt || (value.updatedAt === max.updatedAt && value.id > max.id) ? value : max,
+    candidates[0],
+  );
+
+  if (previous && (next.updatedAt < previous.updatedAt || (next.updatedAt === previous.updatedAt && next.id <= previous.id))) return undefined;
+  return encodeDeltaCursor(next);
+};
 
 export class FirestoreSyncDataSource implements SyncDataSource {
   async pullDelta(collectionName: string, tenantId: string, cursor?: string): Promise<any[]> {
