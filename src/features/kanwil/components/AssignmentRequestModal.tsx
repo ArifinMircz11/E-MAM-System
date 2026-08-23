@@ -4,7 +4,7 @@ import { BuildingLibraryIcon, XMarkIcon } from '@/shared/Icons';
 import { KanwilDashboardService } from '../services/kanwilDashboardService';
 import { toast } from 'sonner';
 import { SyncStatus } from '@/domain/entities/base';
-import type { AssignmentStatus } from '@/types';
+import type { AssignmentStatus } from '../types';
 
 interface Props { isOpen: boolean; onClose: () => void; user: any; }
 
