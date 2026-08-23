@@ -20,7 +20,7 @@ export const useClassChat = (classId: string | undefined, activeTab: string) => 
     const context = {
       uid,
       tenantId,
-      permissions: new Set<string>(),
+      permissions: [],
       scope: scope || {},
       roles,
       role: role || undefined,
