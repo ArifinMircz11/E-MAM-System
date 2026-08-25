@@ -55,7 +55,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   async findById(id: string, tenantId?: string): Promise<T | null> {
-    const context = getSecurityContext(true); this.validateContext(context, 'findById'); const entity = await this.getTable().get(id); if (!entity) return null;
+    const context = getSecurityContext(true); this.validateContext(context, 'findById'); const entity = await this.getTable().get(id); if (!entity || (entity as any).deleted === true) return null;
     if (!context.isDeveloper && (entity as any).tenantId !== context.tenantId) return null;
     if (tenantId && tenantId !== context.tenantId && !context.isDeveloper) throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', 'Tenant filter berbeda dari SecurityContext.');
     return entity;
@@ -64,18 +64,18 @@ export abstract class BaseRepository<T extends BaseEntity> {
   async findAll(tenantId: string): Promise<T[]> {
     const context = getSecurityContext(true); this.validateContext(context, 'findAll');
     if (!context.isDeveloper && tenantId !== context.tenantId) throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', 'Tenant query berbeda dari SecurityContext.');
-    if (context.isDeveloper && tenantId === 'global' && context.scope?.level === 'global') return await this.getTable().toArray();
-    return await this.getTable().where('tenantId').equals(context.tenantId).toArray();
+    const rows = context.isDeveloper && tenantId === 'global' && context.scope?.level === 'global' ? await this.getTable().toArray() : await this.getTable().where('tenantId').equals(context.tenantId).toArray();
+    return rows.filter((row: any) => row.deleted !== true);
   }
 
-  async getById(context: SecurityContext, id: string): Promise<T | null> { this.validateContext(context, 'getById'); const entity = await this.getTable().get(id); if (entity && !context.isDeveloper && (entity as any).tenantId !== context.tenantId) return null; return entity || null; }
-  async getAll(context: SecurityContext): Promise<T[]> { this.validateContext(context, 'getAll'); if (context.isDeveloper && context.tenantId === 'global' && context.scope?.level === 'global') return await this.getTable().toArray(); return await this.getTable().where('tenantId').equals(context.tenantId).toArray(); }
+  async getById(context: SecurityContext, id: string): Promise<T | null> { this.validateContext(context, 'getById'); const entity = await this.getTable().get(id); if (!entity || (entity as any).deleted === true) return null; if (!context.isDeveloper && (entity as any).tenantId !== context.tenantId) return null; return entity; }
+  async getAll(context: SecurityContext): Promise<T[]> { this.validateContext(context, 'getAll'); const rows = context.isDeveloper && context.tenantId === 'global' && context.scope?.level === 'global' ? await this.getTable().toArray() : await this.getTable().where('tenantId').equals(context.tenantId).toArray(); return rows.filter((row: any) => row.deleted !== true); }
 
   async save(context: SecurityContext, entity: Partial<T>): Promise<T> {
     this.assertEntityTenant(context, entity, 'save'); const table = this.getTable(); const dbInstance = this.db; const tName = this.tableName || table.name || 'students'; const input = { ...(entity as Partial<T>) } as T & Record<string, any>; const existing = input.id ? await table.get(input.id) : undefined;
     if (existing && !context.isDeveloper && (existing as any).tenantId !== context.tenantId) throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', `Record '${input.id}' bukan milik tenant aktif.`);
     const isCreate = !existing; const id = input.id || this.generateId(); const currentVersion = Number((existing as any)?.version ?? 0); const requestedVersion = Number(input.version ?? 0); const nextVersion = isCreate ? Math.max(1, requestedVersion) : Math.max(currentVersion + 1, requestedVersion); const now = Date.now();
-    const dataToSave = { ...existing, ...input, id, tenantId: context.tenantId, syncStatus: SyncStatus.PENDING, version: nextVersion, updatedAt: now, ...(isCreate ? { createdAt: Number(input.createdAt ?? now) } : {}) } as T & Record<string, any>;
+    const dataToSave = { ...existing, ...input, id, tenantId: context.tenantId, syncStatus: SyncStatus.PENDING, version: nextVersion, deleted: false, deletedAt: undefined, updatedAt: now, ...(isCreate ? { createdAt: Number(input.createdAt ?? now) } : {}) } as T & Record<string, any>;
     const queueItem = { id: this.generateQueueId(id, nextVersion), tenantId: context.tenantId, collection: tName, operation: isCreate ? 'create' : 'update', recordId: id, payload: dataToSave, status: 'pending', attempts: 0, createdAt: now, updatedAt: now, priority: 'high', metadata: { actorId: context.uid, version: nextVersion, idempotencyKey: `${context.tenantId}:${tName}:${id}:${nextVersion}`, action: isCreate ? 'CREATE' : 'UPDATE' } };
     await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => { await table.put(dataToSave as T); if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any); });
     return dataToSave as T;
@@ -87,7 +87,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
     this.validateContext(context, 'delete'); const table = this.getTable(); const dbInstance = this.db; const tName = this.tableName || table.name || 'students'; const existing = await table.get(id); if (!existing || (!context.isDeveloper && (existing as any).tenantId !== context.tenantId)) return;
     const now = Date.now(); const currentVersion = Number((existing as any).version ?? 0); const nextVersion = currentVersion + 1; const tombstone = { ...(existing as any), id, tenantId: context.tenantId, version: nextVersion, syncStatus: SyncStatus.PENDING, deleted: true, deletedAt: now, updatedAt: now };
     const queueItem = { id: this.generateQueueId(id, nextVersion), tenantId: context.tenantId, collection: tName, operation: 'delete', recordId: id, payload: tombstone, status: 'pending', attempts: 0, createdAt: now, updatedAt: now, priority: 'high', metadata: { actorId: context.uid, version: nextVersion, idempotencyKey: `${context.tenantId}:${tName}:${id}:${nextVersion}`, action: 'DELETE' } };
-    await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => { await table.delete(id); if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any); });
+    await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => { await table.put(tombstone as T); if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any); });
   }
 
   private generateId(): string { return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `ID_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`; }
