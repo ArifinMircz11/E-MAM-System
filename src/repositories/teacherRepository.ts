@@ -1,14 +1,12 @@
 import { BaseRepository } from './base/BaseRepository';
 import type { Teacher } from '@/domain/entities/teacher';
-import { localDb } from '@/database/dexie';
-import { syncRepository } from './SyncRepository';
 import type { SecurityContext } from '@/core/security/types';
+import { getSecurityContext } from '@/core/security/contextHelper';
 
 /**
  * TeacherRepository
- *
- * Implementation using Dexie as the primary operational database.
- * Mandatory tenant isolation enforced.
+ * Primary operational repository: all mutations are persisted to Dexie first
+ * and routed to SyncQueue by BaseRepository.
  */
 export class TeacherRepository extends BaseRepository<Teacher> {
   constructor() {
@@ -20,9 +18,7 @@ export class TeacherRepository extends BaseRepository<Teacher> {
   }
 
   async fetchByIdUnik(tenantId: string, idUnik: string): Promise<Teacher | null> {
-    const teacher = await this.table.get(idUnik);
-    if (!teacher || teacher.tenantId !== tenantId) return null;
-    return teacher;
+    return (await this.table.where('tenantId').equals(tenantId).filter((t: any) => t.idUnik === idUnik).first()) || null;
   }
 
   async findAll(tenantId: string): Promise<Teacher[]> {
@@ -30,59 +26,26 @@ export class TeacherRepository extends BaseRepository<Teacher> {
   }
 
   async create(entity: Teacher): Promise<void> {
-    const dataToSave = {
-      ...entity,
-      syncStatus: 'pending' as any,
-      updatedAt: Date.now(),
-    };
-    const dbInstance = (this.table as any).db || localDb;
-    await dbInstance.transaction('rw', [this.table, dbInstance.sync_queue], async () => {
-      await this.table.add(dataToSave);
-      await syncRepository.enqueue({
-        collection: 'teachers',
-        action: 'CREATE',
-        payload: dataToSave,
-        tenantId: entity.tenantId,
-      }, undefined, { triggerSync: false, db: dbInstance });
-    });
+    await super.create(entity);
     (await import('@/services/SyncEngine')).SyncEngine.processQueue().catch(console.error);
   }
 
   async update(entity: Teacher): Promise<void> {
-    const dataToSave = {
-      ...entity,
-      syncStatus: 'pending' as any,
-      updatedAt: Date.now(),
-    };
-    const dbInstance = (this.table as any).db || localDb;
-    await dbInstance.transaction('rw', [this.table, dbInstance.sync_queue], async () => {
-      await this.table.put(dataToSave);
-      await syncRepository.enqueue({
-        collection: 'teachers',
-        action: 'UPDATE',
-        payload: dataToSave,
-        tenantId: entity.tenantId,
-      }, undefined, { triggerSync: false, db: dbInstance });
-    });
+    await super.save(entity);
     (await import('@/services/SyncEngine')).SyncEngine.processQueue().catch(console.error);
   }
 
   async delete(id: string, tenantId: string): Promise<void> {
-    const dbInstance = (this.table as any).db || localDb;
-    await dbInstance.transaction('rw', [this.table, dbInstance.sync_queue], async () => {
-      await this.table.where('id').equals(id).filter(t => t.tenantId === tenantId).delete();
-      await syncRepository.enqueue({
-        collection: 'teachers',
-        action: 'DELETE',
-        payload: { id },
-        tenantId: tenantId,
-      }, undefined, { triggerSync: false, db: dbInstance });
-    });
+    const context = getSecurityContext(true);
+    if (context.tenantId !== tenantId && !context.isDeveloper) {
+      throw new Error('TeacherRepository.delete: tenantId tidak sesuai SecurityContext.');
+    }
+    await super.delete(context, id);
     (await import('@/services/SyncEngine')).SyncEngine.processQueue().catch(console.error);
   }
 
-  async refresh(tenantId: string): Promise<void> {
-    // Sync logic will be handled by SyncService in Phase 3
+  async refresh(_tenantId: string): Promise<void> {
+    // Pull/sync is owned by SyncEngine; repository remains local-only.
   }
 
   // --- BUSINESS-SPECIFIC METHODS ---
@@ -92,7 +55,7 @@ export class TeacherRepository extends BaseRepository<Teacher> {
   }
 
   async findByIdUnik(tenantId: string, idUnik: string): Promise<Teacher | null> {
-    return await this.findById(idUnik, tenantId);
+    return await this.fetchByIdUnik(tenantId, idUnik);
   }
 
   async findByNik(tenantId: string, nik: string): Promise<Teacher | null> {
@@ -100,21 +63,16 @@ export class TeacherRepository extends BaseRepository<Teacher> {
   }
 
   async fetchByTenant(arg1: SecurityContext | string, arg2?: string): Promise<Teacher[]> {
-    const tenantId = typeof arg1 === 'string' ? arg1 : arg2 || (arg1 as any)?.tenantId;
+    const tenantId = typeof arg1 === 'string' ? arg1 : arg2 || arg1.tenantId;
     return await this.findAll(tenantId);
   }
 
   async getByTenant(arg1: SecurityContext | string, arg2?: string): Promise<Teacher[]> {
     return await this.fetchByTenant(arg1, arg2);
   }
+
   async findByUserId(tenantId: string, userId: string): Promise<Teacher | null> {
-    return (
-      (await this.table
-        .where('tenantId')
-        .equals(tenantId)
-        .filter((t: any) => t.userId === userId || t.linkedUserId === userId || t.authUid === userId || t.userUid === userId)
-        .first()) || null
-    );
+    return (await this.table.where('tenantId').equals(tenantId).filter((t: any) => t.userId === userId || t.linkedUserId === userId || t.authUid === userId || t.userUid === userId).first()) || null;
   }
 }
 
