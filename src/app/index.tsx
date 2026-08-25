@@ -11,21 +11,20 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
-import { registerSW } from 'virtual:pwa-register';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 
 // Register Service Worker in production
-if (typeof window !== 'undefined' && !env.IS_DEV && 'serviceWorker' in navigator) {
-  registerSW({
-    immediate: true,
-    onNeedRefresh() {
-      console.log('[PWA] New content available, please refresh.');
-    },
-    onOfflineReady() {
-      console.log('[PWA] Application is ready to work offline.');
-    },
-  });
-}
+// if (typeof window !== 'undefined' && !env.IS_DEV && 'serviceWorker' in navigator) {
+//   registerSW({
+//     immediate: true,
+//     onNeedRefresh() {
+//       console.log('[PWA] New content available, please refresh.');
+//     },
+//     onOfflineReady() {
+//       console.log('[PWA] Application is ready to work offline.');
+//     },
+//   });
+// }
 
 // Global Guard for Dev Environment Noise (Vite HMR & WebSocket rejections)
 const isChunkLoadError = (err: any) => {

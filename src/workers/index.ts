@@ -1,4 +1,0 @@
-/**
- * Workers Layer Placeholder
- */
-export {};
