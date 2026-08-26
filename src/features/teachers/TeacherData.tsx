@@ -9,7 +9,7 @@ import { TeacherBulkUploadModal } from '@/features/teachers/components/TeacherBu
 import { activateTeacherAccount } from '@/services/teacherService';
 import type { Teacher } from '@/types';
 import { UserRole, COMMON_SUBJECTS } from '@/types';
-import { EmploymentStatus, AsnStatus } from '@/types/roles';
+import { EmploymentStatus, AsnStatus } from '@/types';
 import { getFriendlyErrorMessage } from '@/services/authService';
 import { toast } from 'sonner';
 import { writeJSONToExcel } from '@/utils/excelHelper';

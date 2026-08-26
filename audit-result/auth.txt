@@ -1,0 +1,2 @@
+src/core/session/sessionManager.ts:8:class SessionManager {
+src/core/session/sessionManager.ts:40:export const sessionManager = new SessionManager();

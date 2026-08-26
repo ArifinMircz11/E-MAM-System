@@ -13,7 +13,8 @@ import {
 } from '@/shared/Icons';
 import { TenantDropdown } from './TenantDropdown';
 import { AccountTypeDropdown } from './AccountTypeDropdown';
-import { AccountType, UserRole } from '@/types/roles';
+import type { AccountType } from '@/types';
+import { UserRole } from '@/types/roles';
 import { RoleDropdown } from './RoleDropdown';
 import { AssignmentForm } from './AssignmentForm';
 import { IdentityCompletionService } from '@/services/IdentityCompletionService';

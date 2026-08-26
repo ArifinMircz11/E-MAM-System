@@ -1,0 +1,50 @@
+src/esaf/registry/RuleRegistry.ts:  description: 'Queries in repositories must filter or scope by tenantId to prevent cross-tenant data leaks.',
+src/esaf/registry/RuleRegistry.ts:      // If repository queries collection without tenantId index or filter
+src/esaf/registry/RuleRegistry.ts:      if (text.includes('.where(') && !text.includes('tenantId') && !filePath.includes('tenant')) {
+src/esaf/registry/RuleRegistry.ts:          evidence: 'Dexie query in repository missing tenantId scoping.',
+src/esaf/registry/RuleRegistry.ts:          recommendation: 'Ensure all operational queries start with tenantId composite index or filter (e.g. db.collection.where("[tenantId+... ]").equals([tenantId, ...])).',
+src/lib/teacherMapping.ts:      tenantId: '',
+src/lib/studentMapping.ts:      tenantId: '', // akan diisi oleh service
+src/lib/auth-middleware.ts:          tenantId: decodedToken.tenantId || '',
+src/lib/auth-middleware.ts:    let resolvedTenantId = userData.tenantId;
+src/lib/auth-middleware.ts:        res.status(403).json({ success: false, error: 'Forbidden: Missing authoritative tenantId for user.' });
+src/lib/auth-middleware.ts:      tenantId: resolvedTenantId,
+src/features/profile/components/Profile.tsx:        const tenantId = TenantContext.getTenantId();
+src/features/profile/components/Profile.tsx:        const snapReq = await profileRequestRepository.fetchPending(tenantId);
+src/features/profile/components/Profile.tsx:        const tenantId = TenantContext.getTenantId();
+src/features/profile/components/Profile.tsx:                profile.tenantId,
+src/features/profile/components/Profile.tsx:                profile.tenantId || 'default',
+src/features/profile/components/Profile.tsx:                profile.tenantId,
+src/features/profile/components/IdentityCompletionPage.tsx:  const [tenantId, setTenantId] = useState(user.tenantId || '');
+src/features/profile/components/IdentityCompletionPage.tsx:    if (!tenantId) {
+src/features/profile/components/IdentityCompletionPage.tsx:        tenantId,
+src/features/profile/components/IdentityCompletionPage.tsx:          <TenantDropdown value={tenantId} onChange={setTenantId} />
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:        logger('Starting migration: Repairing Missing tenantId across all records...');
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:        const activeTenantId = user?.tenantId || 'global';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:              if (!rec.tenantId) {
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:                await table.update(rec.id, { tenantId: activeTenantId });
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/MigrationAssistant.tsx:            <option value="tenant_backfill">Global: Backfill Missing tenantId (Isolation Fix)</option>
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DLQManager.tsx:        tenantId: updatedPayload.tenantId || user?.tenantId || 'default',
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DLQManager.tsx:          const isEditing = selectedDlqId === rec.id; const hasMissingTenantId = !rec.payload?.tenantId;
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DLQManager.tsx:              {hasMissingTenantId && <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-400 text-[9px] font-semibold leading-relaxed font-sans">⚠️ <strong>Peringatan Keamanan Multi-Tenant:</strong> Atribut <code>tenantId</code> tidak terdeteksi!</div>}
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:      const activeTenantId = useUserStore.getState().tenantId || '30315537';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:          tenantId: activeTenantId,
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:          sistemJangkar: { tenantId: activeTenantId },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:          tenantId: activeTenantId,
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:          sistemJangkar: { tenantId: activeTenantId },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:      { child: 'students', parent: 'tenants', fk: 'tenantId' },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:      { child: 'teachers', parent: 'tenants', fk: 'tenantId' },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:      { child: 'classes', parent: 'tenants', fk: 'tenantId' },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:      { child: 'attendance', parent: 'tenants', fk: 'tenantId' },
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:              if (parentItem && c.tenantId && parentItem.tenantId && c.tenantId !== parentItem.tenantId) crossTenant++;
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:      const activeTenantId = user?.tenantId || 'global';
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:            if (!child.tenantId) { updatedFields.tenantId = activeTenantId; needsUpdate = true; }
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/DataRefactorer.tsx:              if (parentDoc?.tenantId && child.tenantId !== parentDoc.tenantId) { updatedFields.tenantId = parentDoc.tenantId; needsUpdate = true; fixedTenantCount++; }
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:        tenantId: 'global'
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:            tenantId: 'global'
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:          tenantId: 'global'
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">TenantId: <span className="font-bold text-amber-600">{targetUser?.tenantId || '30315537'}</span></p>
+src/features/developer/components/DeveloperConsole/UserMigrationCenter.tsx:            <span className="bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 px-2.5 py-1 rounded-lg font-bold">tenantId: global</span>
+src/features/developer/components/DeveloperConsole/DevTabLogs.tsx:      const tenantId = useUserStore.getState().tenantId || '30315537';
+src/features/developer/components/DeveloperConsole/DevTabLogs.tsx:      const result = await getAuditLogsPaginated(tenantId, isLoadMore ? lastOnlineDoc : null, 15);
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:  const { tenantId: activeTenantId, setUserData } = useUserStore();

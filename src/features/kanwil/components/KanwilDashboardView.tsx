@@ -13,7 +13,7 @@ import {
 } from '@/shared/Icons';
 import { KanwilDashboardService } from '../services/kanwilDashboardService';
 import type { KanwilDashboardSummary } from '../types';
-import { ViewState } from '@/types/roles';
+import { ViewState } from '@/types';
 
 interface Props {
   onNavigate: (view: ViewState) => void;

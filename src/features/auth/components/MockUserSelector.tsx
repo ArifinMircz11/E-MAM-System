@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, BookOpen, Code, GraduationCap, Loader2, Shield, Users } from 'lucide-react';
-import { isMockMode } from '@/services/firebase';
+import { isMockMode } from '@/services/authService';
 import { UserRole } from '@/types';
 import { preAuthAccountService } from '../services/preAuthAccountService';
 

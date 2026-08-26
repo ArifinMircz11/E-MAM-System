@@ -1,5 +1,6 @@
 import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
-import { UserRole, AccountType } from '@/types/roles';
+import type { AccountType } from '@/types';
+import { UserRole } from '@/types/roles';
 import { ArchitectureBoundaryEnforcer } from '@/core/boundary/ArchitectureBoundaryEnforcer';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 import { reportArchitectureViolation } from '@/core/monitoring/ArchitectureGuard';

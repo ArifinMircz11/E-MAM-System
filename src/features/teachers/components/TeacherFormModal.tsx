@@ -17,7 +17,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import type { Teacher } from '@/types';
 import { UserRole } from '@/types';
-import { EmploymentStatus, AsnStatus } from '@/types/roles';
+import { EmploymentStatus, AsnStatus } from '@/types';
 import { toast } from 'sonner';
 
 interface TeacherFormModalProps {

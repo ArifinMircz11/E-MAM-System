@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { AccountType } from '@/types/roles';
+import type { AccountType } from '@/types';
 
 interface AccountTypeDropdownProps {
   value: AccountType;

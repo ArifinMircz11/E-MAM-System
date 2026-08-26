@@ -1,0 +1,50 @@
+src/lib/auth-middleware.ts:import { SecurityContextImpl } from '../core/identity/security-context/SecurityContext';
+src/lib/auth-middleware.ts:    const securityContext = new SecurityContextImpl({
+src/lib/auth-middleware.ts:    console.error('Error verifying ID token or resolving SecurityContext:', error);
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:      const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:      const securityContext = getSecurityContext();
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:      const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/developer/components/DeveloperConsole/DevTabFirestoreGov/components/LensSimulation.tsx:      const context = getSecurityContext();
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:import type { SecurityContext } from '@/core/security/types';
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:  const securityCtx = getSecurityContext();
+src/features/developer/components/DeveloperConsole/DevTabManajemenMadrasah.tsx:      const securityContext: SecurityContext = {
+src/features/developer/components/Madrasah/MadrasahCreateModal.tsx:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/developer/components/Madrasah/MadrasahCreateModal.tsx:    const ctx = getSecurityContext();
+src/features/developer/components/DataExplorerView.tsx:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/developer/components/DataExplorerView.tsx:  const securityContext = useMemo(() => getSecurityContext(), []);
+src/features/developer/components/DataSubmissionForm.tsx:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/developer/components/DataSubmissionForm.tsx:        const secCtx = getSecurityContext();
+src/features/template/services/TemplateService.ts:import type { SecurityContext } from '@/core/security/types';
+src/features/template/services/TemplateService.ts:  async getList(context: SecurityContext): Promise<ITemplateEntity[]> {
+src/features/template/services/TemplateService.ts:  async getById(context: SecurityContext, id: string): Promise<ITemplateEntity | null> {
+src/features/template/services/TemplateService.ts:  async create(context: SecurityContext, data: TemplateFormData): Promise<ITemplateEntity> {
+src/features/template/services/TemplateService.ts:  async update(context: SecurityContext, id: string, data: TemplateFormData): Promise<ITemplateEntity> {
+src/features/template/services/TemplateService.ts:  async delete(context: SecurityContext, id: string): Promise<void> {
+src/features/reports/hooks/useReports.ts:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/reports/hooks/useReports.ts:  const tenantId = getSecurityContext().tenantId;
+src/features/reports/services/reportService.ts:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/reports/services/reportService.ts:  const secCtx = getSecurityContext();
+src/features/reports/services/reportService.ts:  const secCtx = getSecurityContext();
+src/features/reports/services/reportService.ts:  const secCtx = getSecurityContext();
+src/features/reports/services/reportService.ts:  const secCtx = getSecurityContext();
+src/features/attendance/services/attendanceService.ts:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/attendance/services/attendanceService.ts:    const secCtx = getSecurityContext(false);
+src/features/attendance/components/QRScanner.tsx:import { getSecurityContext } from '@/core/security/contextHelper';
+src/features/attendance/components/QRScanner.tsx:      // Using static import for getSecurityContext
+src/features/attendance/components/QRScanner.tsx:      const securityContext = getSecurityContext();
+src/features/attendance/components/QRScanner.tsx:      // Using static import for getSecurityContext
+src/features/attendance/components/QRScanner.tsx:      const context = getSecurityContext();
+src/features/attendance/components/QRScanner.tsx:      const securityContext = getSecurityContext();
+src/features/messages/services/MessagingService.ts:    const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:    const secCtx = getSecurityContext();
+src/features/messages/services/MessagingService.ts:    const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:    const secCtx = getSecurityContext();
+src/features/messages/services/MessagingService.ts:    const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:    const secCtx = getSecurityContext();
+src/features/messages/services/MessagingService.ts:    const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:    const secCtx = getSecurityContext();
+src/features/messages/services/MessagingService.ts:      const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:      const context = getSecurityContext();
+src/features/messages/services/MessagingService.ts:    const { getSecurityContext } = await import('@/core/security/contextHelper');
+src/features/messages/services/MessagingService.ts:    const secCtx = getSecurityContext();

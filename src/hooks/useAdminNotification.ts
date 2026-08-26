@@ -9,8 +9,7 @@ import {
   serverTimestamp,
   firestoreGateway,
 } from '@/services/gateways/FirestoreGateway';
-import { handleFirestoreError } from '@/services/authService';
-import { OperationType } from '@/types';
+import { handleFirestoreError, OperationType } from '@/services/authService';
 import { realtimeHub } from '@/services/realtime/realtimeHub';
 
 export function useAdminNotification() {

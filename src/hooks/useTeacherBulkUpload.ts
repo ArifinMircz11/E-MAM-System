@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { readExcelToJSON, writeJSONToExcel } from '@/utils/excelHelper';
 import { bulkImportTeachers } from '@/services/teacherService';
 import { mapRawDataToTeacher } from '@/lib/teacherMapping';
-import { EmploymentStatus, AsnStatus } from '@/types/roles';
+import { EmploymentStatus, AsnStatus } from '@/types';
 import { toast } from 'sonner';
 
 export interface ParsedTeacherRow {

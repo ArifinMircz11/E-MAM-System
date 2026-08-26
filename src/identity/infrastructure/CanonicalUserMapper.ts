@@ -1,5 +1,6 @@
 import { CanonicalUser } from '../domain/CanonicalUser';
-import { AccountType, UserRole } from '@/types/roles';
+import type { AccountType } from '@/types';
+import { UserRole } from '@/types';
 import { validateCanonicalUser } from '../domain/CanonicalValidation';
 
 export class CanonicalUserMapperException extends Error {

@@ -13,18 +13,21 @@ import './index.css';
 import App from './App';
 import { ArchitectureBoundaryError } from '@/core/boundary/ArchitectureBoundaryError';
 
+import { registerSW } from 'virtual:pwa-register';
+
 // Register Service Worker in production
-// if (typeof window !== 'undefined' && !env.IS_DEV && 'serviceWorker' in navigator) {
-//   registerSW({
-//     immediate: true,
-//     onNeedRefresh() {
-//       console.log('[PWA] New content available, please refresh.');
-//     },
-//     onOfflineReady() {
-//       console.log('[PWA] Application is ready to work offline.');
-//     },
-//   });
-// }
+if (typeof window !== 'undefined' && env.IS_PROD && 'serviceWorker' in navigator) {
+  const updateSW = registerSW({
+    onNeedRefresh() {
+      if (confirm('New content available. Reload?')) {
+        updateSW();
+      }
+    },
+    onOfflineReady() {
+      console.log('[PWA] Application is ready to work offline.');
+    },
+  });
+}
 
 // Global Guard for Dev Environment Noise (Vite HMR & WebSocket rejections)
 const isChunkLoadError = (err: any) => {

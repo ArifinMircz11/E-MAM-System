@@ -13,7 +13,7 @@ import {
 } from '@/shared/Icons';
 import { useSystemStore } from '@/stores/systemStore';
 import { useAuthStore } from '@/stores/authStore';
-import { ViewState } from '@/types/roles';
+import { ViewState } from '@/types';
 import { AssignmentRequestModal } from '@/features/kanwil/components/AssignmentRequestModal';
 
 interface GuestDashboardProps {
