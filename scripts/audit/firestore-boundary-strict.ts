@@ -4,92 +4,59 @@ import path from 'node:path';
 const ROOT = path.resolve('src');
 const REPORT = path.resolve('firestore-boundary-strict-report.json');
 
-const forbiddenImports = [
-  'firebase/firestore',
-  'firebase/app',
-];
-
+const forbiddenImports = ['firebase/firestore', 'firebase/app', '@firebase/firestore'];
 const forbiddenPatterns = [
-  /\bgetFirestore\s*\(/,
-  /\bcollection\s*\(/,
-  /\bdoc\s*\(/,
-  /\bgetDoc\s*\(/,
-  /\bgetDocs\s*\(/,
-  /\bonSnapshot\s*\(/,
-  /\baddDoc\s*\(/,
-  /\bsetDoc\s*\(/,
-  /\bupdateDoc\s*\(/,
-  /\bdeleteDoc\s*\(/,
-  /\bwriteBatch\s*\(/,
-  /\brunTransaction\s*\(/,
+  /\bgetFirestore\s*\(/, /\bcollection\s*\(/, /\bdoc\s*\(/, /\bgetDoc\s*\(/,
+  /\bgetDocs\s*\(/, /\bonSnapshot\s*\(/, /\baddDoc\s*\(/, /\bsetDoc\s*\(/,
+  /\bupdateDoc\s*\(/, /\bdeleteDoc\s*\(/, /\bwriteBatch\s*\(/, /\brunTransaction\s*\(/,
 ];
 
-const allowedSegments = [
-  `${path.sep}sync${path.sep}`,
-  `${path.sep}database${path.sep}`,
-  `${path.sep}repositories${path.sep}`,
-];
+// Cloud access is allowed ONLY in the canonical sync corridor.
+const allowedFiles = new Set([
+  'src/services/gateways/FirestoreGateway.ts',
+  'src/services/sync/FirestoreSyncDataSource.ts',
+  'src/core/offline/FirestoreSyncDataSource.ts',
+]);
 
-function walk(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+function walk(dir: string, out: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (['node_modules', 'dist', '.git'].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return walk(full);
-    return /\.(ts|tsx)$/.test(entry.name) ? [full] : [];
-  });
+    if (entry.isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx)$/.test(entry.name)) out.push(full);
+  }
+  return out;
 }
 
-const findings: Array<{
-  file: string;
-  line: number;
-  rule: string;
-  text: string;
-  allowedLayer: boolean;
-}> = [];
+const findings: Array<{ file: string; line: number; rule: string; text: string; allowed: boolean }> = [];
 
 for (const file of walk(ROOT)) {
   const relative = path.relative(process.cwd(), file).replaceAll(path.sep, '/');
-  const allowedLayer = allowedSegments.some((segment) => file.includes(segment));
+  const allowed = allowedFiles.has(relative);
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-
   lines.forEach((text, index) => {
     for (const imp of forbiddenImports) {
-      if (text.includes(imp)) {
-        findings.push({ file: relative, line: index + 1, rule: `FORBIDDEN_IMPORT:${imp}`, text: text.trim(), allowedLayer });
-      }
+      if (text.includes(imp)) findings.push({ file: relative, line: index + 1, rule: `FORBIDDEN_IMPORT:${imp}`, text: text.trim(), allowed });
     }
-
     for (const pattern of forbiddenPatterns) {
-      if (pattern.test(text)) {
-        findings.push({ file: relative, line: index + 1, rule: `FIRESTORE_API:${pattern.source}`, text: text.trim(), allowedLayer });
-      }
+      if (pattern.test(text)) findings.push({ file: relative, line: index + 1, rule: `FIRESTORE_API:${pattern.source}`, text: text.trim(), allowed });
     }
   });
 }
 
-const violations = findings.filter((item) => !item.allowedLayer);
+const violations = findings.filter((item) => !item.allowed);
 const report = {
   generatedAt: new Date().toISOString(),
-  root: 'src',
-  policy: 'UI/feature code must not access Firestore directly. Cloud access belongs behind Repository/Sync boundary.',
+  policy: 'Firestore SDK access is restricted to the canonical cloud sync corridor. Repositories and application services must not access Firestore directly.',
+  allowedFiles: [...allowedFiles],
   totalFindings: findings.length,
   violations: violations.length,
   passed: violations.length === 0,
   findings,
 };
-
 fs.writeFileSync(REPORT, JSON.stringify(report, null, 2));
-
-console.log('=== E-MAM STRICT FIRESTORE BOUNDARY AUDIT ===');
-console.log(`Findings: ${findings.length}`);
-console.log(`Violations outside allowed data/sync layers: ${violations.length}`);
-console.log(`Report: ${path.relative(process.cwd(), REPORT)}`);
-
-if (violations.length > 0) {
-  for (const item of violations) {
-    console.log(`❌ ${item.file}:${item.line} — ${item.rule}`);
-  }
-  process.exitCode = 1;
-} else {
-  console.log('✅ FIRESTORE BOUNDARY PASS');
-}
+console.log(`Strict Firestore boundary: ${violations.length === 0 ? 'PASS' : 'FAIL'}`);
+console.log(`Violations: ${violations.length}`);
+for (const item of violations) console.log(`❌ ${item.file}:${item.line} — ${item.rule}`);
+if (violations.length > 0) process.exitCode = 1;
