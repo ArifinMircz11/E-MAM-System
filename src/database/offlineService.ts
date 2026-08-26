@@ -29,11 +29,7 @@ export const OfflineService = {
         localDb.classes.count(),
         localDb.teachers.count(),
       ]);
-      return {
-        students: counts[0],
-        classes: counts[1],
-        teachers: counts[2],
-      };
+      return { students: counts[0], classes: counts[1], teachers: counts[2] };
     } catch (e) {
       console.error('[OfflineService] Integrity check failed:', e);
       throw e;
@@ -47,16 +43,14 @@ export const OfflineService = {
     docId?: string,
   ) {
     const resolvedDocId = docId || payload?.id || payload?.uid || payload?.studentsId || payload?.teachersId || payload?.classId;
-
-    const res = await syncRepository.enqueue({
+    return syncRepository.enqueue({
       tenantId: payload?.tenantId,
       collection,
       operation: type,
-      recordId: resolvedDocId ? String(resolvedDocId) : undefined,
+      recordId: resolvedDocId,
       payload,
+      version: payload?.version,
     });
-
-    return res;
   },
 };
 
