@@ -24,12 +24,16 @@ function printWorkQueue() {
 }
 
 function runMandatoryGuard(name: string, script: string): number {
+  const bin = process.platform === 'win32'
+    ? path.resolve('node_modules/.bin/tsx.cmd')
+    : path.resolve('node_modules/.bin/tsx');
   try {
-    execFileSync('npx', ['tsx', script], { stdio: 'inherit', cwd: process.cwd() });
+    if (!fs.existsSync(bin)) throw new Error(`tsx executable missing: ${bin}`);
+    execFileSync(bin, [script], { stdio: 'inherit', cwd: process.cwd() });
     console.log(`✅ ${name}`);
     return 0;
-  } catch {
-    console.error(`❌ ${name}`);
+  } catch (error) {
+    console.error(`❌ ${name}: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
   }
 }
@@ -37,7 +41,6 @@ function runMandatoryGuard(name: string, script: string): number {
 function runMainAuditSuite() {
   console.log('=== 🛡️ E-MAM MASTER ARCHITECTURE AUDIT ===\n');
   let total = 0;
-
   total += runGovernanceAudit();
   console.log('--------------------------------------------------');
   total += runFoundationAudit();
@@ -48,17 +51,14 @@ function runMainAuditSuite() {
   console.log('--------------------------------------------------');
   total += runUnusedAudit();
   console.log('--------------------------------------------------');
-
-  // Mandatory architecture/security guards. A failure blocks the audit.
   total += runMandatoryGuard('Final architecture guard', 'scripts/audit/final-architecture-guard.ts');
   total += runMandatoryGuard('Strict Firestore boundary', 'scripts/audit/firestore-boundary-strict.ts');
+  total += runMandatoryGuard('Cloud boundary', 'scripts/audit/cloud-boundary.js');
   total += runMandatoryGuard('Auth flow guard', 'scripts/audit/auth-flow-guard.ts');
   total += runMandatoryGuard('Final target checklist', 'scripts/audit/final-target-checklist.ts');
-
   printWorkQueue();
   console.log('\n==================================================');
-  if (total === 0) console.log('🎉 MASTER AUDIT PASS / GREEN');
-  else console.log(`🛑 MASTER AUDIT FAIL / ${total} finding(s). Production remains BLOCKED.`);
+  console.log(total === 0 ? '🎉 MASTER AUDIT PASS / GREEN' : `🛑 MASTER AUDIT FAIL / ${total} finding(s). Production remains BLOCKED.`);
   process.exitCode = total === 0 ? 0 : 1;
 }
 
