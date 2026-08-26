@@ -1,86 +1,44 @@
-﻿import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
-export function runFeaturesAudit(): number {
-  console.log('🔍 [Audit Features] Auditing Feature Isolation & Direct Firestore Access...');
+/** Feature audit: Firestore SDK is allowed only in the canonical sync/cloud corridor. */
+const SRC = path.resolve('src');
+const ALLOWED = new Set([
+  'src/services/firebase.ts',
+  'src/services/gateways/FirestoreGateway.ts',
+  'src/services/SyncEngine.ts',
+  'src/services/masterSyncService.ts',
+]);
+const ALLOWED_PREFIXES = ['src/services/sync/', 'src/services/realtime/', 'src/sync/', 'src/core/sync/'];
 
-  const srcDir = path.resolve('src');
-  let issues = 0;
+function walk(dir: string, out: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (['node_modules', 'dist', '.git', 'coverage'].includes(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    entry.isDirectory() ? walk(full, out) : /\.(ts|tsx)$/.test(entry.name) && out.push(full);
+  }
+  return out;
+}
 
-  function scan(dir: string): void {
-    for (const file of fs.readdirSync(dir)) {
-      const full = path.join(dir, file);
+function isAllowed(relative: string): boolean {
+  return ALLOWED.has(relative) || ALLOWED_PREFIXES.some((prefix) => relative.startsWith(prefix));
+}
 
-      if (fs.statSync(full).isDirectory()) {
-        if (file !== 'node_modules' && file !== 'dist') {
-          scan(full);
-        }
-        continue;
-      }
-
-      if (!file.endsWith('.ts') && !file.endsWith('.tsx')) {
-        continue;
-      }
-
-      const content = fs.readFileSync(full, 'utf8');
-      const relativePath = path.relative(process.cwd(), full);
-
-      /*
-       * ENTERPRISE FIRESTORE LOCK
-       *
-       * Firebase/Firestore SDK access is permitted ONLY inside:
-       *   src/services/sync/
-       *   src/services/realtime/
-       *   src/services/SyncEngine.ts
-       *   src/services/masterSyncService.ts
-       *   src/sync/
-       *   src/core/sync/
-       *
-       * Gateways, firebase.ts, domain services, repositories,
-       * features, hooks and UI are NOT trusted boundaries.
-       */
-
-      const normalized = relativePath.replace(/\\/g, '/');
-
-      const isAuthorizedFirestoreBoundary =
-        normalized === 'src/services/firebase.ts' ||
-        normalized === 'src/services/gateways/FirestoreGateway.ts' ||
-        normalized.startsWith('src/services/sync/') ||
-        normalized.startsWith('src/services/realtime/') ||
-        normalized === 'src/services/SyncEngine.ts' ||
-        normalized === 'src/services/masterSyncService.ts' ||
-        normalized.startsWith('src/sync/') ||
-        normalized.startsWith('src/core/sync/');
-
-      const hasDirectFirestoreImport =
-        /from\s+['"]firebase\/firestore['"]/.test(content) ||
-        /from\s+['"]@firebase\/firestore['"]/.test(content);
-
-      if (hasDirectFirestoreImport && !isAuthorizedFirestoreBoundary) {
-        console.log(
-          `❌ [Rule Violation - Firestore Lock] Direct Firestore import in: ${normalized}`,
-        );
-        issues++;
-      }
+const findings: Array<{ rule: string; file: string; line: number; text: string }> = [];
+for (const file of walk(SRC)) {
+  const relative = path.relative(process.cwd(), file).replaceAll(path.sep, '/');
+  if (isAllowed(relative)) continue;
+  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+  lines.forEach((text, i) => {
+    if (/from\s+['"](?:firebase\/firestore|@firebase\/firestore)['"]/.test(text) || /require\(\s*['"](?:firebase\/firestore|@firebase\/firestore)['"]\s*\)/.test(text)) {
+      findings.push({ rule: 'FEATURE-NO-DIRECT-FIRESTORE', file: relative, line: i + 1, text: text.trim() });
     }
-  }
-
-  scan(srcDir);
-
-  if (issues === 0) {
-    console.log(
-      '✅ [Audit Features] Zero illegal Firestore imports detected outside authorized sync boundaries!',
-    );
-  } else {
-    console.log(
-      `❌ [Audit Features] Found ${issues} Firestore access violations.`,
-    );
-  }
-
-  return issues;
+  });
 }
 
-if (process.argv[1]?.endsWith('features.ts')) {
-  runFeaturesAudit();
-}
-
+console.log(`🔍 [Audit Features] Firestore boundary findings: ${findings.length}`);
+for (const finding of findings) console.log(`❌ [${finding.rule}] ${finding.file}:${finding.line}`);
+const report = { generatedAt: new Date().toISOString(), passed: findings.length === 0, violations: findings.length, findings };
+fs.writeFileSync(path.resolve('features-audit-report.json'), JSON.stringify(report, null, 2));
+if (findings.length) process.exitCode = 1;
