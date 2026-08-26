@@ -1,13 +1,7 @@
-import { syncQueue } from '@/core/offline/SyncQueue';
-import { FirestoreSyncDataSource } from '@/core/offline/FirestoreSyncDataSource';
+import { syncRepository, type SyncQueueItem } from '@/repositories/SyncRepository';
+import { FirestoreSyncDataSource } from '@/infrastructure/datasource/SyncDataSource';
 
-/**
- * Canonical SyncEngine.
- *
- * Only this service owns the background synchronization loop.
- * Application writes must first reach Dexie/SyncQueue; this engine drains
- * the queue and delegates cloud operations to the sync data source.
- */
+/** Canonical synchronization engine: Dexie SyncQueue -> Firestore gateway. */
 export class SyncEngine {
   private static instance: SyncEngine;
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -28,16 +22,31 @@ export class SyncEngine {
   }
 
   async sync(): Promise<void> {
-    if (this.running || typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (this.running || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     this.running = true;
     try {
-      // The queue remains the operational source of pending writes.
-      const pending = await syncQueue.peek?.();
-      if (!pending) return;
-      await this.dataSource.push(pending);
-      await syncQueue.ack?.(pending.id);
+      let item = await syncRepository.nextPending();
+      while (item) {
+        await this.process(item);
+        item = await syncRepository.nextPending();
+      }
     } finally {
       this.running = false;
+    }
+  }
+
+  private async process(item: SyncQueueItem): Promise<void> {
+    await syncRepository.markProcessing(item.id);
+    try {
+      if (item.operation === 'delete') {
+        await this.dataSource.delete(item.collection, item.documentId);
+      } else {
+        await this.dataSource.push(item.collection, item.documentId, item.payload);
+      }
+      await syncRepository.markCompleted(item.id);
+    } catch (error) {
+      const updated = await syncRepository.markFailed(item.id, error);
+      if (updated && updated.retryCount >= 5) await syncRepository.moveToDeadLetter(updated);
     }
   }
 
