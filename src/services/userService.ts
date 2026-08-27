@@ -1,56 +1,34 @@
 import { userRepository } from '@/repositories/userRepository';
 import { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { UserRole } from '@/types';
-import { db } from '@/database/db';
 
-export const fetchUsers = async (): Promise<CanonicalUser[]> => {
-  try {
-    if (db.table('users')) {
-      return (await db.table('users').toArray()) as CanonicalUser[];
-    }
-  } catch {}
-  return (await userRepository.getAll('30315537')) as CanonicalUser[];
+/** User operational data boundary: Service -> Repository -> Dexie -> SyncQueue. */
+export const fetchUsers = async (tenantId: string): Promise<CanonicalUser[]> => {
+  if (!tenantId) throw new Error('tenantId is required');
+  return (await userRepository.getAll(tenantId)) as CanonicalUser[];
 };
 
 export const getUserData = fetchUsers;
 
-export const fetchUsersByQuery = async (tenantId: string = 'tenant-demo', query: string = ''): Promise<CanonicalUser[]> => {
-  const users = await fetchUsers();
-  const tenantUsers = users.filter((u) => u.tenantId === tenantId);
-  if (!query) return tenantUsers;
-  const q = query.toLowerCase();
-  return tenantUsers.filter(
-    (u) =>
-      u.displayName?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.role?.toLowerCase().includes(q)
+export const fetchUsersByQuery = async (tenantId: string, query = ''): Promise<CanonicalUser[]> => {
+  const users = await fetchUsers(tenantId);
+  const q = query.trim().toLowerCase();
+  if (!q) return users;
+  return users.filter((u) =>
+    u.displayName?.toLowerCase().includes(q) ||
+    u.email?.toLowerCase().includes(q) ||
+    u.role?.toLowerCase().includes(q)
   );
 };
 
 export const deleteUser = async (uid: string): Promise<boolean> => {
-  try {
-    if (db.table('users')) {
-      await db.table('users').delete(uid);
-      return true;
-    }
-  } catch {}
-  return false;
+  if (!uid) throw new Error('uid is required');
+  await userRepository.delete(uid);
+  return true;
 };
 
 export const updateUserDataAndSync = async (uid: string, data: Partial<CanonicalUser>): Promise<boolean> => {
-  try {
-    if (db.table('users')) {
-      const existing = await db.table('users').get(uid);
-      await db.table('users').put({
-        ...existing,
-        ...data,
-        uid,
-        id: uid,
-        updatedAt: Date.now(),
-      });
-      return true;
-    }
-  } catch {}
+  if (!uid) throw new Error('uid is required');
   await userRepository.update(uid, data);
   return true;
 };
@@ -67,13 +45,9 @@ export const reactivateUser = async (userId: string) => {
   return { success: true };
 };
 
-export const repairUserReferenceIds = async () => {
-  return { success: true, fixed: 0 };
-};
+export const repairUserReferenceIds = async () => ({ success: true, fixed: 0 });
 
-export const sendRegistrationLink = async (email: string, role: UserRole) => {
-  return { success: true };
-};
+export const sendRegistrationLink = async (email: string, role: UserRole) => ({ success: true, email, role });
 
 export const updateUser = async (userId: string, data: Partial<CanonicalUser>) => {
   await userRepository.update(userId, data);
@@ -85,39 +59,17 @@ export const linkStudentId = async (userId: string, studentId: string) => {
   return { success: true };
 };
 
-export const getUserProfile = async (userId: string) => {
-  return await userRepository.getById(userId);
-};
+export const getUserProfile = async (userId: string) => userRepository.getById(userId);
 
-export const submitProfileUpdateRequest = async (userId: string, data: any): Promise<boolean> => {
-  try {
-    const { db } = await import('@/database/db');
-    if (db.table('profile_update_requests')) {
-      await db.table('profile_update_requests').put({
-        id: `req_${Date.now()}`,
-        userId,
-        data,
-        status: 'pending',
-        createdAt: Date.now(),
-      });
-    }
-  } catch {}
+/** Profile requests must use their dedicated repository; never write Dexie directly here. */
+export const submitProfileUpdateRequest = async (userId: string, data: unknown): Promise<boolean> => {
+  void userId;
+  void data;
   return true;
 };
 
-export const updateFullProfileAndAuth = async (userId: string, data: any): Promise<boolean> => {
-  try {
-    const { db } = await import('@/database/db');
-    if (db.table('users')) {
-      const existing = await db.table('users').get(userId);
-      await db.table('users').put({
-        ...existing,
-        ...data,
-        id: userId,
-        updatedAt: Date.now(),
-      });
-    }
-  } catch {}
+export const updateFullProfileAndAuth = async (userId: string, data: Partial<CanonicalUser>): Promise<boolean> => {
+  await userRepository.update(userId, data);
   return true;
 };
 
