@@ -3,7 +3,6 @@ import { ViewState, UserRole, STAFF_ABOVE, ADMIN_DEV_ONLY, ALL_ROLES } from '@/t
 import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { RouteGuard } from '@/core/authorization/route-guard';
 import { useAuthStore } from '@/stores/authStore';
-import { canAccess } from '@/core/authorization/authorizationResolver';
 import * as Views from './ViewRegistry';
 
 export interface ViewRendererProps {
@@ -32,7 +31,6 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
   isDarkMode,
   toggleTheme,
   handleLoginSuccess,
-  user,
 }) => {
   const canonicalUser = useAuthStore((state) => state.user);
   const roles = canonicalUser?.roles?.length ? canonicalUser.roles : canonicalUser?.role ? [canonicalUser.role] : [];
@@ -49,14 +47,12 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
       case ViewState.HOME:
       case ViewState.LOGIN:
         return <Views.Login onLoginSuccess={handleLoginSuccess || (() => {})} onNavigate={handleNavigate} />;
-
       case ViewState.DASHBOARD:
         if (roles.includes(UserRole.SISWA) || roles.includes(UserRole.KETUA_KELAS)) return <Views.StudentDashboardPage onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} />;
         if (roles.includes(UserRole.ORANG_TUA)) return <Views.ParentPortal onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} />;
         if (roles.includes(UserRole.GURU_BK) || roles.includes(UserRole.BK)) return <Views.DashboardBK onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} userRole={UserRole.GURU_BK} />;
         if (roles.includes(UserRole.TAMU) || roles.includes(UserRole.GUEST) || roles.includes(UserRole.ALUMNI)) return <Views.GuestDashboard onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} />;
         return <Views.Dashboard onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} userRole={primaryRole} />;
-
       case ViewState.DASHBOARD_BK:
         return guarded(<Views.DashboardBK onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} userRole={primaryRole} />, [UserRole.GURU_BK, UserRole.BK, UserRole.ADMIN, UserRole.DEVELOPER, UserRole.KEPALA_MADRASAH]);
       case ViewState.ATTENDANCE:
@@ -112,11 +108,6 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
         return <Views.Dashboard onNavigate={handleNavigate} onOpenSidebar={onOpenSidebar} userRole={primaryRole} />;
     }
   };
-
-  // Keep authorization decision centralized. RouteGuard remains the enforcement boundary.
-  if (user && !canAccess({}, undefined as never)) {
-    return null;
-  }
 
   return <div className="w-full h-full flex flex-col">{renderCurrentView()}</div>;
 };
