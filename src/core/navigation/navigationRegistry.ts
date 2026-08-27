@@ -3,10 +3,9 @@ import { ROLE_BOTTOM_NAV } from './roleNavigation';
 import { ALL_FEATURES_NAV } from './featureNavigation';
 import { FeatureNavItem } from './navigation.types';
 import { TenantContext } from '@/core/context/TenantContext';
-import { ROLE_PERMISSIONS } from '@/types/permissions';
 import { ViewState } from '@/types';
+import { canAccess } from '@/core/authorization/authorizationResolver';
 
-// Map ViewStates to required granular permissions for strict filtering
 export const VIEW_PERMISSION_MAP: Record<string, string> = {
   [ViewState.USERS]: 'user.read',
   [ViewState.MADRASAH_MASTER]: 'developer.access',
@@ -28,48 +27,16 @@ export const VIEW_PERMISSION_MAP: Record<string, string> = {
   [ViewState.KANWIL_SATUAN_KERJA]: 'kanwil.access',
 };
 
-const resolveFeatureAccess = (item: FeatureNavItem, role: UserRole, isBottomNav = false): boolean => {
+const resolveFeatureAccess = (item: FeatureNavItem, _role: UserRole, isBottomNav = false): boolean => {
   try {
-    // 1. Get Security Context
     const context = TenantContext.getContext();
     if (!context) return false;
-
-    // Developer gets absolute bypass
-    if (context.isDeveloper) return true;
-
-    // 2. Check Active Role Authorized for the item
-    const activeRole = role || context.role;
-    if (item.roles && !item.roles.includes(activeRole)) {
-      return false;
-    }
-
-    // 3. Check Granular Permissions from SecurityContext / Fallback mapping (skipped for BottomNav config allocation)
-    const requiredPermission = VIEW_PERMISSION_MAP[item.view];
-    if (requiredPermission && !isBottomNav) {
-      const userPermissions = context.permissions;
-      
-      // If user permissions doesn't contain the permission, check role permissions configuration
-      const hasPerm = userPermissions instanceof Set 
-        ? userPermissions.has(requiredPermission as any)
-        : Array.isArray(userPermissions) && userPermissions.includes(requiredPermission as any);
-
-      if (!userPermissions || !hasPerm) {
-        const rolePerms = ROLE_PERMISSIONS[activeRole];
-        if (!rolePerms || !rolePerms.includes(requiredPermission as any)) {
-          return false;
-        }
-      }
-    }
-
-    // 4. Tenant Scope Validation
-    if (!context.tenantId) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    // 5. Fallback check (standard role-based check) if Context is not fully established yet
-    return !item.roles || item.roles.includes(role);
+    return canAccess({
+      roles: item.roles,
+      permission: isBottomNav ? undefined : VIEW_PERMISSION_MAP[item.view],
+    }, context);
+  } catch {
+    return false;
   }
 };
 
@@ -78,26 +45,22 @@ export const navigationRegistry = {
     let effectiveRole: UserRole = role as UserRole;
     try {
       const context = TenantContext.getContext();
-      if (context && context.effectiveRole) {
-        effectiveRole = context.effectiveRole as UserRole;
-      }
+      if (context?.effectiveRole) effectiveRole = context.effectiveRole as UserRole;
     } catch {
-      // Use passed role if context is uninitialized
+      // Use supplied role when context is unavailable.
     }
-
     const baseTabs = ROLE_BOTTOM_NAV[effectiveRole] || (role ? ROLE_BOTTOM_NAV[role] : undefined) || [];
-    return baseTabs.filter(tab => resolveFeatureAccess({ label: tab.label, icon: tab.icon, view: tab.view, roles: undefined }, effectiveRole, true));
+    return baseTabs.filter((tab) =>
+      resolveFeatureAccess({ label: tab.label, icon: tab.icon, view: tab.view, roles: undefined }, effectiveRole, true),
+    );
   },
-  
-  getAllFeatures: (role: UserRole) => {
-    return ALL_FEATURES_NAV.filter(item => resolveFeatureAccess(item, role));
-  },
+
+  getAllFeatures: (role: UserRole) => ALL_FEATURES_NAV.filter((item) => resolveFeatureAccess(item, role)),
 
   getSidebarItems: (role: UserRole) => {
-    const items = ALL_FEATURES_NAV.filter(item => resolveFeatureAccess(item, role));
+    const items = ALL_FEATURES_NAV.filter((item) => resolveFeatureAccess(item, role));
     const sections: Record<string, any[]> = {};
-    
-    items.forEach(item => {
+    items.forEach((item) => {
       const section = item.section || 'Lainnya';
       if (!sections[section]) sections[section] = [];
       sections[section].push({
@@ -111,8 +74,6 @@ export const navigationRegistry = {
         roles: item.roles,
       });
     });
-
     return Object.entries(sections).map(([title, items]) => ({ title, section: title, items }));
-  }
+  },
 };
-
