@@ -5,10 +5,11 @@ import { useUserStore } from '@/stores/userStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { AuthBootstrapService } from '@/services/AuthBootstrapService';
-import { UserRole } from '@/types';
 
 /**
  * UI lifecycle adapter only. Authentication business workflow lives in AuthBootstrapService.
+ * The listener watchdog guarantees that a broken auth provider cannot hold the
+ * entire application behind the splash screen indefinitely.
  */
 export const useAuthInitialization = () => {
   const [authLoading, setAuthLoading] = useState(true);
@@ -21,62 +22,95 @@ export const useAuthInitialization = () => {
   const setProfileLoading = useProfileStore((state) => state.setIsLoading);
 
   useEffect(() => {
-    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+    let bootstrapTimer: ReturnType<typeof setTimeout> | null = null;
+    let authCallbackReceived = false;
+    let disposed = false;
+
     SecurityContextService.setLifecycleState('BOOTSTRAPPING');
 
     const finishLoading = () => {
-      if (safetyTimer) clearTimeout(safetyTimer);
-      safetyTimer = null;
+      if (disposed) return;
       setAuthLoading(false);
     };
 
-    const unsubAuth = onAuthStateChanged(async (firebaseUser) => {
-      if (safetyTimer) clearTimeout(safetyTimer);
-      safetyTimer = null;
-
-      if (!firebaseUser) {
+    // Hard upper bound for the initial auth listener. A failed Firebase/config/
+    // service-worker bootstrap must fall back to the login shell, not infinite splash.
+    bootstrapTimer = setTimeout(() => {
+      if (!authCallbackReceived) {
+        console.error('[AuthInit] Auth listener timeout; releasing splash screen.');
         setUser(null);
         clearUserData();
         clearProfile();
         setAccountStatus(null);
+        SecurityContextService.setLifecycleState('ERROR', 'AUTH_LISTENER_TIMEOUT');
         finishLoading();
-        SecurityContextService.setLifecycleState('SIGNED_OUT');
-        return;
       }
+    }, 8000);
 
-      setAuthLoading(true);
-      SecurityContextService.setLifecycleState('AUTHENTICATED');
-      safetyTimer = setTimeout(finishLoading, 5000);
+    let unsubAuth: (() => void) | undefined;
+    try {
+      unsubAuth = onAuthStateChanged(async (firebaseUser) => {
+        authCallbackReceived = true;
+        if (bootstrapTimer) clearTimeout(bootstrapTimer);
+        bootstrapTimer = null;
 
-      try {
-        const result = await AuthBootstrapService.initialize(firebaseUser);
-        setUser(result.user);
-        setUserData(result.userData);
-        setAccountStatus(result.accountStatus as any);
-        setProfileLoading(true);
+        if (!firebaseUser) {
+          setUser(null);
+          clearUserData();
+          clearProfile();
+          setAccountStatus(null);
+          finishLoading();
+          SecurityContextService.setLifecycleState('SIGNED_OUT');
+          return;
+        }
+
+        setAuthLoading(true);
+        SecurityContextService.setLifecycleState('AUTHENTICATED');
+
+        // Secondary watchdog covers a slow canonical identity bootstrap.
+        const identityTimer = setTimeout(finishLoading, 5000);
+
         try {
-          setProfile(result.profile);
+          const result = await AuthBootstrapService.initialize(firebaseUser);
+          if (disposed) return;
+
+          setUser(result.user);
+          setUserData(result.userData);
+          setAccountStatus(result.accountStatus as any);
+          setProfileLoading(true);
+          try {
+            setProfile(result.profile);
+          } finally {
+            setProfileLoading(false);
+          }
+          SecurityContextService.setLifecycleState('READY');
+        } catch (error) {
+          if (disposed) return;
+          console.error('[AuthInit] Initialization failed:', error);
+          setUser(null);
+          clearUserData();
+          clearProfile();
+          setAccountStatus('pending' as any);
+          SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
         } finally {
-          setProfileLoading(false);
+          clearTimeout(identityTimer);
+          finishLoading();
         }
-        if (result.linkedStudent) console.info('[AuthInit] Student identity linked successfully.');
-        if (result.userData?.role === UserRole.TAMU) {
-          SecurityContextService.setLifecycleState('READY');
-        } else {
-          SecurityContextService.setLifecycleState('READY');
-        }
-        finishLoading();
-      } catch (error) {
-        console.error('[AuthInit] Initialization failed:', error);
-        setAccountStatus('pending' as any);
-        SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
-        finishLoading();
-      }
-    });
+      });
+    } catch (error) {
+      console.error('[AuthInit] Failed to register auth listener:', error);
+      setUser(null);
+      clearUserData();
+      clearProfile();
+      setAccountStatus(null);
+      SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
+      finishLoading();
+    }
 
     return () => {
-      if (safetyTimer) clearTimeout(safetyTimer);
-      unsubAuth();
+      disposed = true;
+      if (bootstrapTimer) clearTimeout(bootstrapTimer);
+      unsubAuth?.();
     };
   }, [
     setUser,
