@@ -1,31 +1,27 @@
 import { userRepositoryImpl, UserRepositoryImpl } from '@/identity/infrastructure/UserRepositoryImpl';
-import { db } from '@/database/db';
+import { getSecurityContext } from '@/core/security/contextHelper';
 
+/**
+ * Compatibility facade for legacy callers.
+ * All operational access is delegated to UserRepositoryImpl so tenant
+ * validation, Dexie writes, versioning and SyncQueue remain centralized.
+ */
 export { UserRepositoryImpl, userRepositoryImpl };
 
+const context = () => getSecurityContext(true);
+
 export const userRepository = {
-  getById: async (id: string) => {
-    return (await db.table('users').get(id)) || null;
-  },
-  getByUid: async (uid: string) => {
-    return (await db.table('users').where('uid').equals(uid).first()) || null;
-  },
-  getByReferenceId: async (referenceId: string) => {
-    return (await db.table('users').where('referenceId').equals(referenceId).first()) || null;
-  },
+  getById: async (id: string) => userRepositoryImpl.getById(context(), id),
+  getByUid: async (uid: string) => userRepositoryImpl.getByUid(context(), uid),
+  getByReferenceId: async (referenceId: string) => userRepositoryImpl.getByReferenceId(context(), referenceId),
   getAll: async (tenantId?: string) => {
-    if (tenantId) {
-      return await db.table('users').where('tenantId').equals(tenantId).toArray();
+    const ctx = context();
+    if (tenantId && tenantId !== ctx.tenantId && !ctx.isDeveloper) {
+      throw new Error('Tenant access denied');
     }
-    return await db.table('users').toArray();
+    return userRepositoryImpl.getAll(ctx);
   },
-  save: async (user: any) => {
-    return await db.table('users').put(user);
-  },
-  update: async (id: string, updates: any) => {
-    return await db.table('users').update(id, updates);
-  },
-  delete: async (id: string) => {
-    return await db.table('users').delete(id);
-  },
+  save: async (user: any) => userRepositoryImpl.save(context(), user),
+  update: async (id: string, updates: any) => userRepositoryImpl.save(context(), { ...updates, id }),
+  delete: async (id: string) => userRepositoryImpl.delete(context(), id),
 };
