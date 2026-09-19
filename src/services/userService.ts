@@ -1,6 +1,7 @@
 import { userRepository } from '@/repositories/userRepository';
 import { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { UserRole } from '@/types';
+import { studentRepository } from '@/features/students/repositories/StudentRepository';
 
 /** User operational data boundary: Service -> Repository -> Dexie -> SyncQueue. */
 export const fetchUsers = async (tenantId: string): Promise<CanonicalUser[]> => {
@@ -54,9 +55,26 @@ export const updateUser = async (userId: string, data: Partial<CanonicalUser>) =
   return { success: true };
 };
 
-export const linkStudentId = async (userId: string, studentId: string) => {
-  await userRepository.update(userId, { referenceId: studentId });
-  return { success: true };
+export const linkStudentId = async (userId: string, idUnik: string, tenantId: string) => {
+  if (!userId) throw new Error('userId is required');
+  if (!idUnik.trim()) throw new Error('idUnik is required');
+  if (!tenantId.trim()) throw new Error('tenantId is required');
+
+  const student = await studentRepository.fetchByIdUnik(tenantId, idUnik.trim());
+  if (!student?.id) {
+    throw new Error('Data siswa tidak ditemukan pada madrasah tersebut. Periksa ID Unik dan NPSN.');
+  }
+
+  await userRepository.update(userId, {
+    referenceId: student.id,
+    studentsId: student.id,
+    tenantId,
+    idUnik: student.idUnik || idUnik.trim(),
+    status: 'active',
+    approvalStatus: 'approved',
+  });
+
+  return { success: true, studentDocId: student.id, student };
 };
 
 export const getUserProfile = async (userId: string) => userRepository.getById(userId);
