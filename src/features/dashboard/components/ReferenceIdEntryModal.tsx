@@ -66,7 +66,7 @@ const ReferenceIdEntryModal: React.FC<ReferenceIdEntryModalProps> = ({ isOpen, o
         } as any);
 
         setUserData({
-          referenceId: cleanId,
+          referenceId: studentDocId,
           tenantId: tenantIdStr,
           status: 'active',
         });
