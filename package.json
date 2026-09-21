@@ -139,6 +139,7 @@
     "fix": "tsx scripts/fix/index.ts",
     "fix:structure": "tsx scripts/fix/structure.ts",
     "fix:imports": "tsx scripts/fix/imports.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "audit:fk-sync": "tsx scripts/audit/schema/fk-sync-audit.ts"
   }
 }

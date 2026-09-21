@@ -22,6 +22,7 @@ export async function importClasses(): Promise<{ successCount: number; errorCoun
     if (mappedAcademicYears.length > 0) {
       await db.academic_years.bulkPut(mappedAcademicYears);
     }
+    const academicYearIdsByName = Object.fromEntries(mappedAcademicYears.map((year) => [year.name, year.id]));
 
     // 2. Classes
     const rawClasses = (legacyData as any).classes || [];
@@ -29,7 +30,7 @@ export async function importClasses(): Promise<{ successCount: number; errorCoun
 
     for (const raw of rawClasses) {
       try {
-        const mapped = mapLegacyClass(raw);
+        const mapped = mapLegacyClass(raw, academicYearIdsByName);
         mappedClasses.push(mapped);
         successCount++;
       } catch (err) {

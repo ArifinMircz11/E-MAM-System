@@ -36,6 +36,8 @@ import {
 } from '@/shared/Icons';
 import { toast } from 'sonner';
 import { addClass, updateClass, deleteClass, addClassArchive } from '@/services/classService';
+import { getAcademicYears } from '@/services/academicService';
+import type { AcademicYear } from '@/types';
 import { useStudentStore } from '@/stores/studentStore';
 import { useSystemStore } from '@/stores/systemStore';
 import { useUserStore } from '@/stores/userStore';
@@ -81,6 +83,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
   const [presensiSubTab, setPresensiSubTab] = useState<'kelas' | 'qr_scanner'>('kelas');
 
   const [classes, setClasses] = useState<ClassData[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +107,8 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
     id: '',
     name: '',
     level: '10',
-    academicYear: '2025/2026',
+    academicYearId: '',
+    academicYear: undefined,
     teacherId: '',
     teacherName: '',
     walikelasId: '',
@@ -200,10 +204,11 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
     setLoading(true);
     const fetchData = async () => {
       try {
-        const [classesData, teachersData, studentsData] = await Promise.all([
+        const [classesData, teachersData, studentsData, yearsData] = await Promise.all([
           getStoredClasses(),
           getStoredTeachers(),
           getStoredStudents(),
+          getAcademicYears(tenantId),
         ]);
 
         // Filter classes for Siswa if role-restricted
@@ -220,6 +225,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
         );
         setClasses(sortedClasses);
         setTeachers(teachersData);
+        setAcademicYears(yearsData);
 
         // Default select the first class to prevent unselected load (Zero-Waste O(1) directive 3)
         if (sortedClasses.length > 0 && !selectedClass) {
@@ -232,7 +238,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
       }
     };
     fetchData();
-  }, [getStoredClasses, getStoredTeachers, getStoredStudents, isStudent, activeStudentClass]);
+  }, [getStoredClasses, getStoredTeachers, getStoredStudents, isStudent, activeStudentClass, tenantId]);
 
   // Load schedules, point_records, daily attendance, letters, archives
   useEffect(() => {
@@ -615,7 +621,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
       id: '',
       name: '',
       level: '10',
-      academicYear: '2025/2026',
+      academicYearId: academicYears.find((year) => year.isActive)?.id || '',
     });
     setIsClassModalOpen(true);
   };
@@ -1748,16 +1754,19 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide ml-1">
                       Tahun Pelajaran *
                     </label>
-                    <input
+                    <select
                       required
-                      type="text"
-                      value={classFormData.academicYear || '2025/2026'}
+                      value={classFormData.academicYearId || ''}
                       onChange={(e) =>
-                        setClassFormData({ ...classFormData, academicYear: e.target.value })
+                        setClassFormData({ ...classFormData, academicYearId: e.target.value, academicYear: undefined })
                       }
                       className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"
-                      placeholder="MISAL: 2025/2026"
-                    />
+                      >
+                      <option value="" disabled>Pilih tahun ajaran</option>
+                      {academicYears.map((year) => (
+                        <option key={year.id} value={year.id}>{year.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

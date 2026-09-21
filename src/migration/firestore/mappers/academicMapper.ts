@@ -27,18 +27,19 @@ export interface LegacyAcademicYear {
 /**
  * Maps legacy Class to modern Class structure
  */
-export function mapLegacyClass(legacy: LegacyClass) {
-  const cId = legacy.classId ? `cls_${legacy.classId.replace(/[^a-zA-Z0-9]/g, '_')}` : `cls_generated_${Math.random().toString(36).substr(2, 9)}`;
-  const normalizedYearId = `ay_${(legacy.academicYear || '2025_2026').replace(/[^a-zA-Z0-9]/g, '_')}`;
+export function mapLegacyClass(legacy: LegacyClass, academicYearIdsByName: Record<string, string> = {}) {
+  if (!legacy.classId || !legacy.tenantId || !legacy.academicYear) throw new Error('Legacy class requires classId, tenantId and academicYear');
+  const cId = `cls_${legacy.classId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const normalizedYearId = academicYearIdsByName[legacy.academicYear] || `ay_${legacy.academicYear.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   return {
     id: cId,
     classId: legacy.classId || '',
-    tenantId: legacy.tenantId || 'default_tenant',
-    name: legacy.name || 'Unnamed Class',
-    level: legacy.level || 'Unassigned',
+    tenantId: legacy.tenantId,
+    name: legacy.name,
+    level: legacy.level,
     academicYearId: normalizedYearId,
-    academicYear: legacy.academicYear || '2025/2026', // Keep for compatibility
+    // Legacy academicYear string is intentionally not persisted; academicYearId is canonical
     waliKelasId: legacy.teacherId ? `gtk_${legacy.teacherId.replace(/[^a-zA-Z0-9]/g, '_')}` : null,
     studentCount: 0,
     version: 1,
@@ -56,12 +57,13 @@ export function mapLegacyClass(legacy: LegacyClass) {
  * Maps legacy Academic Year to modern Academic Year structure
  */
 export function mapLegacyAcademicYear(legacy: LegacyAcademicYear) {
+  if (!legacy.tenantId || !legacy.name) throw new Error('Legacy academic year requires tenantId and name');
   const ayId = legacy.id ? `ay_${legacy.id.replace(/[^a-zA-Z0-9]/g, '_')}` : `ay_${legacy.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   return {
     id: ayId,
-    tenantId: legacy.tenantId || 'default_tenant',
-    name: legacy.name || '2025/2026',
+    tenantId: legacy.tenantId,
+    name: legacy.name,
     status: legacy.isActive || legacy.status === 'Aktif' ? 'ACTIVE' : 'INACTIVE',
     version: 1,
     schemaVersion: 1,

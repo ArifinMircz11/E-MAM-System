@@ -1,79 +1,57 @@
-import { db } from '@/database/db';
 import { ClassData } from '@/types';
-import { MOCK_CLASSES } from './mockData';
+import { classRepository } from '@/repositories/classRepository';
 
-export const getClasses = async (tenantId: string = 'tenant-demo'): Promise<ClassData[]> => {
-  try {
-    if (!db.table('classes')) return MOCK_CLASSES;
-    const list = await db.table('classes').where('tenantId').equals(tenantId).toArray();
-    return list.length > 0 ? list : MOCK_CLASSES;
-  } catch {
-    return MOCK_CLASSES;
-  }
+export const getClasses = async (tenantId: string): Promise<ClassData[]> => {
+  if (!tenantId) throw new Error('tenantId is required');
+  return classRepository.getAll(tenantId) as Promise<ClassData[]>;
 };
 
 export const getClassById = async (id: string): Promise<ClassData | null> => {
-  try {
-    if (!db.table('classes')) return MOCK_CLASSES[0] || null;
-    return (await db.table('classes').get(id)) || MOCK_CLASSES[0] || null;
-  } catch {
-    return MOCK_CLASSES[0] || null;
-  }
+  if (!id) throw new Error('class id is required');
+  return (await classRepository.getById(id)) as ClassData | null;
 };
 
 export const addClass = async (classData: Partial<ClassData>) => {
+  if (!classData.tenantId) throw new Error('tenantId is required');
+  if (!classData.academicYearId && !classData.academicYear) {
+    throw new Error('academicYearId is required');
+  }
   const newClass: ClassData = {
-    id: classData.id || `cls-${Date.now()}`,
-    tenantId: classData.tenantId || 'tenant-demo',
-    name: classData.name || 'Kelas Baru',
-    grade: classData.grade || '7',
-    academicYear: classData.academicYear || '2025/2026',
-    waliKelasName: classData.waliKelasName,
-    totalStudents: 0,
-    createdAt: Date.now(),
+    ...classData,
+    id: classData.id || crypto.randomUUID(),
+    tenantId: classData.tenantId,
+    name: classData.name || '',
+    grade: classData.grade || '',
+    academicYearId: classData.academicYearId,
+    academicYear: undefined,
+    totalStudents: classData.totalStudents || 0,
+    createdAt: classData.createdAt || Date.now(),
     updatedAt: Date.now(),
-  };
-  try {
-    if (db.table('classes')) {
-      await db.table('classes').put(newClass);
-    }
-  } catch {}
+  } as ClassData;
+  await classRepository.save(newClass as any);
   return newClass;
 };
 
 export const updateClass = async (id: string, data: Partial<ClassData>): Promise<boolean> => {
-  try {
-    if (db.table('classes')) {
-      await db.table('classes').update(id, { ...data, updatedAt: Date.now() });
-      return true;
-    }
-  } catch {}
-  return false;
+  const existing = await classRepository.getById(id);
+  if (!existing) return false;
+  await classRepository.save({ ...existing, ...data, updatedAt: Date.now() } as any);
+  return true;
 };
 
 export const deleteClass = async (id: string): Promise<boolean> => {
-  try {
-    if (db.table('classes')) {
-      await db.table('classes').delete(id);
-      return true;
-    }
-  } catch {}
-  return false;
+  const existing = await classRepository.getById(id);
+  if (!existing) return false;
+  await classRepository.save({ ...existing, deleted: true, updatedAt: Date.now() } as any);
+  return true;
 };
 
 export const addClassArchive = async (classId: string, archive: any): Promise<boolean> => {
-  try {
-    if (db.table('classes')) {
-      const cls = await db.table('classes').get(classId);
-      if (cls) {
-        const archives = cls.archives || [];
-        archives.push(archive);
-        await db.table('classes').update(classId, { archives, updatedAt: Date.now() });
-        return true;
-      }
-    }
-  } catch {}
-  return false;
+  const cls = await classRepository.getById(classId);
+  if (!cls) return false;
+  const archives = Array.isArray((cls as any).archives) ? [...(cls as any).archives, archive] : [archive];
+  await classRepository.save({ ...(cls as any), archives, updatedAt: Date.now() } as any);
+  return true;
 };
 
 export const classService = {

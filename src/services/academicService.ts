@@ -1,138 +1,92 @@
-import { db } from '@/database/db';
 import type { AcademicYear, Semester, Assignment, Submission } from '@/types';
+import { academicYearRepository } from '@/repositories/AcademicYearRepository';
+import { semesterRepository } from '@/repositories/SemesterRepository';
+import { db } from '@/database/db';
+import { getSecurityContext } from '@/core/security/contextHelper';
 
-export const getActiveAcademicYear = async () => {
-  return {
-    id: 'ay-2025-2026',
-    name: '2025/2026',
-    semester: 'Genap',
-    isActive: true,
-  };
+const resolveTenantId = (tenantId?: string): string => tenantId || getSecurityContext().tenantId;
+
+export const getActiveAcademicYear = async (tenantId?: string): Promise<AcademicYear | null> => {
+  tenantId = resolveTenantId(tenantId);
+  const years = await academicYearRepository.findAll(tenantId);
+  return years.find((year) => year.isActive && !year.deleted) ?? null;
 };
 
-export const getAcademicYears = async (tenantId: string = 'tenant-demo'): Promise<AcademicYear[]> => {
-  try {
-    if (db.table('academic_years')) {
-      const list = await db.table('academic_years').where('tenantId').equals(tenantId).toArray();
-      if (list.length > 0) return list;
-    }
-  } catch {}
-  return [
-    {
-      id: 'ay-2024-2025',
-      name: '2024/2025',
-      startDate: '2024-07-15',
-      endDate: '2025-06-20',
-      isActive: false,
-    },
-    {
-      id: 'ay-2025-2026',
-      name: '2025/2026',
-      startDate: '2025-07-14',
-      endDate: '2026-06-25',
-      isActive: true,
-    },
-  ];
+export const getAcademicYears = async (tenantId?: string): Promise<AcademicYear[]> => {
+  tenantId = resolveTenantId(tenantId);
+  return academicYearRepository.findAll(tenantId);
 };
 
-export const saveAcademicYear = async (academicYear: Partial<AcademicYear>, tenantId: string = 'tenant-demo'): Promise<boolean> => {
-  try {
-    if (db.table('academic_years')) {
-      const id = academicYear.id || `ay_${Date.now()}`;
-      await db.table('academic_years').put({
-        ...academicYear,
-        id,
-        tenantId,
-        updatedAt: Date.now(),
-      });
-      return true;
-    }
-  } catch {}
+export const saveAcademicYear = async (academicYear: Partial<AcademicYear>, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
+  if (!academicYear.name?.trim()) throw new Error('Nama tahun ajaran wajib diisi');
+  const entity = {
+    ...academicYear,
+    id: academicYear.id || crypto.randomUUID(),
+    tenantId,
+    isActive: Boolean(academicYear.isActive),
+    updatedAt: Date.now(),
+  } as AcademicYear;
+  if (academicYear.id) await academicYearRepository.update(entity);
+  else await academicYearRepository.create(entity);
   return true;
 };
 
-export const deleteAcademicYear = async (id: string): Promise<boolean> => {
-  try {
-    if (db.table('academic_years')) {
-      await db.table('academic_years').delete(id);
-    }
-  } catch {}
+export const deleteAcademicYear = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
+  await academicYearRepository.delete(id, tenantId);
   return true;
 };
 
-export const activateAcademicYear = async (id: string, tenantId: string = 'tenant-demo'): Promise<boolean> => {
-  try {
-    if (db.table('academic_years')) {
-      const all = await db.table('academic_years').where('tenantId').equals(tenantId).toArray();
-      for (const item of all) {
-        await db.table('academic_years').update(item.id, { isActive: item.id === id });
-      }
-    }
-  } catch {}
+export const activateAcademicYear = async (id: string, tenantId?: string | unknown[]): Promise<boolean> => {
+  const resolvedTenantId = resolveTenantId(typeof tenantId === 'string' ? tenantId : undefined);
+  const years = await academicYearRepository.findAll(resolvedTenantId);
+  const target = years.find((year) => year.id === id);
+  if (!target) throw new Error('Tahun ajaran tidak ditemukan');
+  for (const year of years) {
+    const next = { ...year, isActive: year.id === id, updatedAt: Date.now() } as AcademicYear;
+    await academicYearRepository.update(next);
+  }
   return true;
 };
 
-export const getSemesters = async (tenantId: string = 'tenant-demo', academicYearId?: string): Promise<Semester[]> => {
-  try {
-    if (db.table('semesters')) {
-      let query = db.table('semesters').where('tenantId').equals(tenantId);
-      const list = await query.toArray();
-      if (list.length > 0) {
-        if (academicYearId) return list.filter(s => s.academicYearId === academicYearId);
-        return list;
-      }
-    }
-  } catch {}
-  return [
-    {
-      id: 'sem-1',
-      academicYearId: 'ay-2025-2026',
-      name: 'Ganjil',
-      isActive: false,
-    },
-    {
-      id: 'sem-2',
-      academicYearId: 'ay-2025-2026',
-      name: 'Genap',
-      isActive: true,
-    },
-  ];
+export const getSemesters = async (tenantOrAcademicYearId?: string, academicYearId?: string): Promise<Semester[]> => {
+  const tenantId = resolveTenantId();
+  const years = await academicYearRepository.findAll(tenantId);
+  const isYearId = !!tenantOrAcademicYearId && years.some((year) => year.id === tenantOrAcademicYearId);
+  const selectedYearId = academicYearId || (isYearId ? tenantOrAcademicYearId : undefined);
+  const list = await semesterRepository.getAll(tenantId);
+  return selectedYearId ? list.filter((semester) => semester.academicYearId === selectedYearId) : list;
 };
 
-export const saveSemester = async (semester: Partial<Semester>, tenantId: string = 'tenant-demo'): Promise<boolean> => {
-  try {
-    if (db.table('semesters')) {
-      const id = semester.id || `sem_${Date.now()}`;
-      await db.table('semesters').put({
-        ...semester,
-        id,
-        tenantId,
-        updatedAt: Date.now(),
-      });
-      return true;
-    }
-  } catch {}
+export const saveSemester = async (semester: Partial<Semester>, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
+  if (!semester.academicYearId) throw new Error('academicYearId is required');
+  await semesterRepository.save({
+    ...semester,
+    id: semester.id || crypto.randomUUID(),
+    tenantId,
+    updatedAt: Date.now(),
+  });
   return true;
 };
 
-export const deleteSemester = async (id: string): Promise<boolean> => {
-  try {
-    if (db.table('semesters')) {
-      await db.table('semesters').delete(id);
-    }
-  } catch {}
+export const deleteSemester = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
+  const item = (await semesterRepository.getAll(tenantId)).find((semester: any) => semester.id === id);
+  if (!item) return false;
+  await db.table('semesters').delete(id);
   return true;
 };
 
-export const activateSemester = async (id: string, tenantId: string = 'tenant-demo'): Promise<boolean> => {
-  try {
-    if (db.table('semesters')) {
-      const all = await db.table('semesters').where('tenantId').equals(tenantId).toArray();
-      for (const item of all) {
-        await db.table('semesters').update(item.id, { isActive: item.id === id });
-      }
-    }
-  } catch {}
+export const activateSemester = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
+  const list = await semesterRepository.getAll(tenantId);
+  const target = list.find((semester: any) => semester.id === id);
+  if (!target) throw new Error('Semester tidak ditemukan');
+  for (const semester of list) {
+    await semesterRepository.save({ ...semester, isActive: semester.id === id, updatedAt: Date.now() });
+  }
   return true;
 };
 
