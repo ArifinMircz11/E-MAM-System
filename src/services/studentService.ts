@@ -1,134 +1,81 @@
-import { db } from '@/database/db';
-import { Student } from '@/types';
-import { MOCK_STUDENTS } from './mockData';
+import type { Student } from '@/types';
+import { studentRepository } from '@/features/students/repositories/StudentRepository';
+import { getSecurityContext } from '@/core/security/contextHelper';
 
-export const getStudents = async (tenantId: string = 'tenant-demo'): Promise<Student[]> => {
-  try {
-    if (!db.table('students')) return MOCK_STUDENTS;
-    const list = await db.table('students').where('tenantId').equals(tenantId).toArray();
-    return list.length > 0 ? list : MOCK_STUDENTS;
-  } catch {
-    return MOCK_STUDENTS;
-  }
+const context = () => getSecurityContext(true);
+
+export const getStudents = async (tenantId?: string): Promise<Student[]> => {
+  const ctx = context();
+  const activeTenant = tenantId || ctx.tenantId;
+  if (!activeTenant || activeTenant !== ctx.tenantId && !ctx.isDeveloper) throw new Error('StudentService: tenantId tidak valid.');
+  return studentRepository.findAll(activeTenant);
 };
 
 export const getStudentData = getStudents;
 
-export const getStudentsByClass = async (classId: string, tenantId: string = 'tenant-demo') => {
-  try {
-    if (db.table('students')) {
-      return await db.table('students').where('tenantId').equals(tenantId).filter(s => s.classId === classId).toArray();
-    }
-    return [];
-  } catch {
-    return [];
-  }
+export const getStudentsByClass = async (classId: string, tenantId?: string): Promise<Student[]> => {
+  const ctx = context();
+  const activeTenant = tenantId || ctx.tenantId;
+  if (activeTenant !== ctx.tenantId && !ctx.isDeveloper) throw new Error('StudentService: tenant mismatch.');
+  return studentRepository.findByClass(classId, activeTenant);
 };
-
 
 export const getStudentByUserId = async (userId: string): Promise<Student | null> => {
-  try {
-    if (!db.table('students')) return MOCK_STUDENTS[0] || null;
-    return (await db.table('students').where('userId').equals(userId).first()) || MOCK_STUDENTS[0] || null;
-  } catch {
-    return MOCK_STUDENTS[0] || null;
-  }
+  const ctx = context();
+  return studentRepository.fetchByUserId(ctx.tenantId, userId);
 };
 
-export const getStudentGenderBreakdown = async (tenantId: string = 'tenant-demo') => {
+export const getStudentGenderBreakdown = async (tenantId?: string) => {
   const students = await getStudents(tenantId);
-  const male = students.filter((s) => s.gender === 'L').length;
-  const female = students.filter((s) => s.gender === 'P').length;
-  return { male, female, total: students.length };
+  return {
+    male: students.filter((s) => s.gender === 'L').length,
+    female: students.filter((s) => s.gender === 'P').length,
+    total: students.length,
+  };
 };
 
-export const updateStudent = async (id: string, data: Partial<Student>) => {
-  try {
-    if (db.table('students')) {
-      await db.table('students').update(id, { ...data, updatedAt: Date.now() });
-    }
-    return true;
-  } catch {
-    return false;
-  }
+export const updateStudent = async (id: string, data: Partial<Student>): Promise<boolean> => {
+  const ctx = context();
+  const current = await studentRepository.findById(id, ctx.tenantId);
+  if (!current) return false;
+  await studentRepository.update({ ...current, ...data } as Student);
+  return true;
 };
 
-export const saveStudent = async (student: Student) => {
-  try {
-    if (db.table('students')) {
-      await db.table('students').put(student);
-    }
-    return true;
-  } catch {
-    return false;
-  }
+export const saveStudent = async (student: Student): Promise<boolean> => {
+  await studentRepository.save(context(), student);
+  return true;
 };
 
-export const deleteStudent = async (id: string) => {
-  try {
-    if (db.table('students')) {
-      await db.table('students').delete(id);
-    }
-    return true;
-  } catch {
-    return false;
-  }
+export const deleteStudent = async (id: string): Promise<boolean> => {
+  const ctx = context();
+  await studentRepository.delete(id, ctx.tenantId);
+  return true;
 };
 
-export const lookupStudentByIdUnik = async (idUnik: string, tenantId?: string): Promise<any | null> => {
-  try {
-    if (!db.table('students')) {
-      const found = MOCK_STUDENTS.find(s => s.idUnik === idUnik);
-      return found ? { ...found, namaLengkap: found.name } : null;
-    }
-    const student = await db.table('students')
-      .where('idUnik')
-      .equals(idUnik)
-      .first();
-    const result = student || MOCK_STUDENTS.find(s => s.idUnik === idUnik) || null;
-    return result ? { ...result, namaLengkap: result.name } : null;
-  } catch {
-    const found = MOCK_STUDENTS.find(s => s.idUnik === idUnik);
-    return found ? { ...found, namaLengkap: found.name } : null;
-  }
+export const lookupStudentByIdUnik = async (idUnik: string, tenantId?: string): Promise<Student | null> => {
+  const ctx = context();
+  const activeTenant = tenantId || ctx.tenantId;
+  const student = await studentRepository.fetchByIdUnik(activeTenant, idUnik);
+  return student ? { ...student, namaLengkap: (student as any).namaLengkap || student.name } : null;
 };
 
-export const lookupStudentByNisn = async (nisn: string, tenantId?: string): Promise<any | null> => {
-  try {
-    if (!db.table('students')) {
-      const found = MOCK_STUDENTS.find(s => s.nisn === nisn);
-      return found ? { ...found, namaLengkap: found.name } : null;
-    }
-    const student = await db.table('students')
-      .where('nisn')
-      .equals(nisn)
-      .first();
-    const result = student || MOCK_STUDENTS.find(s => s.nisn === nisn) || null;
-    return result ? { ...result, namaLengkap: result.name } : null;
-  } catch {
-    const found = MOCK_STUDENTS.find(s => s.nisn === nisn);
-    return found ? { ...found, namaLengkap: found.name } : null;
-  }
+export const lookupStudentByNisn = async (nisn: string, tenantId?: string): Promise<Student | null> => {
+  const ctx = context();
+  const activeTenant = tenantId || ctx.tenantId;
+  const student = await studentRepository.fetchByNisn(activeTenant, nisn);
+  return student ? { ...student, namaLengkap: (student as any).namaLengkap || student.name } : null;
 };
 
 export const checkExistingUserByAttribute = async (field: string, value: string): Promise<boolean> => {
-  try {
-    if (!db.table('users')) return false;
-    const list = await db.table('users').filter((u: any) => u[field] === value).toArray();
-    return list.length > 0;
-  } catch {
-    return false;
-  }
+  const db = studentRepository.db;
+  const users = await db.table('users').toArray();
+  return users.some((u: any) => u[field] === value && u.tenantId === context().tenantId && u.deleted !== true);
 };
 
-export const seedDummyStudents = async () => {
-  try {
-    if (db.table('students')) {
-      for (const s of MOCK_STUDENTS) {
-        await db.table('students').put(s);
-      }
-    }
-  } catch {}
+/** Test/demo data seeding is intentionally separated from production services. */
+export const seedDummyStudents = async (): Promise<void> => {
+  throw new Error('Dummy student seeding is disabled in the production data path. Use an explicit test fixture/seed command.');
 };
 
 export const promoteStudents = async (
@@ -136,40 +83,30 @@ export const promoteStudents = async (
   targetClassName: string,
   targetClassId: string,
 ): Promise<boolean> => {
-  try {
-    if (db.table('students')) {
-      for (const id of studentIds) {
-        await db.table('students').update(id, {
-          class: targetClassName,
-          classId: targetClassId,
-          updatedAt: Date.now(),
-        });
-      }
-      return true;
-    }
-  } catch {}
-  return false;
+  const ctx = context();
+  await studentRepository.promoteBatch(studentIds, ctx.tenantId, {
+    class: targetClassName,
+    className: targetClassName,
+    classId: targetClassId,
+    updatedAt: Date.now(),
+  });
+  return true;
 };
 
 export const promoteStudentsToAlumni = async (
   studentIds: string[],
   graduationYear: string,
 ): Promise<boolean> => {
-  try {
-    if (db.table('students')) {
-      for (const id of studentIds) {
-        await db.table('students').update(id, {
-          status: 'alumni',
-          class: 'ALUMNI',
-          classId: 'ALUMNI',
-          graduationYear,
-          updatedAt: Date.now(),
-        });
-      }
-      return true;
-    }
-  } catch {}
-  return false;
+  const ctx = context();
+  await studentRepository.promoteBatch(studentIds, ctx.tenantId, {
+    status: 'alumni',
+    class: 'ALUMNI',
+    className: 'ALUMNI',
+    classId: 'ALUMNI',
+    graduationYear,
+    updatedAt: Date.now(),
+  });
+  return true;
 };
 
 export const studentService = {
