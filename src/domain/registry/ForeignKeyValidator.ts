@@ -25,7 +25,11 @@ export async function validateForeignKeys(
 
     for (const value of values) {
       const key = String(value);
-      const targetRecord = await table.get(key);
+      const targetRecord =
+        relation.to.field === target.primaryKey || relation.to.field === 'id'
+          ? await table.get(key)
+          : await table.where(relation.to.field).equals(key).first();
+
       if (!targetRecord || (targetRecord as any).deleted === true) {
         errors.push(`[${relation.name}] FK ${relation.from.field}='${key}' tidak ditemukan pada ${target.dexieTable}.`);
         continue;
