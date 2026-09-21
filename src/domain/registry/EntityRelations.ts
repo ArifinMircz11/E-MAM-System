@@ -31,6 +31,7 @@ export const ENTITY_RELATIONS: readonly EntityRelation[] = [
   { name: 'user.tenant', from: { entity: 'user', field: 'tenantId' }, to: { entity: 'tenant', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
 
   { name: 'student.class', from: { entity: 'student', field: 'classId' }, to: { entity: 'class', field: 'id' }, cardinality: 'many-to-one', inverseField: 'studentIds', onDelete: 'set-null' },
+  { name: 'class.academicYear', from: { entity: 'class', field: 'academicYearId' }, to: { entity: 'academic_year', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'classIds', onDelete: 'restrict' },
   { name: 'class.homeroomTeacher', from: { entity: 'class', field: 'waliKelasId' }, to: { entity: 'teacher', field: 'idUnik' }, cardinality: 'many-to-one', inverseField: 'waliKelasClassIds', onDelete: 'set-null' },
 
   { name: 'attendance.student', from: { entity: 'attendance', field: 'studentsId' }, to: { entity: 'student', field: 'idUnik' }, cardinality: 'many-to-one', required: true, inverseField: 'attendanceIds', onDelete: 'restrict' },
