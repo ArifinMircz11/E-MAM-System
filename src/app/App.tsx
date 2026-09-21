@@ -19,7 +19,7 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { useUserStore } from '@/stores/userStore';
 import { normalizeRoleStr, logoutUser } from '@/services/authService';
 import { subscribeToAnnouncements } from '@/services/realtime/announcementListener';
-import { MOCK_TICKER } from '@/services/mockData';
+import { getTickerItems } from '@/services/tickerService';
 import { resilientLazy } from '@/utils/resilientLazy';
 import { MonitoringModule } from '@/app/boot/modules/MonitoringModule';
 import { TenantContext } from '@/core/context/TenantContext';
@@ -113,7 +113,7 @@ const App: React.FC = () => {
   const unreadChatCount = useNotificationStore((state) => state.unreadChatCount);
   const pendingLetterCount = useNotificationStore((state) => state.pendingLetterCount);
   const pendingApprovalCount = useAuthStore((state) => state.pendingApprovalCount);
-  useEffect(() => { setTickerItems(MOCK_TICKER.filter((item: any) => item.isActive)); }, []);
+  useEffect(() => { void getTickerItems().then((items) => setTickerItems(items.filter((item: any) => item.isActive !== false))); }, []);
 
   const handleNavigate = (view: ViewState) => {
     if (view === currentView) return;
