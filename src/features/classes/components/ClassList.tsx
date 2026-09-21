@@ -204,10 +204,11 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
     setLoading(true);
     const fetchData = async () => {
       try {
-        const [classesData, teachersData, studentsData] = await Promise.all([
+        const [classesData, teachersData, studentsData, yearsData] = await Promise.all([
           getStoredClasses(),
           getStoredTeachers(),
           getStoredStudents(),
+          getAcademicYears(tenantId),
         ]);
 
         // Filter classes for Siswa if role-restricted
@@ -224,6 +225,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
         );
         setClasses(sortedClasses);
         setTeachers(teachersData);
+        setAcademicYears(yearsData);
 
         // Default select the first class to prevent unselected load (Zero-Waste O(1) directive 3)
         if (sortedClasses.length > 0 && !selectedClass) {
@@ -236,7 +238,7 @@ const ClassList: React.FC<ClassListProps> = ({ onBack, onOpenSidebar, onNavigate
       }
     };
     fetchData();
-  }, [getStoredClasses, getStoredTeachers, getStoredStudents, isStudent, activeStudentClass]);
+  }, [getStoredClasses, getStoredTeachers, getStoredStudents, isStudent, activeStudentClass, tenantId]);
 
   // Load schedules, point_records, daily attendance, letters, archives
   useEffect(() => {
