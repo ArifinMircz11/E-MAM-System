@@ -3,33 +3,19 @@ import { ClassItem } from '@/types';
 
 export class ClassRepository {
   async getAll(tenantId: string = 'tenant-demo'): Promise<ClassItem[]> {
-    try {
-      if (db.table('classes')) {
-        return await db.table('classes').where('tenantId').equals(tenantId).toArray();
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    return db.table('classes').where('tenantId').equals(tenantId).filter((c: any) => c.deleted !== true).toArray();
   }
 
   async getById(id: string): Promise<ClassItem | null> {
-    try {
-      if (db.table('classes')) {
-        return (await db.table('classes').get(id)) || null;
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    return (await db.table('classes').get(id)) || null;
   }
 
   async save(cls: ClassItem): Promise<void> {
-    try {
-      if (db.table('classes')) {
-        await db.table('classes').put(cls);
-      }
-    } catch {}
+    await db.table('classes').put(cls);
+  }
+
+  async delete(id: string): Promise<void> {
+    await db.table('classes').delete(id);
   }
 }
 
