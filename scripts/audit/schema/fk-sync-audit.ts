@@ -19,11 +19,11 @@ for (const relation of ENTITY_RELATIONS) {
     source.primaryKey,
     'id',
     'tenantId',
-    ...(source.indexes || []).map((value) => value.replace(/\[|\]/g, '').split('+')),
+    ...(source.indexes || []).flatMap((value) => value.replace(/[\[\]]/g, '').split('+')),
     ...(source.columns || []).map((column) => column.key),
     ...(source.formSchema || []).map((field) => field.name),
   ]);
-  const knownTargetFields = new Set([target.primaryKey, 'id', 'tenantId', ...(target.indexes || []).map((value) => value.replace(/\[|\]/g, '').split('+'))]);
+  const knownTargetFields = new Set([target.primaryKey, 'id', 'tenantId', ...(target.indexes || []).flatMap((value) => value.replace(/[\[\]]/g, '').split('+'))]);
 
   if (!knownSourceFields.has(relation.from.field)) {
     errors.push(`[${relation.name}] source field '${relation.from.field}' is not declared/indexed in ${source.name}`);
