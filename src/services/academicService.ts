@@ -39,8 +39,8 @@ export const deleteAcademicYear = async (id: string, tenantId?: string): Promise
 };
 
 export const activateAcademicYear = async (id: string, tenantId?: string | unknown[]): Promise<boolean> => {
-  tenantId = resolveTenantId(typeof tenantId === 'string' ? tenantId : undefined);
-  const years = await academicYearRepository.findAll(tenantId);
+  const resolvedTenantId = resolveTenantId(typeof tenantId === 'string' ? tenantId : undefined);
+  const years = await academicYearRepository.findAll(resolvedTenantId);
   const target = years.find((year) => year.id === id);
   if (!target) throw new Error('Tahun ajaran tidak ditemukan');
   for (const year of years) {
