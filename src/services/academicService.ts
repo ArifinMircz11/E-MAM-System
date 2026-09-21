@@ -2,20 +2,23 @@ import type { AcademicYear, Semester, Assignment, Submission } from '@/types';
 import { academicYearRepository } from '@/repositories/AcademicYearRepository';
 import { semesterRepository } from '@/repositories/SemesterRepository';
 import { db } from '@/database/db';
+import { getSecurityContext } from '@/core/security/contextHelper';
 
-export const getActiveAcademicYear = async (tenantId: string): Promise<AcademicYear | null> => {
-  if (!tenantId) throw new Error('tenantId is required');
+const resolveTenantId = (tenantId?: string): string => tenantId || getSecurityContext().tenantId;
+
+export const getActiveAcademicYear = async (tenantId?: string): Promise<AcademicYear | null> => {
+  tenantId = resolveTenantId(tenantId);
   const years = await academicYearRepository.findAll(tenantId);
   return years.find((year) => year.isActive && !year.deleted) ?? null;
 };
 
-export const getAcademicYears = async (tenantId: string): Promise<AcademicYear[]> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const getAcademicYears = async (tenantId?: string): Promise<AcademicYear[]> => {
+  tenantId = resolveTenantId(tenantId);
   return academicYearRepository.findAll(tenantId);
 };
 
-export const saveAcademicYear = async (academicYear: Partial<AcademicYear>, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const saveAcademicYear = async (academicYear: Partial<AcademicYear>, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
   if (!academicYear.name?.trim()) throw new Error('Nama tahun ajaran wajib diisi');
   const entity = {
     ...academicYear,
@@ -29,14 +32,14 @@ export const saveAcademicYear = async (academicYear: Partial<AcademicYear>, tena
   return true;
 };
 
-export const deleteAcademicYear = async (id: string, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const deleteAcademicYear = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
   await academicYearRepository.delete(id, tenantId);
   return true;
 };
 
-export const activateAcademicYear = async (id: string, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const activateAcademicYear = async (id: string, tenantId?: string | unknown[]): Promise<boolean> => {
+  tenantId = resolveTenantId(typeof tenantId === 'string' ? tenantId : undefined);
   const years = await academicYearRepository.findAll(tenantId);
   const target = years.find((year) => year.id === id);
   if (!target) throw new Error('Tahun ajaran tidak ditemukan');
@@ -47,14 +50,17 @@ export const activateAcademicYear = async (id: string, tenantId: string): Promis
   return true;
 };
 
-export const getSemesters = async (tenantId: string, academicYearId?: string): Promise<Semester[]> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const getSemesters = async (tenantOrAcademicYearId?: string, academicYearId?: string): Promise<Semester[]> => {
+  const tenantId = resolveTenantId();
+  const years = await academicYearRepository.findAll(tenantId);
+  const isYearId = !!tenantOrAcademicYearId && years.some((year) => year.id === tenantOrAcademicYearId);
+  const selectedYearId = academicYearId || (isYearId ? tenantOrAcademicYearId : undefined);
   const list = await semesterRepository.getAll(tenantId);
-  return academicYearId ? list.filter((semester) => semester.academicYearId === academicYearId) : list;
+  return selectedYearId ? list.filter((semester) => semester.academicYearId === selectedYearId) : list;
 };
 
-export const saveSemester = async (semester: Partial<Semester>, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const saveSemester = async (semester: Partial<Semester>, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
   if (!semester.academicYearId) throw new Error('academicYearId is required');
   await semesterRepository.save({
     ...semester,
@@ -65,16 +71,16 @@ export const saveSemester = async (semester: Partial<Semester>, tenantId: string
   return true;
 };
 
-export const deleteSemester = async (id: string, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const deleteSemester = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
   const item = (await semesterRepository.getAll(tenantId)).find((semester: any) => semester.id === id);
   if (!item) return false;
   await db.table('semesters').delete(id);
   return true;
 };
 
-export const activateSemester = async (id: string, tenantId: string): Promise<boolean> => {
-  if (!tenantId) throw new Error('tenantId is required');
+export const activateSemester = async (id: string, tenantId?: string): Promise<boolean> => {
+  tenantId = resolveTenantId(tenantId);
   const list = await semesterRepository.getAll(tenantId);
   const target = list.find((semester: any) => semester.id === id);
   if (!target) throw new Error('Semester tidak ditemukan');
