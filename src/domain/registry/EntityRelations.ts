@@ -45,12 +45,16 @@ export const ENTITY_RELATIONS: readonly EntityRelation[] = [
   { name: 'teacherAssignment.teacher', from: { entity: 'teacher_assignment', field: 'teacherId' }, to: { entity: 'teacher', field: 'idUnik' }, cardinality: 'many-to-one', required: true, inverseField: 'assignmentIds', onDelete: 'restrict' },
   { name: 'teacherAssignment.class', from: { entity: 'teacher_assignment', field: 'classId' }, to: { entity: 'class', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'assignmentIds', onDelete: 'restrict' },
   { name: 'teacherAssignment.subject', from: { entity: 'teacher_assignment', field: 'subjectId' }, to: { entity: 'subject', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'assignmentIds', onDelete: 'restrict' },
+  { name: 'teacherAssignment.academicYear', from: { entity: 'teacher_assignment', field: 'academicYearId' }, to: { entity: 'academic_year', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
+  { name: 'teacherAssignment.semester', from: { entity: 'teacher_assignment', field: 'semesterId' }, to: { entity: 'semester', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
 
   { name: 'schedule.class', from: { entity: 'schedule', field: 'classId' }, to: { entity: 'class', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'scheduleIds', onDelete: 'restrict' },
-  { name: 'schedule.teacher', from: { entity: 'schedule', field: 'teacherId' }, to: { entity: 'teacher', field: 'idUnik' }, cardinality: 'many-to-one', required: true, inverseField: 'scheduleIds', onDelete: 'restrict' },
+  { name: 'schedule.teacherAssignment', from: { entity: 'schedule', field: 'teacherAssignmentId' }, to: { entity: 'teacher_assignment', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'scheduleIds', onDelete: 'restrict' },
   { name: 'schedule.subject', from: { entity: 'schedule', field: 'subjectId' }, to: { entity: 'subject', field: 'id' }, cardinality: 'many-to-one', required: true, inverseField: 'scheduleIds', onDelete: 'restrict' },
   { name: 'schedule.day', from: { entity: 'schedule', field: 'dayId' }, to: { entity: 'day', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
   { name: 'schedule.academicYear', from: { entity: 'schedule', field: 'academicYearId' }, to: { entity: 'academic_year', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
+  { name: 'timeSlot.academicYear', from: { entity: 'time_slot', field: 'academicYearId' }, to: { entity: 'academic_year', field: 'id' }, cardinality: 'many-to-one', required: true, onDelete: 'restrict' },
+  { name: 'timeSlot.semester', from: { entity: 'time_slot', field: 'semesterId' }, to: { entity: 'semester', field: 'id' }, cardinality: 'many-to-one', onDelete: 'restrict' },
   { name: 'schedule.exception', from: { entity: 'schedule_exception', field: 'scheduleId' }, to: { entity: 'schedule', field: 'id' }, cardinality: 'many-to-one', inverseField: 'exceptionIds', onDelete: 'cascade' },
 
   { name: 'point.student', from: { entity: 'point', field: 'studentsId' }, to: { entity: 'student', field: 'idUnik' }, cardinality: 'many-to-one', required: true, inverseField: 'pointIds', onDelete: 'restrict' },
