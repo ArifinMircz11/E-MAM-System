@@ -24,7 +24,7 @@ import {
   where as fsWhere,
   type Firestore,
 } from 'firebase/firestore';
-import clientEnv from '@/core/config/clientEnv';
+import clientEnv, { getClientEnv } from '@/core/config/clientEnv';
 
 export type QuerySnapshotMock = any;
 
@@ -53,8 +53,8 @@ class FirestoreGateway {
     this.db = getFirestore(this.app, config.DATABASE_ID || '(default)');
 
     if (clientEnv.USE_FIREBASE_EMULATOR && typeof window !== 'undefined') {
-      const host = clientEnv.getClientEnv?.('VITE_FIRESTORE_EMULATOR_HOST', '127.0.0.1') || '127.0.0.1';
-      const port = Number(clientEnv.getClientEnv?.('VITE_FIRESTORE_EMULATOR_PORT', '8080') || 8080);
+      const host = getClientEnv('VITE_FIRESTORE_EMULATOR_HOST', '127.0.0.1');
+      const port = Number(getClientEnv('VITE_FIRESTORE_EMULATOR_PORT', '8080'));
       connectFirestoreEmulator(this.db, host, port);
     }
   }
