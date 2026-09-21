@@ -134,6 +134,8 @@ export interface Teacher extends AppEntity {
 export interface ClassData extends AppEntity {
   name: string;
   grade?: string | number;
+  academicYearId?: string;
+  /** @deprecated use academicYearId */
   academicYear?: string;
   waliKelasId?: string;
   waliKelasName?: string;
