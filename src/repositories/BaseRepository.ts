@@ -6,6 +6,8 @@ import { getSecurityContext } from "@/core/security/contextHelper";
 import { SyncStatus } from "@/domain/entities/base";
 import { ArchitectureBoundaryEnforcer } from "@/core/boundary/ArchitectureBoundaryEnforcer";
 import { ArchitectureBoundaryError } from "@/core/boundary/ArchitectureBoundaryError";
+import { entityRegistry } from '@/domain/registry/EntityRegistry';
+import { validateForeignKeys } from '@/domain/registry/ForeignKeyValidator';
 
 export abstract class BaseRepository<T extends BaseEntity> {
   protected tableName?: string;
@@ -48,6 +50,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
       if (existing && !context.isDeveloper && (existing as any).tenantId !== context.tenantId) throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', `Record '${entity.id}' bukan milik tenant aktif.`);
       const id = entity.id || this.generateId(); const isCreate = !existing; const currentVersion = Number((existing as any)?.version ?? 0); const requestedVersion = Number((entity as any).version ?? 0); const nextVersion = isCreate ? Math.max(1, requestedVersion) : Math.max(currentVersion + 1, requestedVersion);
       const dataToSave = { ...existing, ...entity, id, tenantId: context.tenantId, syncStatus: SyncStatus.PENDING, version: nextVersion, updatedAt: now, ...(isCreate ? { createdAt: Number((entity as any).createdAt ?? now) } : {}) } as T & Record<string, any>;
+      const entityMeta = entityRegistry.getAll().find((meta) => meta.dexieTable === tName);
+      if (entityMeta) await validateForeignKeys(dbInstance, entityMeta.name, dataToSave as Record<string, unknown>, { strict: true });
       prepared.push(dataToSave as T); queueItems.push({ id: this.generateQueueId(id, nextVersion), tenantId: context.tenantId, collection: tName, operation: isCreate ? 'create' : 'update', recordId: id, payload: dataToSave, status: 'pending', attempts: 0, createdAt: now, updatedAt: now, priority: 'high', metadata: { actorId: context.uid, version: nextVersion, idempotencyKey: `${context.tenantId}:${tName}:${id}:${nextVersion}`, action: isCreate ? 'CREATE' : 'UPDATE' } });
     }
     await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => { await table.bulkPut(prepared as any); if (queueItems.length) await dbInstance.table('sync_queue').bulkPut(queueItems as any); });
@@ -76,6 +80,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
     if (existing && !context.isDeveloper && (existing as any).tenantId !== context.tenantId) throw new ArchitectureBoundaryError('tenant', 'TENANT_ACCESS_DENIED', `Record '${input.id}' bukan milik tenant aktif.`);
     const isCreate = !existing; const id = input.id || this.generateId(); const currentVersion = Number((existing as any)?.version ?? 0); const requestedVersion = Number(input.version ?? 0); const nextVersion = isCreate ? Math.max(1, requestedVersion) : Math.max(currentVersion + 1, requestedVersion); const now = Date.now();
     const dataToSave = { ...existing, ...input, id, tenantId: context.tenantId, syncStatus: SyncStatus.PENDING, version: nextVersion, deleted: false, deletedAt: undefined, updatedAt: now, ...(isCreate ? { createdAt: Number(input.createdAt ?? now) } : {}) } as T & Record<string, any>;
+    const entityMeta = entityRegistry.getAll().find((meta) => meta.dexieTable === tName);
+    if (entityMeta) await validateForeignKeys(dbInstance, entityMeta.name, dataToSave as Record<string, unknown>, { strict: true });
     const queueItem = { id: this.generateQueueId(id, nextVersion), tenantId: context.tenantId, collection: tName, operation: isCreate ? 'create' : 'update', recordId: id, payload: dataToSave, status: 'pending', attempts: 0, createdAt: now, updatedAt: now, priority: 'high', metadata: { actorId: context.uid, version: nextVersion, idempotencyKey: `${context.tenantId}:${tName}:${id}:${nextVersion}`, action: isCreate ? 'CREATE' : 'UPDATE' } };
     await dbInstance.transaction('rw', [dbInstance.table(tName), dbInstance.table('sync_queue')], async () => { await table.put(dataToSave as T); if (tName !== 'sync_queue' && tName !== 'login_logs') await dbInstance.table('sync_queue').put(queueItem as any); });
     return dataToSave as T;
