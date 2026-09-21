@@ -1,13 +1,17 @@
-import { db } from '@/database/db';
 import { TenantContext } from '@/core/context/TenantContext';
+import { studentRepository } from '@/features/students/repositories/StudentRepository';
+import { teacherRepository } from '@/repositories/teacherRepository';
+import { classRepository } from '@/repositories/classRepository';
 
 export const getDashboardSummary = async (tenantId?: string) => {
   const activeTenant = tenantId || TenantContext.getTenantId();
-  const studentsCount = await db.table('students').where('tenantId').equals(activeTenant).filter((s: any) => s.deleted !== true).count();
-  const teachersCount = await db.table('teachers').where('tenantId').equals(activeTenant).filter((t: any) => t.deleted !== true).count();
+  const [students, teachers] = await Promise.all([
+    studentRepository.findAll(activeTenant),
+    teacherRepository.getAll(activeTenant),
+  ]);
   return {
-    totalStudents: studentsCount,
-    totalTeachers: teachersCount,
+    totalStudents: students.length,
+    totalTeachers: teachers.length,
     attendanceRate: null,
     violationsCount: null,
   };
@@ -15,16 +19,16 @@ export const getDashboardSummary = async (tenantId?: string) => {
 
 export const getDashboardStats = async (tenantId?: string) => {
   const activeTenant = tenantId || TenantContext.getTenantId();
-  const [studentsCount, teachersCount, classesCount] = await Promise.all([
-    db.table('students').where('tenantId').equals(activeTenant).filter((s: any) => s.deleted !== true).count(),
-    db.table('teachers').where('tenantId').equals(activeTenant).filter((t: any) => t.deleted !== true).count(),
-    db.table('classes').where('tenantId').equals(activeTenant).filter((c: any) => c.deleted !== true).count(),
+  const [students, teachers, classes] = await Promise.all([
+    studentRepository.findAll(activeTenant),
+    teacherRepository.getAll(activeTenant),
+    classRepository.getAll(activeTenant),
   ]);
   return {
-    totalStudents: studentsCount,
-    totalTeachers: teachersCount,
-    totalGTK: teachersCount,
-    totalClasses: classesCount,
+    totalStudents: students.length,
+    totalTeachers: teachers.length,
+    totalGTK: teachers.length,
+    totalClasses: classes.length,
     isStale: false,
   };
 };
