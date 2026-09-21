@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { flushPendingAutoFixLogs } from '@/services/sync/autoFixEngine';
 import { fetchPendingLettersCount } from '@/services/realtime/pendingLettersListener';
 import { UserRole } from '@/types';
-import { seedInitialData } from '@/services/seedService';
 import { SyncEngine } from '@/services/SyncEngine';
 import { AppInitializationService } from '@/services/AppInitializationService';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
@@ -59,23 +58,6 @@ export const useAppInitialization = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, [setIsOnline, updateConnectivity]);
-
-  // Automatic system bootstrapping for privileged authenticated users.
-  useEffect(() => {
-    if (isMockMode || !user || !navigator.onLine) return;
-
-    const bootstrapSistem = async () => {
-      const isAdminOrDev = [UserRole.ADMIN as string, UserRole.DEVELOPER as string].includes(userRole);
-      if (!isAdminOrDev) return;
-
-      try {
-        await seedInitialData();
-      } catch (err) {
-        console.warn('[Omni-Bootstrap] Seeding skipped or errored:', err);
-      }
-    };
-    void bootstrapSistem();
-  }, [user, userRole]);
 
   // Notification & realtime listeners are only meaningful for authenticated users.
   useEffect(() => {
