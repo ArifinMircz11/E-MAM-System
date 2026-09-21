@@ -19,9 +19,11 @@ import {
   onSnapshot as fsOnSnapshot,
   orderBy as fsOrderBy,
   query as fsQuery,
+  serverTimestamp as fsServerTimestamp,
   setDoc as fsSetDoc,
   startAfter as fsStartAfter,
   where as fsWhere,
+  writeBatch as fsWriteBatch,
   type Firestore,
 } from 'firebase/firestore';
 import clientEnv, { getClientEnv } from '@/core/config/clientEnv';
@@ -34,9 +36,7 @@ class FirestoreGateway {
 
   constructor() {
     const config = clientEnv.FIREBASE;
-    if (!config.PROJECT_ID) {
-      throw new Error('[FirestoreGateway] Firebase PROJECT_ID is not configured.');
-    }
+    if (!config.PROJECT_ID) throw new Error('[FirestoreGateway] Firebase PROJECT_ID is not configured.');
 
     this.app = getApps().length
       ? getApp()
@@ -59,57 +59,23 @@ class FirestoreGateway {
     }
   }
 
-  collection(_db: Firestore, path: string) {
-    return fsCollection(this.db, path);
-  }
-
-  doc(_db: Firestore, path: string, ...pathSegments: string[]) {
-    return fsDoc(this.db, path, ...pathSegments);
-  }
-
-  query(collectionRef: any, ...queryConstraints: any[]) {
-    return fsQuery(collectionRef, ...queryConstraints);
-  }
-
-  orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
-    return fsOrderBy(field, direction);
-  }
-
-  limit(limitCount: number) {
-    return fsLimit(limitCount);
-  }
-
-  where(field: string, op: any, value: any) {
-    return fsWhere(field, op, value);
-  }
-
-  startAfter(...values: any[]) {
-    return fsStartAfter(...values);
-  }
-
-  documentId() {
-    return fsDocumentId();
-  }
-
-  onSnapshot(queryRef: any, onNext: (snapshot: any) => void, onError?: (error: any) => void) {
-    return fsOnSnapshot(queryRef, onNext, onError);
-  }
-
-  async getDocs(queryRef: any) {
-    return fsGetDocs(queryRef);
-  }
-
-  async setDoc(docRef: any, data: Record<string, unknown>, options?: { merge?: boolean }) {
-    return fsSetDoc(docRef, data, options);
-  }
-
-  async deleteDoc(docRef: any) {
-    return fsDeleteDoc(docRef);
-  }
+  collection(_db: Firestore, path: string) { return fsCollection(this.db, path); }
+  doc(_db: Firestore, path: string, ...pathSegments: string[]) { return fsDoc(this.db, path, ...pathSegments); }
+  query(collectionRef: any, ...queryConstraints: any[]) { return fsQuery(collectionRef, ...queryConstraints); }
+  orderBy(field: string, direction: 'asc' | 'desc' = 'asc') { return fsOrderBy(field, direction); }
+  limit(limitCount: number) { return fsLimit(limitCount); }
+  where(field: string, op: any, value: any) { return fsWhere(field, op, value); }
+  startAfter(...values: any[]) { return fsStartAfter(...values); }
+  documentId() { return fsDocumentId(); }
+  onSnapshot(queryRef: any, onNext: (snapshot: any) => void, onError?: (error: any) => void) { return fsOnSnapshot(queryRef, onNext, onError); }
+  async getDocs(queryRef: any) { return fsGetDocs(queryRef); }
+  async setDoc(docRef: any, data: Record<string, unknown>, options?: { merge?: boolean }) { return fsSetDoc(docRef, data, options); }
+  async deleteDoc(docRef: any) { return fsDeleteDoc(docRef); }
+  writeBatch() { return fsWriteBatch(this.db); }
+  serverTimestamp() { return fsServerTimestamp(); }
 }
 
 export const firestoreGateway = new FirestoreGateway();
-
 export const collection = (db: Firestore, path: string) => firestoreGateway.collection(db, path);
 export const doc = (db: Firestore, path: string, ...segments: string[]) => firestoreGateway.doc(db, path, ...segments);
 export const query = (ref: any, ...constraints: any[]) => firestoreGateway.query(ref, ...constraints);
@@ -119,8 +85,5 @@ export const orderBy = (field: string, direction: 'asc' | 'desc' = 'asc') => fir
 export const startAfter = (...values: any[]) => firestoreGateway.startAfter(...values);
 export const documentId = () => firestoreGateway.documentId();
 export const onSnapshot = (ref: any, onNext: (snapshot: any) => void, onError?: (error: any) => void) => firestoreGateway.onSnapshot(ref, onNext, onError);
-export const writeBatch = () => ({
-  set: (docRef: any, data: any, options?: any) => fsSetDoc(docRef, data, options),
-  delete: (docRef: any) => fsDeleteDoc(docRef),
-});
-export const serverTimestamp = () => new Date().toISOString();
+export const writeBatch = () => firestoreGateway.writeBatch();
+export const serverTimestamp = () => firestoreGateway.serverTimestamp();
