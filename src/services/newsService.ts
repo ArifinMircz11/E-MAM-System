@@ -1,54 +1,20 @@
-import { MOCK_TICKER } from './mockData';
-import { TickerItem } from '@/types';
+import { db } from '@/database/db';
 
-export const getNews = async (force: boolean = false) => {
+export const getNews = async (): Promise<any[]> => {
   try {
-    const { db } = await import('@/database/db');
-    if (db.table('news')) {
-      const list = await db.table('news').toArray();
-      if (list.length > 0) return list;
-    }
-  } catch {}
-  
-  return [
-    {
-      id: 'news-1',
-      title: 'Pelaksanaan Asesmen Madrasah Berbasis Komputer (AMBK) 2026',
-      content: 'Jadwal dan persiapan teknis AMBK untuk seluruh tingkat kelas telah dipublikasikan.',
-      category: 'Akademik',
-      date: new Date().toISOString().split('T')[0],
-      author: 'Humas Madrasah',
-    },
-    {
-      id: 'news-2',
-      title: 'Sosialisasi Integrasi Sistem Presensi Digital Siswa & GTK',
-      content: 'Mulai semester ini, seluruh data presensi diintegrasikan secara realtime dan offline-first.',
-      category: 'Informasi',
-      date: new Date().toISOString().split('T')[0],
-      author: 'Tim IT',
-    },
-  ];
+    return await db.table('news').filter((item: any) => item.deleted !== true).toArray();
+  } catch {
+    return [];
+  }
 };
 
 export const saveNews = async (newsItem: any) => {
-  try {
-    const { db } = await import('@/database/db');
-    if (db.table('news')) {
-      await db.table('news').put(newsItem);
-      return newsItem;
-    }
-  } catch {}
+  await db.table('news').put(newsItem);
   return newsItem;
 };
 
 export const deleteNews = async (id: string) => {
-  try {
-    const { db } = await import('@/database/db');
-    if (db.table('news')) {
-      await db.table('news').delete(id);
-      return true;
-    }
-  } catch {}
+  await db.table('news').delete(id);
   return true;
 };
 
