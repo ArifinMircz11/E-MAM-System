@@ -27,10 +27,10 @@ export interface LegacyAcademicYear {
 /**
  * Maps legacy Class to modern Class structure
  */
-export function mapLegacyClass(legacy: LegacyClass) {
+export function mapLegacyClass(legacy: LegacyClass, academicYearIdsByName: Record<string, string> = {}) {
   if (!legacy.classId || !legacy.tenantId || !legacy.academicYear) throw new Error('Legacy class requires classId, tenantId and academicYear');
   const cId = `cls_${legacy.classId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-  const normalizedYearId = `ay_${legacy.academicYear.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const normalizedYearId = academicYearIdsByName[legacy.academicYear] || `ay_${legacy.academicYear.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   return {
     id: cId,
