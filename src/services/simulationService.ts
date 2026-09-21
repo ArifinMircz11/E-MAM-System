@@ -1,3 +1,1 @@
-export const simulationService = {
-  runSimulation: async () => ({ status: 'success' }),
-};
+export const simulationService = { };

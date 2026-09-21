@@ -1,4 +1,1 @@
-export const subscribePendingApprovalsCount = (callback: (count: number) => void) => {
-  callback(0);
-  return () => {};
-};
+export const initPendingApprovalListener = () => {};

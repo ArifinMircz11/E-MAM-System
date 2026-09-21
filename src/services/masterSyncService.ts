@@ -1,3 +1,1 @@
-export const masterSyncService = {
-  syncMasterData: async () => {},
-};
+export const masterSyncService = { };

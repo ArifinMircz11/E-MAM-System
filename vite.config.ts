@@ -1,19 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
-      injectRegister: 'auto',
-    }),
+      registerType: 'autoUpdate',
+    })
   ],
   resolve: {
     alias: {
@@ -21,12 +18,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
     host: '0.0.0.0',
-    allowedHosts: 'all',
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-  },
+    port: 3000,
+  }
 });

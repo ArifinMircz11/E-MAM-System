@@ -1,2 +1,1 @@
-export * from '../BaseRepository';
-export { BaseRepository as default } from '../BaseRepository';
+export class BaseRepository { create = async (data: any) => {}; };

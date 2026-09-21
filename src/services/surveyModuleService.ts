@@ -1,3 +1,1 @@
-export const surveyModuleService = {
-  getSurveys: async () => [],
-};
+export const surveyModuleService = { };
