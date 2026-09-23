@@ -265,7 +265,10 @@ export class EMamDatabase extends Dexie {
             if (!existing) await target.put({ ...row, id });
           }
         } catch (error) {
-          console.warn('[Dexie V13] Legacy store migration skipped:', legacyName, error);
+          // Migration failure must abort the version upgrade. V14 must never remove a
+          // legacy store when its data was not copied successfully.
+          console.error('[Dexie V13] Legacy store migration failed:', legacyName, error);
+          throw error;
         }
       }
     });
@@ -284,7 +287,21 @@ export class EMamDatabase extends Dexie {
 
       // Backfill FK fields only when the referenced canonical parent is already local.
       const classRows = await classes.toArray();
+      const studentRows = await students.toArray();
       const classById = new Map(classRows.map((row: any) => [String(row.id), row]));
+      const classByBusinessKey = new Map(
+        classRows.flatMap((row: any) => [
+          row.classId ? [String(row.classId), row] : [],
+          row.name ? [String(row.name), row] : [],
+        ]),
+      );
+      const studentByBusinessKey = new Map(
+        studentRows.flatMap((row: any) => [
+          row.idUnik ? [String(row.idUnik), row] : [],
+          row.studentsId ? [String(row.studentsId), row] : [],
+        ]),
+      );
+
       await students.toCollection().modify((row: any) => {
         if (!row.academicYearId && row.classId) {
           row.academicYearId = classById.get(String(row.classId))?.academicYearId;
@@ -292,12 +309,20 @@ export class EMamDatabase extends Dexie {
       });
       await schedules.toCollection().modify((row: any) => {
         if (!row.academicYearId && row.classId) {
-          row.academicYearId = classById.get(String(row.classId))?.academicYearId;
+          row.academicYearId =
+            classById.get(String(row.classId))?.academicYearId ??
+            classByBusinessKey.get(String(row.classId))?.academicYearId;
         }
       });
       await attendance.toCollection().modify((row: any) => {
-        if (!row.studentId && row.studentsId) row.studentId = row.studentsId;
-        if (!row.classId && row.class) row.classId = row.class;
+        if (!row.studentId && row.studentsId) {
+          row.studentId = studentByBusinessKey.get(String(row.studentsId))?.id;
+        }
+        if (!row.classId && row.class) {
+          row.classId =
+            classById.get(String(row.class))?.id ??
+            classByBusinessKey.get(String(row.class))?.id;
+        }
       });
     });
   }
