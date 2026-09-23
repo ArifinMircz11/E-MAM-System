@@ -124,7 +124,7 @@ entityRegistry.register({
   firestoreCollection: 'students',
   primaryKey: 'id',
   businessKey: 'idUnik',
-  indexes: ['id', 'idUnik', 'tenantId', 'studentsId', 'classId', '[tenantId+classId]'],
+  indexes: ['id', 'idUnik', 'tenantId', 'studentsId', 'classId', 'academicYearId', '[tenantId+classId]', '[tenantId+academicYearId]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -477,7 +477,7 @@ entityRegistry.register({
   dexieTable: 'semesters',
   firestoreCollection: 'semesters',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'academicYearId', 'isActive', '[tenantId+isActive]'],
+  indexes: ['id', 'tenantId', 'academicYearId', 'isActive', '[tenantId+academicYearId]', '[tenantId+isActive]'],
   tenantScoped: true,
   syncEnabled: true,
 });
@@ -532,7 +532,7 @@ entityRegistry.register({
   dexieTable: 'schedules',
   firestoreCollection: 'schedules',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'classId', 'dayId', 'timeSlotId', 'academicYearId', '[tenantId+classId]', '[tenantId+dayId]'],
+  indexes: ['id', 'tenantId', 'academicYearId', 'semesterId', 'classId', 'dayId', 'timeSlotId', 'subjectId', 'teacherAssignmentId', 'roomId', '[tenantId+academicYearId]', '[tenantId+semesterId]', '[tenantId+classId]', '[tenantId+classId+semesterId]'],
   tenantScoped: true,
   syncEnabled: true,
 });
