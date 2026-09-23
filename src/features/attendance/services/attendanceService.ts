@@ -231,10 +231,14 @@ export const recordAttendanceByScan = async (
 
     if (!student) return { success: false, message: 'ID_TIDAK_VALID' };
 
+    const studentId = String(student.id);
     const idUnik = student.idUnik || (student as any).studentsId;
+    const classId = String((student as any).classId || '');
+    const academicYearId = String((student as any).academicYearId || '');
     const tenantId = student.sistemJangkar?.tenantId || student.tenantId;
     if (!tenantId) throw new Error('tenantId required');
-    const academicYear = student.metadataAkademik?.tahunAngkatan || '2025';
+    if (!classId || !academicYearId) return { success: false, message: 'RELATION_AKADEMIK_TIDAK_LENGKAP' };
+    const academicYear = academicYearId;
 
     if (!idUnik) return { success: false, message: 'DATA_SISWA_TIDAK_LENGKAP' };
 
@@ -284,7 +288,7 @@ export const recordAttendanceByScan = async (
     }
 
     // Simpan lokal agar muncul di history/cache
-    const attId = `${idUnik}_${today}`;
+    const attId = `${studentId}_${today}`;
     
     // ATOMIC TRANSACTION: Gunakan localDb.transaction untuk integritas transaksi Dexie
     await localDb.transaction('rw', [localDb.attendance, localDb.sync_queue], async () => {
@@ -297,8 +301,10 @@ export const recordAttendanceByScan = async (
 
         const outboxPayload = {
             id: String(attId),
-            studentId: idUnik,
+            studentId,
             studentsId: idUnik,
+            classId,
+            academicYearId,
             studentName: student.namaLengkap,
             nisn: student.nisn || '',
             className: normalizedClass,
@@ -322,6 +328,7 @@ export const recordAttendanceByScan = async (
             timeStr: timeStr,
             phone: student.kontakDanWali?.nomorHpSiswa || student.noTelepon,
             tenantId: tenantId,
+            academicYearId,
             academicYear: academicYear,
         };
 
@@ -329,8 +336,10 @@ export const recordAttendanceByScan = async (
             id: String(attId), // FIX: Ensure 'id' key path is present for Dexie!
             ...(existingLocal || {}),
             studentsId: idUnik,
-            studentId: idUnik,
+            studentId,
             studentName: student.namaLengkap,
+            classId,
+            academicYearId,
             idUnik: idUnik,
             nisn: student.nisn || '',
             className: normalizedClass,
@@ -479,8 +488,10 @@ export const prosesPresensiSiswa = async (studentDocId: string, jamScan: string)
 
   const attendanceData: any = {
     id: String(`${studentDocId}_${today}`),
-    studentsId: studentDocId,
-    studentId: studentDocId,
+    studentsId: student?.idUnik || studentDocId,
+    studentId: String(student?.id || studentDocId),
+    classId: String(student?.classId || ''),
+    academicYearId: String((student as any)?.academicYearId || ''),
     className: className,
     date: today,
     masuk: delay > 0 ? `${jamScan} (+${delay})` : jamScan,
