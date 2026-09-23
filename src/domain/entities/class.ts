@@ -9,7 +9,9 @@ export interface Class extends AppEntity {
   level: string;
   teacherId?: string | null;
   teacherName?: string;
-  academicYear: string;
+  academicYearId: string;
+  /** Legacy display label; never used as an FK. */
+  academicYear?: string;
   studentCount?: number;
   waliKelasId?: string | null;
   walikelasId?: string | null; // Legacy lowercase k
