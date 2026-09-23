@@ -119,18 +119,18 @@ export class EMamDatabase extends Dexie {
       gtk: 'id, tenantId, version, syncStatus, [tenantId+status], nip, nupdk, isClaimed',
       teachers: 'id, tenantId, version, syncStatus, [tenantId+status], tenantsId, teachersId, nip, isClaimed',
       siswa: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], nisn, nik',
-      students: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], tenantsId, studentsId, classId, tingkatRombel, status',
+      students: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+academicYearId], [tenantId+status], tenantsId, studentsId, classId, academicYearId, tingkatRombel, status',
       orang_tua: 'id, tenantId, version, syncStatus, [tenantId+studentId], nik',
       alumni: 'id, tenantId, version, syncStatus, [tenantId+graduationYear], nisn',
       tahun_pelajaran: 'id, tenantId, version, syncStatus, [tenantId+isActive], year',
       academic_years: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], tenantsId, isActive',
       academicYears: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], tenantsId, isActive',
       semester: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], semesterCode',
-      semesters: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], academicYearId',
+      semesters: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], [tenantId+isActive], academicYearId, code, startDate, endDate',
       days: 'id, order, name',
       daftar_kelas: 'id, tenantId, version, syncStatus, [tenantId+academicYearId], name',
       kelas: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, name',
-      classes: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, name',
+      classes: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, academicYearId, waliKelasId, name',
       mata_pelajaran: 'id, tenantId, version, syncStatus, [tenantId+code], name',
       subjects: 'id, tenantId, npsn, version, syncStatus, [tenantId+code], name',
       ruang: 'id, tenantId, version, syncStatus, [tenantId+code], name',
@@ -140,13 +140,13 @@ export class EMamDatabase extends Dexie {
       teacher_assignments: 'id, tenantId, npsn, version, syncStatus, [tenantId+teacherId], [tenantId+classId], [tenantId+subjectId]',
       riwayat_siswa: 'id, tenantId, version, syncStatus, [tenantId+studentId], academicYearId',
       jadwal: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+teacherId], [tenantId+classId+dayIndex], tenantsId, classId, day',
-      schedules: 'id, tenantId, npsn, version, syncStatus, [tenantId+classId], [tenantId+teacherId], [tenantId+classId+dayId], tenantsId, classId, dayId, timeSlotId',
+      schedules: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], [tenantId+semesterId], [tenantId+classId], [tenantId+classId+dayId], [tenantId+classId+semesterId], academicYearId, semesterId, classId, dayId, timeSlotId, subjectId, teacherAssignmentId, roomId',
       time_slots: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], academicYearId, period, startTime',
       schedule_exceptions: 'id, tenantId, npsn, version, syncStatus, [tenantId+scheduleId], date',
       schedule_logs: 'id, tenantId, npsn, version, syncStatus, [tenantId+scheduleId], createdAt',
       jadwal_mengajar: 'id, tenantId, version, syncStatus, [tenantId+teacherId], day',
       absensi_siswa: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+tanggal], tenantsId, studentsId, studentId, date, tanggal, classId',
-      attendance: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+studentsId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+classId+date], [tenantId+tanggal], [tenantId+date], tenantsId, studentsId, studentId, date, tanggal, classId',
+      attendance: 'id, tenantId, version, syncStatus, [tenantId+academicYearId], [tenantId+semesterId], [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+classId+date], academicYearId, semesterId, scheduleId, studentId, classId, date, tanggal, studentsId, tenantsId',
       absensi_guru: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+date], tenantsId, teachersId, date',
       teacher_attendance: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+date], tenantsId, teachersId, date',
       jurnal: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+classId+date], tenantsId, teacherId, date',
@@ -274,6 +274,32 @@ export class EMamDatabase extends Dexie {
     const canonicalSchema = { ...schema };
     for (const legacyName of ["pengguna","gtk","siswa","academicYears","tahun_pelajaran","semester","daftar_kelas","kelas","mata_pelajaran","ruang","jadwal","absensi_siswa","absensi_guru","jurnal","kategori_poin","pointCategories","poin","notification","audit_log"]) delete canonicalSchema[legacyName as keyof typeof canonicalSchema];
     this.version(14).stores(canonicalSchema);
+
+    // V15: enforce the canonical academic relation indexes used by offline repositories.
+    this.version(15).stores(canonicalSchema).upgrade(async (tx) => {
+      const students = tx.table('students');
+      const classes = tx.table('classes');
+      const schedules = tx.table('schedules');
+      const attendance = tx.table('attendance');
+
+      // Backfill FK fields only when the referenced canonical parent is already local.
+      const classRows = await classes.toArray();
+      const classById = new Map(classRows.map((row: any) => [String(row.id), row]));
+      await students.toCollection().modify((row: any) => {
+        if (!row.academicYearId && row.classId) {
+          row.academicYearId = classById.get(String(row.classId))?.academicYearId;
+        }
+      });
+      await schedules.toCollection().modify((row: any) => {
+        if (!row.academicYearId && row.classId) {
+          row.academicYearId = classById.get(String(row.classId))?.academicYearId;
+        }
+      });
+      await attendance.toCollection().modify((row: any) => {
+        if (!row.studentId && row.studentsId) row.studentId = row.studentsId;
+        if (!row.classId && row.class) row.classId = row.class;
+      });
+    });
   }
 }
 
