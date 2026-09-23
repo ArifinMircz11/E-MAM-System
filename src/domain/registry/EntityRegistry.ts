@@ -122,9 +122,9 @@ entityRegistry.register({
   label: 'Siswa',
   dexieTable: 'students',
   firestoreCollection: 'students',
-  primaryKey: 'idUnik',
+  primaryKey: 'id',
   businessKey: 'idUnik',
-  indexes: ['idUnik', 'tenantId', 'id', 'studentsId'],
+  indexes: ['id', 'idUnik', 'tenantId', 'studentsId', 'classId', '[tenantId+classId]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -175,9 +175,9 @@ entityRegistry.register({
   label: 'Guru & Staf',
   dexieTable: 'teachers',
   firestoreCollection: 'teachers',
-  primaryKey: 'idUnik',
+  primaryKey: 'id',
   businessKey: 'idUnik',
-  indexes: ['idUnik', 'tenantId', 'id', 'teachersId', 'nip', 'nik'],
+  indexes: ['id', 'idUnik', 'tenantId', 'teachersId', 'nip', 'nik'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -246,7 +246,7 @@ entityRegistry.register({
   dexieTable: 'classes',
   firestoreCollection: 'classes',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'classId', 'name'],
+  indexes: ['id', 'tenantId', 'classId', 'name', 'academicYearId', '[tenantId+academicYearId]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -276,7 +276,7 @@ entityRegistry.register({
   dexieTable: 'academic_years',
   firestoreCollection: 'academic_years',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'name', 'isActive'],
+  indexes: ['id', 'tenantId', 'name', 'isActive', '[tenantId+isActive]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
