@@ -126,6 +126,22 @@ export const ProfileHome: React.FC<ProfileHomeProps> = ({ profile, onEdit, theme
     { id: 'kontak', label: 'Alamat & Kontak', desc: 'Telepon & Lokasi Rumah', icon: MapPinIcon },
   ];
 
+
+  const [isCardFlipped, setIsCardFlipped] = React.useState(false);
+
+  const digitalCard = {
+    name: profile.displayName || 'Pengguna e-MAM',
+    role: roleLabels[profile.role] || profile.role || 'Pengguna',
+    id: profile.idUnik || profile.studentsId || profile.teachersId || '-',
+    identity: profile.nisn || profile.nip || profile.nik || '-',
+    className: profile.class || profile.tingkatRombel || '-',
+    tenant: tenantConfig?.namaSekolah || profile.namaSekolah || 'Madrasah',
+    npsn: tenantConfig?.npsn || profile.npsn || '-',
+    email: profile.email || '-',
+    phone: profile.phone || '-',
+    photo: profile.photoURL || profile.photoUrl || '',
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Stats Quick Grid */}
@@ -155,88 +171,107 @@ export const ProfileHome: React.FC<ProfileHomeProps> = ({ profile, onEdit, theme
         ))}
       </div>
 
-      {/* Main Info Card */}
-      <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 overflow-hidden shadow-xl">
-        <div className="p-6 md:p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <SparklesIcon className="w-5 h-5 text-indigo-500" />
-            <h3 className="text-[11px] font-bold text-slate-800 dark:text-white uppercase tracking-[0.2em]">
-              Ringkasan Identitas
-            </h3>
+      {/* Digital Identity Card — tap/click to flip */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-4">
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-800 dark:text-white uppercase tracking-[0.2em]">Kartu Digital</h3>
+            <p className="text-[9px] text-slate-400 font-semibold mt-1">Ketuk kartu untuk melihat detail identitas</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400">
-                  <EnvelopeIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
-                    Email Terdaftar
-                  </p>
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {profile.email || '-'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400">
-                  <PhoneIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
-                    Nomor WhatsApp
-                  </p>
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {profile.phone || '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400">
-                  <MapPinIcon className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
-                    Domisili
-                  </p>
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
-                    {profile.address || 'Alamat belum diatur'}
-                  </p>
-                </div>
-              </div>
-              {profile.class && (
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-indigo-500">
-                    <ZapIcon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
-                      Rombel / Penugasan
-                    </p>
-                    <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase">
-                      {profile.class}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">
+            {isCardFlipped ? 'Detail' : 'Identitas'}
+          </span>
         </div>
 
-        <div className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t border-slate-100 dark:border-slate-800 flex justify-center">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-            Terakhir diperbarui:{' '}
-            {new Date().toLocaleDateString('id-ID', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-          </p>
+        <div
+          className="relative w-full max-w-2xl mx-auto h-[250px] sm:h-[280px] cursor-pointer select-none [perspective:1200px]"
+          role="button"
+          tabIndex={0}
+          aria-label="Kartu digital profil. Ketuk untuk membalik kartu."
+          onClick={() => setIsCardFlipped((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsCardFlipped((v) => !v);
+            }
+          }}
+        >
+          <motion.div
+            animate={{ rotateY: isCardFlipped ? 180 : 0 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+            className="relative w-full h-full [transform-style:preserve-3d]"
+          >
+            <div className="absolute inset-0 [backface-visibility:hidden] overflow-hidden rounded-[2rem] border border-indigo-200/60 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 text-white shadow-2xl">
+              <div className="absolute -right-16 -top-20 w-48 h-48 rounded-full bg-white/10" />
+              <div className="absolute -left-20 -bottom-24 w-56 h-56 rounded-full bg-cyan-400/10" />
+              <div className="relative h-full p-5 sm:p-7 flex flex-col justify-between">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-indigo-200">e-MAM System</p>
+                    <p className="text-[9px] text-indigo-100/80 mt-1 uppercase font-semibold">Digital Identity Card</p>
+                  </div>
+                  <ShieldCheckIcon className="w-7 h-7 text-cyan-200" />
+                </div>
+                <div className="flex items-center gap-4 sm:gap-5">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/30 bg-white/10 flex items-center justify-center shrink-0 shadow-lg">
+                    {digitalCard.photo ? (
+                      <img src={digitalCard.photo} alt={digitalCard.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black">{digitalCard.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-2xl font-black tracking-tight truncate">{digitalCard.name}</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-cyan-200 uppercase tracking-wider mt-1">{digitalCard.role}</p>
+                    <p className="text-[9px] text-white/70 font-mono mt-2 truncate">ID: {digitalCard.id}</p>
+                  </div>
+                </div>
+                <div className="flex items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[8px] uppercase tracking-wider text-white/50 font-bold">Madrasah</p>
+                    <p className="text-[10px] sm:text-xs font-bold truncate">{digitalCard.tenant}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[8px] uppercase tracking-wider text-white/50 font-bold">Ketuk</p>
+                    <p className="text-[9px] text-cyan-200 font-bold">Lihat detail ↻</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl">
+              <div className="h-full p-5 sm:p-7 flex flex-col">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <div>
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-indigo-500">Data Identitas</p>
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white mt-1">{digitalCard.name}</h4>
+                  </div>
+                  <IdentificationIcon className="w-6 h-6 text-indigo-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-3 mt-4 flex-1">
+                  {[
+                    ['Role', digitalCard.role],
+                    ['ID Unik', digitalCard.id],
+                    ['NIP / NISN', digitalCard.identity],
+                    ['Rombel', digitalCard.className],
+                    ['NPSN', digitalCard.npsn],
+                    ['Status', statusCfg.label],
+                    ['Email', digitalCard.email],
+                    ['WhatsApp', digitalCard.phone],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <p className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate mt-0.5">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <span className="text-[8px] font-semibold text-slate-400">Data ditampilkan dari profil aktif</span>
+                  <span className="text-[8px] font-bold text-indigo-500 uppercase">Ketuk ↻ Balik</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
 
