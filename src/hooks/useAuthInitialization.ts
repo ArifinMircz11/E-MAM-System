@@ -5,10 +5,13 @@ import { useUserStore } from '@/stores/userStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { SecurityContextService } from '@/core/security/SecurityContextService';
 import { AuthBootstrapService } from '@/services/AuthBootstrapService';
+import { IdentitySessionService } from '@/identity/application/IdentitySession';
+import type { CanonicalUser } from '@/identity/domain/CanonicalUser';
 import { UserRole } from '@/types';
 
 /**
  * UI lifecycle adapter only. Authentication business workflow lives in AuthBootstrapService.
+ * Canonical operational identity is established explicitly after bootstrap.
  */
 export const useAuthInitialization = () => {
   const [authLoading, setAuthLoading] = useState(true);
@@ -35,6 +38,7 @@ export const useAuthInitialization = () => {
       safetyTimer = null;
 
       if (!firebaseUser) {
+        IdentitySessionService.clear();
         setUser(null);
         clearUserData();
         clearProfile();
@@ -50,6 +54,11 @@ export const useAuthInitialization = () => {
 
       try {
         const result = await AuthBootstrapService.initialize(firebaseUser);
+
+        // Firebase Auth establishes authentication; only the canonical user
+        // establishes an operational identity/tenant boundary.
+        IdentitySessionService.establish(result.userData as CanonicalUser);
+
         setUser(result.user);
         setUserData(result.userData);
         setAccountStatus(result.accountStatus as any);
@@ -67,6 +76,7 @@ export const useAuthInitialization = () => {
         }
         finishLoading();
       } catch (error) {
+        IdentitySessionService.clear();
         console.error('[AuthInit] Initialization failed:', error);
         setAccountStatus('pending' as any);
         SecurityContextService.setLifecycleState('ERROR', error instanceof Error ? error : String(error));
