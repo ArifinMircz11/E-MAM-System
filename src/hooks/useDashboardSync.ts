@@ -14,7 +14,7 @@ import type { UserRole } from '@/types';
 export const useDashboardSync = (userRole: UserRole, isStaff: boolean) => {
   const [loading, setLoading] = useState(true);
   const user = useAuthStore((state) => state.user);
-  const tenantId = useUserStore((state) => state.tenantId) || '30315537';
+  const tenantId = useUserStore((state) => state.tenantId);
   const studentsId = user?.studentsId || user?.idUnik;
 
   const setStats = useDashboardStore((state) => state.setStats);
