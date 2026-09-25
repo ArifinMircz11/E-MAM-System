@@ -8,7 +8,6 @@ import {
   UserIcon,
 } from '@/shared/Icons';
 import { roleIcons, getRoleScope } from '@/constants/dashboard';
-import { useSyncStore } from '@/stores/syncStore';
 import { useTenantStore } from '@/stores/tenantStore';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { HeaderSyncIndicator } from './HeaderSyncIndicator';
@@ -47,7 +46,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   referenceId,
 }) => {
   const { isImpersonating, stopImpersonation } = useImpersonation();
-  const pendingWritesCount = useSyncStore((state) => state.pendingWritesCount);
   const { config: tenantConfig } = useTenantStore();
   const totalBadges = unreadNotifCount + unreadChatCount + pendingLetterCount;
 
