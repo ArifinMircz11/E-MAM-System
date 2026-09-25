@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { localDb } from '@/database/dexie';
+import { syncRepository } from '@/repositories/SyncRepository';
 import { triggerOfflineProcessing } from '@/services/offlineAutoProcessService';
 import { useSyncStore } from '@/stores/syncStore';
 
@@ -30,11 +30,7 @@ export const useOfflineSync = () => {
 
   const checkPending = useCallback(async () => {
     try {
-      const count = await localDb.sync_queue
-        .where('status')
-        .anyOf(['pending', 'waiting', 'failed'])
-        .count();
-
+      const count = await syncRepository.getPendingCount();
       setPendingCount(count);
       setStorePendingCount(count);
       return count;
