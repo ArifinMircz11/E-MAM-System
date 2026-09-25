@@ -4,42 +4,28 @@ import type { DeadLetterQueueItem, SyncQueueItem } from '@/types/syncQueue';
 
 export class EMamDatabase extends Dexie {
   madrasah!: Table<any, string>;
-  pengguna!: Table<any, string>;
   users!: Table<any, string>;
-  gtk!: Table<any, string>;
   teachers!: Table<any, string>;
-  siswa!: Table<any, string>;
   students!: Table<any, string>;
   orang_tua!: Table<any, string>;
   alumni!: Table<any, string>;
-  tahun_pelajaran!: Table<any, string>;
   academic_years!: Table<any, string>;
-  academicYears!: Table<any, string>;
-  semester!: Table<any, string>;
   semesters!: Table<any, string>;
   days!: Table<any, string>;
-  daftar_kelas!: Table<any, string>;
-  kelas!: Table<any, string>;
   classes!: Table<any, string>;
-  mata_pelajaran!: Table<any, string>;
   subjects!: Table<any, string>;
-  ruang!: Table<any, string>;
   rooms!: Table<any, string>;
   jurusan!: Table<any, string>;
   kalender_akademik!: Table<any, string>;
   teacher_assignments!: Table<any, string>;
   riwayat_siswa!: Table<any, string>;
-  jadwal!: Table<any, string>;
   schedules!: Table<any, string>;
   time_slots!: Table<any, string>;
   schedule_exceptions!: Table<any, string>;
   schedule_logs!: Table<any, string>;
   jadwal_mengajar!: Table<any, string>;
-  absensi_siswa!: Table<any, string>;
   attendance!: Table<any, string>;
-  absensi_guru!: Table<any, string>;
   teacher_attendance!: Table<any, string>;
-  jurnal!: Table<any, string>;
   journals!: Table<any, string>;
   penilaian!: Table<any, string>;
   rapor!: Table<any, string>;
@@ -62,18 +48,14 @@ export class EMamDatabase extends Dexie {
   cuti!: Table<any, string>;
   inventaris!: Table<any, string>;
   pelayanan!: Table<any, string>;
-  kategori_poin!: Table<any, string>;
   point_categories!: Table<any, string>;
-  pointCategories!: Table<any, string>;
   jenis_pelanggaran!: Table<any, string>;
   jenis_prestasi!: Table<any, string>;
-  poin!: Table<any, string>;
   points!: Table<any, string>;
   student_point_summaries!: Table<any, string>;
   konseling!: Table<any, string>;
   pemanggilan_orang_tua!: Table<any, string>;
   tindak_lanjut!: Table<any, string>;
-  notification!: Table<any, string>;
   notifications!: Table<any, string>;
   settings!: Table<any, string>;
   session!: Table<any, string>;
@@ -81,7 +63,6 @@ export class EMamDatabase extends Dexie {
   sync_queue!: Table<SyncQueueItem, string>;
   dead_letter_queue!: Table<DeadLetterQueueItem, string>;
   sync_log!: Table<any, string>;
-  audit_log!: Table<any, string>;
   audit_logs!: Table<any, string>;
   cache!: Table<any, string>;
   navigation_cache!: Table<any, string>;
@@ -131,7 +112,7 @@ export class EMamDatabase extends Dexie {
   constructor(databaseName: string = 'e-Mam_Enterprise_LocalDB') {
     super(databaseName);
 
-    this.version(12).stores({
+    const schema = {
       madrasah: 'id, npsn, tenantId, version, syncStatus',
       pengguna: 'id, tenantId, version, syncStatus, [tenantId+role], uid, email, role',
       users: 'id, tenantId, version, syncStatus, [tenantId+role], tenantsId, uid, email, role',
@@ -256,7 +237,43 @@ export class EMamDatabase extends Dexie {
       tenantAudits: 'id, tenantId, createdAt',
       student_parents: 'id, tenantId, studentId, parentId',
       satuan_kerja: 'id, tenantId, code'
+    };
+
+    this.version(12).stores(schema);
+
+    // V13: consolidate legacy duplicate stores into the canonical operational stores.
+    // Data is copied before any legacy store is removed in V14.
+    this.version(13).stores(schema).upgrade(async (tx) => {
+      const migrations: Array<[string, string]> = [
+        ['pengguna', 'users'], ['gtk', 'teachers'], ['siswa', 'students'],
+        ['tahun_pelajaran', 'academic_years'], ['academicYears', 'academic_years'],
+        ['semester', 'semesters'], ['daftar_kelas', 'classes'], ['kelas', 'classes'],
+        ['mata_pelajaran', 'subjects'], ['ruang', 'rooms'], ['jadwal', 'schedules'],
+        ['absensi_siswa', 'attendance'], ['absensi_guru', 'teacher_attendance'],
+        ['jurnal', 'journals'], ['kategori_poin', 'point_categories'],
+        ['pointCategories', 'point_categories'], ['poin', 'points'],
+        ['notification', 'notifications'], ['audit_log', 'audit_logs'],
+      ];
+      for (const [legacyName, canonicalName] of migrations) {
+        try {
+          const rows = await tx.table(legacyName).toArray();
+          const target = tx.table(canonicalName);
+          for (const row of rows) {
+            const id = row.id ?? row.idUnik ?? row.studentsId ?? row.teachersId ?? row.classId;
+            if (id == null) continue;
+            const existing = await target.get(id);
+            if (!existing) await target.put({ ...row, id });
+          }
+        } catch (error) {
+          console.warn('[Dexie V13] Legacy store migration skipped:', legacyName, error);
+        }
+      }
     });
+
+    // V14: remove duplicate legacy stores after V13 has copied their data.
+    const canonicalSchema = { ...schema };
+    for (const legacyName of ["pengguna","gtk","siswa","academicYears","tahun_pelajaran","semester","daftar_kelas","kelas","mata_pelajaran","ruang","jadwal","absensi_siswa","absensi_guru","jurnal","kategori_poin","pointCategories","poin","notification","audit_log"]) delete canonicalSchema[legacyName as keyof typeof canonicalSchema];
+    this.version(14).stores(canonicalSchema);
   }
 }
 
