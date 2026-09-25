@@ -56,6 +56,7 @@ export interface ClassEntity extends AppEntity {
   code: string;
   name: string;
   level: string;
+  academicYearId: string;
   departmentId?: string;
   homeroomTeacherId?: string;
   studentCount?: number;

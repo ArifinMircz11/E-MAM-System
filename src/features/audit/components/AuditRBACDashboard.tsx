@@ -188,7 +188,7 @@ export const AuditRBACDashboard: React.FC = () => {
       const cc = await db.classes.count();
       const ac = await db.attendance.count();
       const lc = await db.letters.count();
-      const pc = await db.pointCategories.count();
+      const pc = await db.point_categories.count();
       const sq = await db.sync_queue.count();
 
       setLocalCounts({

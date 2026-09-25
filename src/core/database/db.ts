@@ -4,42 +4,28 @@ import type { DeadLetterQueueItem, SyncQueueItem } from '@/types/syncQueue';
 
 export class EMamDatabase extends Dexie {
   madrasah!: Table<any, string>;
-  pengguna!: Table<any, string>;
   users!: Table<any, string>;
-  gtk!: Table<any, string>;
   teachers!: Table<any, string>;
-  siswa!: Table<any, string>;
   students!: Table<any, string>;
   orang_tua!: Table<any, string>;
   alumni!: Table<any, string>;
-  tahun_pelajaran!: Table<any, string>;
   academic_years!: Table<any, string>;
-  academicYears!: Table<any, string>;
-  semester!: Table<any, string>;
   semesters!: Table<any, string>;
   days!: Table<any, string>;
-  daftar_kelas!: Table<any, string>;
-  kelas!: Table<any, string>;
   classes!: Table<any, string>;
-  mata_pelajaran!: Table<any, string>;
   subjects!: Table<any, string>;
-  ruang!: Table<any, string>;
   rooms!: Table<any, string>;
   jurusan!: Table<any, string>;
   kalender_akademik!: Table<any, string>;
   teacher_assignments!: Table<any, string>;
   riwayat_siswa!: Table<any, string>;
-  jadwal!: Table<any, string>;
   schedules!: Table<any, string>;
   time_slots!: Table<any, string>;
   schedule_exceptions!: Table<any, string>;
   schedule_logs!: Table<any, string>;
   jadwal_mengajar!: Table<any, string>;
-  absensi_siswa!: Table<any, string>;
   attendance!: Table<any, string>;
-  absensi_guru!: Table<any, string>;
   teacher_attendance!: Table<any, string>;
-  jurnal!: Table<any, string>;
   journals!: Table<any, string>;
   penilaian!: Table<any, string>;
   rapor!: Table<any, string>;
@@ -62,18 +48,14 @@ export class EMamDatabase extends Dexie {
   cuti!: Table<any, string>;
   inventaris!: Table<any, string>;
   pelayanan!: Table<any, string>;
-  kategori_poin!: Table<any, string>;
   point_categories!: Table<any, string>;
-  pointCategories!: Table<any, string>;
   jenis_pelanggaran!: Table<any, string>;
   jenis_prestasi!: Table<any, string>;
-  poin!: Table<any, string>;
   points!: Table<any, string>;
   student_point_summaries!: Table<any, string>;
   konseling!: Table<any, string>;
   pemanggilan_orang_tua!: Table<any, string>;
   tindak_lanjut!: Table<any, string>;
-  notification!: Table<any, string>;
   notifications!: Table<any, string>;
   settings!: Table<any, string>;
   session!: Table<any, string>;
@@ -81,7 +63,6 @@ export class EMamDatabase extends Dexie {
   sync_queue!: Table<SyncQueueItem, string>;
   dead_letter_queue!: Table<DeadLetterQueueItem, string>;
   sync_log!: Table<any, string>;
-  audit_log!: Table<any, string>;
   audit_logs!: Table<any, string>;
   cache!: Table<any, string>;
   navigation_cache!: Table<any, string>;
@@ -131,25 +112,25 @@ export class EMamDatabase extends Dexie {
   constructor(databaseName: string = 'e-Mam_Enterprise_LocalDB') {
     super(databaseName);
 
-    this.version(12).stores({
+    const schema = {
       madrasah: 'id, npsn, tenantId, version, syncStatus',
       pengguna: 'id, tenantId, version, syncStatus, [tenantId+role], uid, email, role',
       users: 'id, tenantId, version, syncStatus, [tenantId+role], tenantsId, uid, email, role',
       gtk: 'id, tenantId, version, syncStatus, [tenantId+status], nip, nupdk, isClaimed',
       teachers: 'id, tenantId, version, syncStatus, [tenantId+status], tenantsId, teachersId, nip, isClaimed',
       siswa: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], nisn, nik',
-      students: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+status], tenantsId, studentsId, classId, tingkatRombel, status',
+      students: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+academicYearId], [tenantId+status], tenantsId, studentsId, classId, academicYearId, tingkatRombel, status',
       orang_tua: 'id, tenantId, version, syncStatus, [tenantId+studentId], nik',
       alumni: 'id, tenantId, version, syncStatus, [tenantId+graduationYear], nisn',
       tahun_pelajaran: 'id, tenantId, version, syncStatus, [tenantId+isActive], year',
       academic_years: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], tenantsId, isActive',
       academicYears: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], tenantsId, isActive',
       semester: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], semesterCode',
-      semesters: 'id, tenantId, npsn, version, syncStatus, [tenantId+isActive], academicYearId',
+      semesters: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], [tenantId+isActive], academicYearId, code, startDate, endDate',
       days: 'id, order, name',
       daftar_kelas: 'id, tenantId, version, syncStatus, [tenantId+academicYearId], name',
       kelas: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, name',
-      classes: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, name',
+      classes: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], tenantsId, classId, academicYearId, waliKelasId, name',
       mata_pelajaran: 'id, tenantId, version, syncStatus, [tenantId+code], name',
       subjects: 'id, tenantId, npsn, version, syncStatus, [tenantId+code], name',
       ruang: 'id, tenantId, version, syncStatus, [tenantId+code], name',
@@ -159,13 +140,13 @@ export class EMamDatabase extends Dexie {
       teacher_assignments: 'id, tenantId, npsn, version, syncStatus, [tenantId+teacherId], [tenantId+classId], [tenantId+subjectId]',
       riwayat_siswa: 'id, tenantId, version, syncStatus, [tenantId+studentId], academicYearId',
       jadwal: 'id, tenantId, version, syncStatus, [tenantId+classId], [tenantId+teacherId], [tenantId+classId+dayIndex], tenantsId, classId, day',
-      schedules: 'id, tenantId, npsn, version, syncStatus, [tenantId+classId], [tenantId+teacherId], [tenantId+classId+dayId], tenantsId, classId, dayId, timeSlotId',
+      schedules: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], [tenantId+semesterId], [tenantId+classId], [tenantId+classId+dayId], [tenantId+classId+semesterId], academicYearId, semesterId, classId, dayId, timeSlotId, subjectId, teacherAssignmentId, roomId',
       time_slots: 'id, tenantId, npsn, version, syncStatus, [tenantId+academicYearId], academicYearId, period, startTime',
       schedule_exceptions: 'id, tenantId, npsn, version, syncStatus, [tenantId+scheduleId], date',
       schedule_logs: 'id, tenantId, npsn, version, syncStatus, [tenantId+scheduleId], createdAt',
       jadwal_mengajar: 'id, tenantId, version, syncStatus, [tenantId+teacherId], day',
       absensi_siswa: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+tanggal], tenantsId, studentsId, studentId, date, tanggal, classId',
-      attendance: 'id, tenantId, version, syncStatus, [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+studentsId+date], [tenantId+classId+tanggal], [tenantId+studentsId+tanggal], [tenantId+classId+date], [tenantId+tanggal], [tenantId+date], tenantsId, studentsId, studentId, date, tanggal, classId',
+      attendance: 'id, tenantId, version, syncStatus, [tenantId+academicYearId], [tenantId+semesterId], [tenantId+scheduleId+date], [tenantId+studentId+date], [tenantId+classId+date], academicYearId, semesterId, scheduleId, studentId, classId, date, tanggal, studentsId, tenantsId',
       absensi_guru: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+date], tenantsId, teachersId, date',
       teacher_attendance: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+date], tenantsId, teachersId, date',
       jurnal: 'id, tenantId, version, syncStatus, [tenantId+teacherId+date], [tenantId+classId+date], tenantsId, teacherId, date',
@@ -256,6 +237,93 @@ export class EMamDatabase extends Dexie {
       tenantAudits: 'id, tenantId, createdAt',
       student_parents: 'id, tenantId, studentId, parentId',
       satuan_kerja: 'id, tenantId, code'
+    };
+
+    this.version(12).stores(schema);
+
+    // V13: consolidate legacy duplicate stores into the canonical operational stores.
+    // Data is copied before any legacy store is removed in V14.
+    this.version(13).stores(schema).upgrade(async (tx) => {
+      const migrations: Array<[string, string]> = [
+        ['pengguna', 'users'], ['gtk', 'teachers'], ['siswa', 'students'],
+        ['tahun_pelajaran', 'academic_years'], ['academicYears', 'academic_years'],
+        ['semester', 'semesters'], ['daftar_kelas', 'classes'], ['kelas', 'classes'],
+        ['mata_pelajaran', 'subjects'], ['ruang', 'rooms'], ['jadwal', 'schedules'],
+        ['absensi_siswa', 'attendance'], ['absensi_guru', 'teacher_attendance'],
+        ['jurnal', 'journals'], ['kategori_poin', 'point_categories'],
+        ['pointCategories', 'point_categories'], ['poin', 'points'],
+        ['notification', 'notifications'], ['audit_log', 'audit_logs'],
+      ];
+      for (const [legacyName, canonicalName] of migrations) {
+        try {
+          const rows = await tx.table(legacyName).toArray();
+          const target = tx.table(canonicalName);
+          for (const row of rows) {
+            const id = row.id ?? row.idUnik ?? row.studentsId ?? row.teachersId ?? row.classId;
+            if (id == null) continue;
+            const existing = await target.get(id);
+            if (!existing) await target.put({ ...row, id });
+          }
+        } catch (error) {
+          // Migration failure must abort the version upgrade. V14 must never remove a
+          // legacy store when its data was not copied successfully.
+          console.error('[Dexie V13] Legacy store migration failed:', legacyName, error);
+          throw error;
+        }
+      }
+    });
+
+    // V14: remove duplicate legacy stores after V13 has copied their data.
+    const canonicalSchema = { ...schema };
+    for (const legacyName of ["pengguna","gtk","siswa","academicYears","tahun_pelajaran","semester","daftar_kelas","kelas","mata_pelajaran","ruang","jadwal","absensi_siswa","absensi_guru","jurnal","kategori_poin","pointCategories","poin","notification","audit_log"]) delete canonicalSchema[legacyName as keyof typeof canonicalSchema];
+    this.version(14).stores(canonicalSchema);
+
+    // V15: enforce the canonical academic relation indexes used by offline repositories.
+    this.version(15).stores(canonicalSchema).upgrade(async (tx) => {
+      const students = tx.table('students');
+      const classes = tx.table('classes');
+      const schedules = tx.table('schedules');
+      const attendance = tx.table('attendance');
+
+      // Backfill FK fields only when the referenced canonical parent is already local.
+      const classRows = await classes.toArray();
+      const studentRows = await students.toArray();
+      const classById = new Map(classRows.map((row: any) => [String(row.id), row]));
+      const classByBusinessKey = new Map(
+        classRows.flatMap((row: any) => [
+          row.classId ? [String(row.classId), row] : [],
+          row.name ? [String(row.name), row] : [],
+        ]),
+      );
+      const studentByBusinessKey = new Map(
+        studentRows.flatMap((row: any) => [
+          row.idUnik ? [String(row.idUnik), row] : [],
+          row.studentsId ? [String(row.studentsId), row] : [],
+        ]),
+      );
+
+      await students.toCollection().modify((row: any) => {
+        if (!row.academicYearId && row.classId) {
+          row.academicYearId = classById.get(String(row.classId))?.academicYearId;
+        }
+      });
+      await schedules.toCollection().modify((row: any) => {
+        if (!row.academicYearId && row.classId) {
+          row.academicYearId =
+            classById.get(String(row.classId))?.academicYearId ??
+            classByBusinessKey.get(String(row.classId))?.academicYearId;
+        }
+      });
+      await attendance.toCollection().modify((row: any) => {
+        if (!row.studentId && row.studentsId) {
+          row.studentId = studentByBusinessKey.get(String(row.studentsId))?.id;
+        }
+        if (!row.classId && row.class) {
+          row.classId =
+            classById.get(String(row.class))?.id ??
+            classByBusinessKey.get(String(row.class))?.id;
+        }
+      });
     });
   }
 }

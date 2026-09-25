@@ -122,9 +122,9 @@ entityRegistry.register({
   label: 'Siswa',
   dexieTable: 'students',
   firestoreCollection: 'students',
-  primaryKey: 'idUnik',
+  primaryKey: 'id',
   businessKey: 'idUnik',
-  indexes: ['idUnik', 'tenantId', 'id', 'studentsId'],
+  indexes: ['id', 'idUnik', 'tenantId', 'studentsId', 'classId', 'academicYearId', '[tenantId+classId]', '[tenantId+academicYearId]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -175,9 +175,9 @@ entityRegistry.register({
   label: 'Guru & Staf',
   dexieTable: 'teachers',
   firestoreCollection: 'teachers',
-  primaryKey: 'idUnik',
+  primaryKey: 'id',
   businessKey: 'idUnik',
-  indexes: ['idUnik', 'tenantId', 'id', 'teachersId', 'nip', 'nik'],
+  indexes: ['id', 'idUnik', 'tenantId', 'teachersId', 'nip', 'nik'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -246,7 +246,7 @@ entityRegistry.register({
   dexieTable: 'classes',
   firestoreCollection: 'classes',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'classId', 'name'],
+  indexes: ['id', 'tenantId', 'classId', 'name', 'academicYearId', '[tenantId+academicYearId]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -276,7 +276,7 @@ entityRegistry.register({
   dexieTable: 'academic_years',
   firestoreCollection: 'academic_years',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'name', 'isActive'],
+  indexes: ['id', 'tenantId', 'name', 'isActive', '[tenantId+isActive]'],
   tenantScoped: true,
   syncEnabled: true,
   columns: [
@@ -477,7 +477,7 @@ entityRegistry.register({
   dexieTable: 'semesters',
   firestoreCollection: 'semesters',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'academicYearId', 'isActive', '[tenantId+isActive]'],
+  indexes: ['id', 'tenantId', 'academicYearId', 'isActive', '[tenantId+academicYearId]', '[tenantId+isActive]'],
   tenantScoped: true,
   syncEnabled: true,
 });
@@ -532,7 +532,7 @@ entityRegistry.register({
   dexieTable: 'schedules',
   firestoreCollection: 'schedules',
   primaryKey: 'id',
-  indexes: ['id', 'tenantId', 'classId', 'dayId', 'timeSlotId', 'academicYearId', '[tenantId+classId]', '[tenantId+dayId]'],
+  indexes: ['id', 'tenantId', 'academicYearId', 'semesterId', 'classId', 'dayId', 'timeSlotId', 'subjectId', 'teacherAssignmentId', 'roomId', '[tenantId+academicYearId]', '[tenantId+semesterId]', '[tenantId+classId]', '[tenantId+classId+semesterId]'],
   tenantScoped: true,
   syncEnabled: true,
 });

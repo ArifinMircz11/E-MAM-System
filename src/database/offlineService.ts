@@ -13,7 +13,7 @@ export const OfflineService = {
       localDb.students.clear(),
       localDb.teachers.clear(),
       localDb.classes.clear(),
-      localDb.pointCategories.clear(),
+      localDb.point_categories.clear(),
       localDb.attendance.clear(),
       localDb.cache.clear(),
       localDb.systemSettings.clear(),
